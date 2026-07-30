@@ -53,7 +53,7 @@ class LexiDeskWindow(QMainWindow):
         self.setWindowTitle("LexiDesk")
         self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setMinimumSize(330, 310)
+        self.setMinimumSize(330, 290)
         self.resize(self.settings.width, self.settings.height)
         if self.settings.x is not None and self.settings.y is not None:
             self.move(self.settings.x, self.settings.y)
@@ -75,22 +75,18 @@ class LexiDeskWindow(QMainWindow):
         self.setCentralWidget(root)
 
         self.title_label = QLabel("LEXIDESK")
-        self.title_label.setObjectName("muted")
+        self.title_label.setObjectName("brand")
 
         self.direction_label = QLabel("OFFLINE")
-        self.direction_label.setObjectName("metadata")
+        self.direction_label.setObjectName("badge")
         self.goal_label = QLabel()
-        self.goal_label.setObjectName("metadata")
+        self.goal_label.setObjectName("muted")
+        self.goal_label.setToolTip("Reviews completed today")
 
         add_button = QPushButton("+")
         add_button.setObjectName("icon")
         add_button.setToolTip("Add a word or phrase")
         add_button.clicked.connect(self.add_word)
-
-        settings_button = QPushButton("⚙")
-        settings_button.setObjectName("icon")
-        settings_button.setToolTip("Settings")
-        settings_button.clicked.connect(self.open_settings)
 
         more_button = QPushButton("⋮")
         more_button.setObjectName("icon")
@@ -107,6 +103,9 @@ class LexiDeskWindow(QMainWindow):
         batch_action.triggered.connect(self.batch_add)
         analytics_action = card_menu.addAction("Learning analytics")
         analytics_action.triggered.connect(self.open_analytics)
+        card_menu.addSeparator()
+        settings_action = card_menu.addAction("Settings")
+        settings_action.triggered.connect(self.open_settings)
         more_button.setMenu(card_menu)
 
         close_button = QPushButton("×")
@@ -120,7 +119,6 @@ class LexiDeskWindow(QMainWindow):
         header.addWidget(self.goal_label)
         header.addWidget(self.direction_label)
         header.addWidget(add_button)
-        header.addWidget(settings_button)
         header.addWidget(more_button)
         header.addWidget(close_button)
 
@@ -171,9 +169,11 @@ class LexiDeskWindow(QMainWindow):
         self.example_label.setObjectName("metadata")
         self.example_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.example_label.setWordWrap(True)
+        self.example_label.setMaximumHeight(34)
 
         card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(18, 14, 18, 14)
+        card_layout.setContentsMargins(18, 12, 18, 12)
+        card_layout.setSpacing(4)
         card_layout.addStretch()
         card_layout.addWidget(self.word_label)
         card_layout.addWidget(self.translation_label)
@@ -191,6 +191,7 @@ class LexiDeskWindow(QMainWindow):
         self.again_button.clicked.connect(lambda: self.review("again"))
 
         self.hard_button = QPushButton("Hard")
+        self.hard_button.setObjectName("hard")
         self.hard_button.setToolTip("Remembered with serious difficulty (2)")
         self.hard_button.setShortcut("2")
         self.hard_button.clicked.connect(lambda: self.review("hard"))
@@ -202,6 +203,7 @@ class LexiDeskWindow(QMainWindow):
         self.good_button.clicked.connect(lambda: self.review("good"))
 
         self.easy_button = QPushButton("Easy")
+        self.easy_button.setObjectName("easy")
         self.easy_button.setToolTip("Remembered immediately (4)")
         self.easy_button.setShortcut("4")
         self.easy_button.clicked.connect(lambda: self.review("easy"))
@@ -212,13 +214,17 @@ class LexiDeskWindow(QMainWindow):
             self.good_button,
             self.easy_button,
         )
+        for button in self.rating_buttons:
+            button.setProperty("role", "rating")
 
         undo_button = QPushButton("Undo")
+        undo_button.setObjectName("secondary")
         undo_button.setToolTip("Undo the most recent review")
         undo_button.setShortcut("Ctrl+Z")
         undo_button.clicked.connect(self.undo_review)
 
         next_button = QPushButton("Next")
+        next_button.setObjectName("secondary")
         next_button.setShortcut("N")
         next_button.clicked.connect(self.next_card)
 
@@ -226,13 +232,14 @@ class LexiDeskWindow(QMainWindow):
         self.countdown_label.setObjectName("countdown")
 
         footer = QGridLayout()
-        footer.setHorizontalSpacing(8)
-        footer.setVerticalSpacing(8)
+        footer.setHorizontalSpacing(6)
+        footer.setVerticalSpacing(3)
         for column, button in enumerate(self.rating_buttons):
             footer.addWidget(button, 0, column)
         footer.addWidget(next_button, 1, 0)
         footer.addWidget(undo_button, 1, 1)
-        footer.setColumnStretch(2, 1)
+        for column in range(4):
+            footer.setColumnStretch(column, 1)
         footer.addWidget(
             self.countdown_label,
             1,
@@ -241,7 +248,8 @@ class LexiDeskWindow(QMainWindow):
         )
 
         layout = QVBoxLayout(root)
-        layout.setContentsMargins(12, 10, 12, 12)
+        layout.setContentsMargins(10, 8, 10, 9)
+        layout.setSpacing(7)
         layout.addLayout(header)
         layout.addWidget(card, 1)
         layout.addLayout(footer)
@@ -265,8 +273,8 @@ class LexiDeskWindow(QMainWindow):
         stats = self.repository.statistics()
         reviews_today = int(stats["reviews_today"])
         self.goal_label.setText(
-            f"{min(reviews_today, self.settings.daily_goal)}/"
-            f"{self.settings.daily_goal} TODAY"
+            f"{min(reviews_today, self.settings.daily_goal)} / "
+            f"{self.settings.daily_goal}"
         )
         self.answer_edit.clear()
         self.answer_edit.setEnabled(True)
@@ -302,7 +310,7 @@ class LexiDeskWindow(QMainWindow):
         example_parts = [
             part for part in (word.example, word.example_translation) if part
         ]
-        self.example_label.setText("\n".join(example_parts))
+        self.example_label.setText("  ·  ".join(example_parts))
         if self.settings.reveal_mode == "quiz":
             self.translation_label.hide()
             self.alternatives_label.hide()

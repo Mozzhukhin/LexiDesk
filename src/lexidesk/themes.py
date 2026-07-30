@@ -8,6 +8,7 @@ THEMES: dict[str, dict[str, str]] = {
         "muted": "#aeb6c1",
         "accent": "#3daee9",
         "danger": "#e06c75",
+        "warning": "#d6a85f",
         "success": "#78c091",
         "border": "#3b4450",
     },
@@ -18,6 +19,7 @@ THEMES: dict[str, dict[str, str]] = {
         "muted": "#6c737a",
         "accent": "#1d99f3",
         "danger": "#c0394a",
+        "warning": "#a66b16",
         "success": "#2d8a57",
         "border": "#c9cdd1",
     },
@@ -28,6 +30,7 @@ THEMES: dict[str, dict[str, str]] = {
         "muted": "#a0a0a0",
         "accent": "#00b7ff",
         "danger": "#ff5570",
+        "warning": "#ffc266",
         "success": "#50e38a",
         "border": "#2a2a2a",
     },
@@ -38,6 +41,7 @@ THEMES: dict[str, dict[str, str]] = {
         "muted": "#a9bcae",
         "accent": "#8bc34a",
         "danger": "#ef7a76",
+        "warning": "#d6b15f",
         "success": "#82d49d",
         "border": "#3a5142",
     },
@@ -48,6 +52,7 @@ THEMES: dict[str, dict[str, str]] = {
         "muted": "#bdb0cf",
         "accent": "#b388ff",
         "danger": "#ff7597",
+        "warning": "#e4b76f",
         "success": "#7ee0b8",
         "border": "#493b60",
     },
@@ -58,8 +63,8 @@ def stylesheet(name: str, scale: int = 100) -> str:
     colors = THEMES.get(name, THEMES["Breeze Dark"])
     factor = max(80, min(scale, 150)) / 100
     body = round(13 * factor)
-    word = round(28 * factor)
-    translation = round(20 * factor)
+    word = round(26 * factor)
+    translation = round(19 * factor)
     return f"""
         QWidget {{
             color: {colors["text"]};
@@ -69,12 +74,12 @@ def stylesheet(name: str, scale: int = 100) -> str:
         QWidget#root {{
             background: {colors["window"]};
             border: 1px solid {colors["border"]};
-            border-radius: 18px;
+            border-radius: 16px;
         }}
         QFrame#card {{
             background: {colors["surface"]};
             border: 1px solid {colors["border"]};
-            border-radius: 14px;
+            border-radius: 13px;
         }}
         QLabel#word {{
             font-size: {word}px;
@@ -88,14 +93,39 @@ def stylesheet(name: str, scale: int = 100) -> str:
         QLabel#muted, QLabel#metadata, QLabel#countdown {{
             color: {colors["muted"]};
         }}
+        QLabel#brand {{
+            font-size: {round(11 * factor)}px;
+            font-weight: 800;
+            letter-spacing: 1px;
+        }}
+        QLabel#badge {{
+            color: {colors["muted"]};
+            background: {colors["surface"]};
+            border: 1px solid {colors["border"]};
+            border-radius: 8px;
+            padding: 2px 7px;
+            font-size: {round(10 * factor)}px;
+            font-weight: 600;
+        }}
         QPushButton {{
             background: {colors["surface"]};
             border: 1px solid {colors["border"]};
-            border-radius: 9px;
-            padding: 8px 12px;
+            border-radius: 8px;
+            padding: 6px 10px;
         }}
         QPushButton:hover {{
             border-color: {colors["accent"]};
+            background: {colors["window"]};
+        }}
+        QPushButton:pressed {{
+            background: {colors["border"]};
+        }}
+        QPushButton:disabled {{
+            color: {colors["muted"]};
+            border-color: transparent;
+        }}
+        QPushButton[role="rating"] {{
+            min-height: 24px;
         }}
         QPushButton#know {{
             color: {colors["success"]};
@@ -105,11 +135,35 @@ def stylesheet(name: str, scale: int = 100) -> str:
             color: {colors["danger"]};
             font-weight: 700;
         }}
+        QPushButton#hard {{
+            color: {colors["warning"]};
+            font-weight: 600;
+        }}
+        QPushButton#easy {{
+            color: {colors["accent"]};
+            font-weight: 600;
+        }}
+        QPushButton#secondary {{
+            color: {colors["muted"]};
+            background: transparent;
+            border-color: transparent;
+            padding: 4px 7px;
+        }}
+        QPushButton#secondary:hover {{
+            color: {colors["text"]};
+            background: {colors["surface"]};
+            border-color: {colors["border"]};
+        }}
         QPushButton#icon {{
             border: none;
             background: transparent;
-            padding: 5px;
-            min-width: 25px;
+            padding: 3px;
+            min-width: 23px;
+            min-height: 23px;
+        }}
+        QPushButton#icon:hover {{
+            background: {colors["surface"]};
+            border-radius: 7px;
         }}
         QLineEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox {{
             background: {colors["surface"]};

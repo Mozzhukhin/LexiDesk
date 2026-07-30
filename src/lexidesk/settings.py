@@ -14,7 +14,7 @@ class Settings:
     x: int | None = None
     y: int | None = None
     width: int = 390
-    height: int = 330
+    height: int = 310
     reveal_mode: str = "both"
     daily_goal: int = 20
     desired_retention: float = 0.9
@@ -48,7 +48,7 @@ class SettingsStore:
                 x=_optional_int(raw.get("x")),
                 y=_optional_int(raw.get("y")),
                 width=_bounded_int(raw.get("width"), defaults.width, 330, 2400),
-                height=_bounded_int(raw.get("height"), defaults.height, 310, 1600),
+                height=_bounded_int(raw.get("height"), defaults.height, 290, 1600),
                 reveal_mode=(
                     raw["reveal_mode"]
                     if raw.get("reveal_mode") in {"both", "quiz", "typing"}

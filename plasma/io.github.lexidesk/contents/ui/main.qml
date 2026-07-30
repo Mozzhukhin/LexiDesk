@@ -229,11 +229,11 @@ PlasmoidItem {
 
     fullRepresentation: Rectangle {
         id: card
-        implicitWidth: 430
-        implicitHeight: 340
-        Layout.minimumWidth: 350
-        Layout.minimumHeight: 280
-        radius: 18
+        implicitWidth: 390
+        implicitHeight: 300
+        Layout.minimumWidth: 330
+        Layout.minimumHeight: 260
+        radius: 16
         color: {
             switch (plasmoid.configuration.colorTheme) {
             case "oled": return "#080808"
@@ -247,8 +247,8 @@ PlasmoidItem {
 
         ColumnLayout {
             anchors.fill: parent
-            anchors.margins: 14
-            spacing: 9
+            anchors.margins: 10
+            spacing: 6
 
             RowLayout {
                 Layout.fillWidth: true
@@ -256,8 +256,9 @@ PlasmoidItem {
                 PlasmaComponents.Label {
                     text: "LEXIDESK"
                     opacity: 0.65
-                    font.pixelSize: 11
+                    font.pixelSize: 10
                     font.bold: true
+                    font.letterSpacing: 1
                 }
 
                 Item { Layout.fillWidth: true }
@@ -265,14 +266,14 @@ PlasmoidItem {
                 PlasmaComponents.Label {
                     text: Math.min(reviewsToday, plasmoid.configuration.dailyGoal)
                         + "/" + plasmoid.configuration.dailyGoal
-                    opacity: 0.65
+                    opacity: 0.55
                     font.pixelSize: 10
                 }
 
                 PlasmaComponents.Label {
                     text: directionText
-                    opacity: 0.65
-                    font.pixelSize: 11
+                    opacity: 0.55
+                    font.pixelSize: 10
                 }
 
                 PlasmaComponents.ToolButton {
@@ -283,14 +284,6 @@ PlasmoidItem {
                 }
 
                 PlasmaComponents.ToolButton {
-                    icon.name: "document-edit"
-                    text: i18n("Edit card")
-                    display: PlasmaComponents.AbstractButton.IconOnly
-                    enabled: cardId > 0
-                    onClicked: launchGui("--edit " + cardId, "library")
-                }
-
-                PlasmaComponents.ToolButton {
                     icon.name: "view-list-details"
                     text: i18n("Open library")
                     display: PlasmaComponents.AbstractButton.IconOnly
@@ -298,14 +291,20 @@ PlasmoidItem {
                 }
             }
 
-            Item {
+            Rectangle {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                Layout.minimumHeight: 125
+                radius: 13
+                color: Qt.alpha(Kirigami.Theme.textColor, 0.035)
+                border.width: 1
+                border.color: Qt.alpha(Kirigami.Theme.textColor, 0.1)
 
                 ColumnLayout {
-                    anchors.centerIn: parent
-                    width: parent.width
-                    spacing: 7
+                    anchors.fill: parent
+                    anchors.margins: 12
+                    spacing: 4
+                    Item { Layout.fillHeight: true }
 
                     PlasmaComponents.Label {
                         Layout.fillWidth: true
@@ -314,7 +313,7 @@ PlasmoidItem {
                             ? i18n("Loading vocabulary…")
                             : (empty ? i18n("Your vocabulary is empty") : sourceText)
                         wrapMode: Text.Wrap
-                        font.pixelSize: empty ? 19 : 28
+                        font.pixelSize: empty ? 18 : 26
                         font.bold: true
                     }
 
@@ -329,7 +328,7 @@ PlasmoidItem {
                         visible: loaded && (empty || revealed)
                         wrapMode: Text.Wrap
                         color: Kirigami.Theme.highlightColor
-                        font.pixelSize: 20
+                        font.pixelSize: 19
                         font.bold: !empty
                         opacity: visible ? 1 : 0
                         Behavior on opacity {
@@ -395,6 +394,8 @@ PlasmoidItem {
                         wrapMode: Text.Wrap
                         opacity: 0.85
                         font.italic: true
+                        maximumLineCount: 2
+                        elide: Text.ElideRight
                     }
 
                     PlasmaComponents.Label {
@@ -405,7 +406,11 @@ PlasmoidItem {
                         wrapMode: Text.Wrap
                         opacity: 0.62
                         font.pixelSize: 12
+                        maximumLineCount: 1
+                        elide: Text.ElideRight
                     }
+
+                    Item { Layout.fillHeight: true }
                 }
             }
 
@@ -434,14 +439,14 @@ PlasmoidItem {
 
             GridLayout {
                 Layout.fillWidth: true
-                columns: card.width < 440 ? 2 : 4
-                columnSpacing: 5
-                rowSpacing: 5
+                columns: 4
+                columnSpacing: 6
+                rowSpacing: 0
 
                 PlasmaComponents.Button {
                     Layout.fillWidth: true
+                    implicitHeight: 34
                     text: i18n("Again")
-                    icon.name: "answer-wrong"
                     enabled: loaded && !empty && !busy && revealed
                     highlighted: suggestedRating === "again"
                     onClicked: review("again")
@@ -449,6 +454,7 @@ PlasmoidItem {
 
                 PlasmaComponents.Button {
                     Layout.fillWidth: true
+                    implicitHeight: 34
                     text: i18n("Hard")
                     enabled: loaded && !empty && !busy && revealed
                     highlighted: suggestedRating === "hard"
@@ -457,8 +463,8 @@ PlasmoidItem {
 
                 PlasmaComponents.Button {
                     Layout.fillWidth: true
+                    implicitHeight: 34
                     text: i18n("Good")
-                    icon.name: "answer-correct"
                     enabled: loaded && !empty && !busy && revealed
                     highlighted: suggestedRating === "good"
                     onClicked: review("good")
@@ -466,6 +472,7 @@ PlasmoidItem {
 
                 PlasmaComponents.Button {
                     Layout.fillWidth: true
+                    implicitHeight: 34
                     text: i18n("Easy")
                     enabled: loaded && !empty && !busy && revealed
                     highlighted: suggestedRating === "easy"
@@ -477,19 +484,23 @@ PlasmoidItem {
                 Layout.fillWidth: true
 
                 PlasmaComponents.ToolButton {
-                    icon.name: "edit-undo"
-                    text: i18n("Undo last review")
-                    display: PlasmaComponents.AbstractButton.IconOnly
-                    enabled: !busy
-                    onClicked: undoReview()
-                }
-
-                PlasmaComponents.ToolButton {
                     icon.name: "go-next"
                     text: i18n("Next")
                     display: PlasmaComponents.AbstractButton.IconOnly
                     enabled: loaded && !busy
                     onClicked: loadNext()
+                    PlasmaComponents.ToolTip.text: text
+                    PlasmaComponents.ToolTip.visible: hovered
+                }
+
+                PlasmaComponents.ToolButton {
+                    icon.name: "edit-undo"
+                    text: i18n("Undo last review")
+                    display: PlasmaComponents.AbstractButton.IconOnly
+                    enabled: !busy
+                    onClicked: undoReview()
+                    PlasmaComponents.ToolTip.text: text
+                    PlasmaComponents.ToolTip.visible: hovered
                 }
 
                 Item { Layout.fillWidth: true }
