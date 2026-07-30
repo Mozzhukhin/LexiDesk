@@ -397,13 +397,45 @@ PlasmoidItem {
 
                             delegate: PlasmaComponents.Button {
                                 required property string modelData
+                                readonly property bool correctOption:
+                                    text === root.translationText
+                                readonly property bool selectedOption:
+                                    text === root.selectedChoice
 
                                 Layout.fillWidth: true
                                 implicitHeight: 32
                                 text: modelData
                                 enabled: !busy && !root.choiceAnswered
-                                highlighted: root.choiceAnswered
-                                    && text === root.translationText
+                                background: Rectangle {
+                                    radius: 7
+                                    color: {
+                                        if (root.choiceAnswered
+                                                && parent.correctOption)
+                                            return Qt.alpha(
+                                                Kirigami.Theme.positiveTextColor,
+                                                0.28)
+                                        if (root.choiceAnswered
+                                                && parent.selectedOption)
+                                            return Qt.alpha(
+                                                Kirigami.Theme.negativeTextColor,
+                                                0.28)
+                                        return Qt.alpha(
+                                            Kirigami.Theme.textColor, 0.055)
+                                    }
+                                    border.width: root.choiceAnswered
+                                        && (parent.correctOption
+                                            || parent.selectedOption) ? 2 : 1
+                                    border.color: {
+                                        if (root.choiceAnswered
+                                                && parent.correctOption)
+                                            return Kirigami.Theme.positiveTextColor
+                                        if (root.choiceAnswered
+                                                && parent.selectedOption)
+                                            return Kirigami.Theme.negativeTextColor
+                                        return Qt.alpha(
+                                            Kirigami.Theme.textColor, 0.18)
+                                    }
+                                }
                                 onClicked: root.chooseAnswer(text)
                             }
                         }

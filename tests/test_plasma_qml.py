@@ -36,5 +36,9 @@ def test_widget_uses_simple_reviews_and_four_choice_quizzes() -> None:
     assert 'review("know")' in qml
     assert "choiceOptions.length === 4" in qml
     assert "cardsSeen % 3 === 0" in qml
+    assert "parent.correctOption" in qml
+    assert "parent.selectedOption" in qml
+    assert "Kirigami.Theme.positiveTextColor" in qml
+    assert "Kirigami.Theme.negativeTextColor" in qml
     assert 'text: i18n("Hard")' not in qml
     assert 'text: i18n("Easy")' not in qml
