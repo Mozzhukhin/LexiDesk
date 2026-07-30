@@ -113,8 +113,10 @@ def card_payload(
     dictionary: OfflineDictionary | None = None,
 ) -> dict[str, Any]:
     payload = word_payload(word, repository)
-    quiz = quiz_payload(word, repository, dictionary) if word is not None else {}
+    variants = quiz_variants(word, repository, dictionary) if word is not None else {}
+    quiz = random.choice(list(variants.values())) if variants else {}
     payload["quiz"] = quiz
+    payload["quizzes"] = variants
     payload["choices"] = quiz.get("choices", [])
     payload["quiz_probability"] = (
         quiz_probability(word, repository) if word is not None else 0
@@ -142,16 +144,55 @@ def quiz_payload(
     repository: WordRepository,
     dictionary: OfflineDictionary | None = None,
 ) -> dict[str, Any]:
+    variants = quiz_variants(word, repository, dictionary)
+    return random.choice(list(variants.values())) if variants else {}
+
+
+def quiz_variants(
+    word: Word,
+    repository: WordRepository,
+    dictionary: OfflineDictionary | None = None,
+) -> dict[str, dict[str, Any]]:
     candidates = _ranked_candidates(word, repository)
     translation_choices = quiz_choices(word, repository, dictionary)
     reverse_choices = _distinct_choices(
         word.source_text,
         [candidate.source_text for candidate in candidates],
     )
-    kinds = ["translation", "reverse", "typing"]
+    variants: dict[str, dict[str, Any]] = {
+        "typing": {
+            "type": "typing",
+            "prompt": word.source_text,
+            "answer": word.target_text,
+            "choices": [],
+            "instruction": "Type the translation",
+        }
+    }
+    if len(translation_choices) == 4:
+        variants["translation"] = {
+            "type": "translation",
+            "prompt": word.source_text,
+            "answer": word.target_text,
+            "choices": translation_choices,
+            "instruction": "Choose the translation",
+        }
+    if len(reverse_choices) == 4:
+        variants["reverse"] = {
+            "type": "reverse",
+            "prompt": word.target_text,
+            "answer": word.source_text,
+            "choices": reverse_choices,
+            "instruction": "Choose the English word",
+        }
     cloze = _cloze_sentence(word)
     if cloze and len(reverse_choices) == 4:
-        kinds.append("cloze")
+        variants["cloze"] = {
+            "type": "cloze",
+            "prompt": cloze,
+            "answer": word.source_text,
+            "choices": reverse_choices,
+            "instruction": "Complete the sentence",
+        }
     category = word.part_of_speech.split(",", 1)[0].strip().casefold()
     same_category = [
         candidate
@@ -168,47 +209,14 @@ def quiz_payload(
         ],
     )
     if correct_context and len(context_choices) == 4:
-        kinds.append("context")
-    kind = random.choice(kinds)
-    if kind == "reverse":
-        return {
-            "type": kind,
-            "prompt": word.target_text,
-            "answer": word.source_text,
-            "choices": reverse_choices,
-            "instruction": "Choose the English word",
-        }
-    if kind == "cloze":
-        return {
-            "type": kind,
-            "prompt": cloze,
-            "answer": word.source_text,
-            "choices": reverse_choices,
-            "instruction": "Complete the sentence",
-        }
-    if kind == "context":
-        return {
-            "type": kind,
+        variants["context"] = {
+            "type": "context",
             "prompt": f"Where does “{word.source_text}” fit best?",
             "answer": correct_context,
             "choices": context_choices,
             "instruction": "Choose the matching context",
         }
-    if kind == "typing":
-        return {
-            "type": kind,
-            "prompt": word.source_text,
-            "answer": word.target_text,
-            "choices": [],
-            "instruction": "Type the translation",
-        }
-    return {
-        "type": "translation",
-        "prompt": word.source_text,
-        "answer": word.target_text,
-        "choices": translation_choices,
-        "instruction": "Choose the translation",
-    }
+    return variants
 
 
 def quiz_choices(

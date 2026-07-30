@@ -35,9 +35,11 @@ def test_widget_uses_simple_reviews_and_four_choice_quizzes() -> None:
     assert 'text: i18n("Next")' in qml
     assert 'quizRating = "dont-know"' in qml
     assert 'quizRating = "know"' in qml
-    assert "choiceOptions.length === 4" in qml
-    assert "cardsSinceQuiz >= 4" in qml
-    assert "Math.random() < quizProbability" in qml
+    assert "choiceOptions = quiz.choices || []" in qml
+    assert "choiceMode = false" in qml
+    assert "id: quizMenu" in qml
+    assert 'root.startQuiz("typing")' in qml
+    assert "Math.random() < quizProbability" not in qml
     assert 'quizType === "typing"' in qml
     assert 'quizType === "context"' in qml
     assert "parent.correctOption" in qml

@@ -4,6 +4,7 @@ import QtCore
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.core as PlasmaCore
+import org.kde.plasma.extras as PlasmaExtras
 import org.kde.plasma.plasmoid
 
 PlasmoidItem {
@@ -39,9 +40,7 @@ PlasmoidItem {
     property string quizPrompt: ""
     property string quizAnswer: ""
     property string quizInstruction: ""
-    property real quizProbability: 0.4
-    property int cardsSeen: 0
-    property int cardsSinceQuiz: 0
+    property var quizVariants: ({})
     property int cardRevision: 0
     property string pendingKind: ""
     property string bridgePath: findExecutable(
@@ -144,6 +143,28 @@ PlasmoidItem {
         choiceAdvanceTimer.restart()
     }
 
+    function startQuiz(kind) {
+        var quiz = quizVariants[kind]
+        if (!quiz || busy || empty)
+            return
+        quizType = quiz.type || kind
+        quizPrompt = quiz.prompt || sourceText
+        quizAnswer = quiz.answer || translationText
+        quizInstruction = quiz.instruction || ""
+        choiceOptions = quiz.choices || []
+        choiceMode = true
+        choiceAnswered = false
+        selectedChoice = ""
+        quizRating = ""
+        answerChecked = false
+        answerFeedback = ""
+        suggestedRating = ""
+        typedAnswer = ""
+        revealed = false
+        choiceAdvanceTimer.stop()
+        cardRevision++
+    }
+
     function undoReview() {
         runBridge("undo", "undo")
     }
@@ -180,22 +201,14 @@ PlasmoidItem {
         retrievability = card.retrievability === null
             || card.retrievability === undefined
             ? -1 : Number(card.retrievability)
+        quizVariants = card.quizzes || {}
         var quiz = card.quiz || {}
         quizType = quiz.type || ""
         quizPrompt = quiz.prompt || sourceText
         quizAnswer = quiz.answer || translationText
         quizInstruction = quiz.instruction || ""
-        quizProbability = Number(card.quiz_probability || 0.4)
         choiceOptions = quiz.choices || card.choices || []
-        cardsSeen++
-        cardsSinceQuiz++
-        var quizAvailable = quizType === "typing"
-            || choiceOptions.length === 4
-        choiceMode = !empty && cardsSeen > 1 && quizAvailable
-            && (cardsSinceQuiz >= 4
-                || (cardsSinceQuiz >= 2 && Math.random() < quizProbability))
-        if (choiceMode)
-            cardsSinceQuiz = 0
+        choiceMode = false
         revealed = !choiceMode
             && plasmoid.configuration.revealMode === "both"
         choiceAnswered = false
@@ -349,6 +362,49 @@ PlasmoidItem {
         border.width: 1
         border.color: Qt.alpha(Kirigami.Theme.textColor, 0.18)
 
+        PlasmaExtras.Menu {
+            id: quizMenu
+            visualParent: quizMenuButton
+            placement: PlasmaExtras.Menu.BottomPosedLeftAlignedPopup
+
+            PlasmaExtras.MenuItem {
+                text: i18n("Choose translation")
+                enabled: Boolean(root.quizVariants.translation)
+                onClicked: root.startQuiz("translation")
+            }
+            PlasmaExtras.MenuItem {
+                text: i18n("Reverse translation")
+                enabled: Boolean(root.quizVariants.reverse)
+                onClicked: root.startQuiz("reverse")
+            }
+            PlasmaExtras.MenuItem {
+                text: i18n("Complete the sentence")
+                enabled: Boolean(root.quizVariants.cloze)
+                onClicked: root.startQuiz("cloze")
+            }
+            PlasmaExtras.MenuItem {
+                text: i18n("Choose the context")
+                enabled: Boolean(root.quizVariants.context)
+                onClicked: root.startQuiz("context")
+            }
+            PlasmaExtras.MenuItem {
+                text: i18n("Type the translation")
+                enabled: Boolean(root.quizVariants.typing)
+                onClicked: root.startQuiz("typing")
+            }
+            PlasmaExtras.MenuItem {
+                text: i18n("Cancel quiz")
+                visible: root.choiceMode
+                onClicked: {
+                    root.choiceMode = false
+                    root.revealed = true
+                    root.answerChecked = false
+                    root.answerFeedback = ""
+                    root.choiceAdvanceTimer.stop()
+                }
+            }
+        }
+
         ColumnLayout {
             anchors.fill: parent
             anchors.margins: 10
@@ -378,6 +434,18 @@ PlasmoidItem {
                     text: directionText
                     opacity: 0.55
                     font.pixelSize: 10
+                }
+
+                PlasmaComponents.ToolButton {
+                    id: quizMenuButton
+                    icon.name: "applications-education-language"
+                    text: i18n("Practice")
+                    display: PlasmaComponents.AbstractButton.IconOnly
+                    enabled: loaded && !empty && !busy
+                    checked: quizMenu.status === PlasmaExtras.Menu.Open
+                    onPressed: quizMenu.openRelative()
+                    PlasmaComponents.ToolTip.text: i18n("Choose a quiz")
+                    PlasmaComponents.ToolTip.visible: hovered
                 }
 
                 PlasmaComponents.ToolButton {

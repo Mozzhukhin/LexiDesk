@@ -26,7 +26,7 @@ every 90 seconds by default.
 - Editable translations, meanings, transcription, forms, frequency, and sources
 - Three modes: always visible, click-to-reveal, and typed translation
 - Passive **Next** browsing that never changes learning statistics
-- Adaptive quizzes: translation, reverse, cloze, context, and typed answer
+- On-demand quiz menu: translation, reverse, cloze, context, and typed answer
 - Same-part-of-speech distractors weighted toward previously difficult cards
 - Soft card-change animations designed for an always-visible desktop widget
 - One-click undo for the most recent review
@@ -50,8 +50,8 @@ every 90 seconds by default.
 
 LexiDesk uses the official FSRS 6 implementation with 90% desired retention by
 default. Ordinary cards are passive: **Next** and automatic rotation only
-change the visible word. LexiDesk inserts a quiz adaptively after two to four
-cards, based on difficulty, recall probability, and earlier mistakes.
+change the visible word. Quizzes never interrupt normal browsing: the user
+starts a chosen training mode from the dedicated Practice menu.
 A correct choice records a successful review; a wrong choice records a failed
 review. Those quiz results produce individualized intervals instead of a fixed
 ladder. The desired retention can be adjusted between 70% and 99%.
@@ -71,9 +71,9 @@ restores the complete state before the most recent new-format review.
    and is limited to one compact sentence.
 3. **Next** requests another card without recording whether the word is known.
    The 90-second timer performs the same passive change automatically.
-4. After two to four displayed cards, LexiDesk chooses an adaptive quiz:
-   translation, reverse translation, sentence gap, matching context, or typing.
-   New and difficult cards are tested more often than stable cards.
+4. The Practice button opens a separate menu for translation, reverse
+   translation, sentence gap, matching context, or typing. A quiz starts only
+   after the user chooses one of these modes.
 5. A correct answer turns green. A wrong selected answer turns red while the
    correct answer turns green. The result remains visible for one second.
 6. The widget then records only that quiz result in FSRS and advances

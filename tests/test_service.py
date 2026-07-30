@@ -2,7 +2,7 @@ import json
 import sqlite3
 from pathlib import Path
 
-from lexidesk.api import quiz_choices, quiz_payload
+from lexidesk.api import quiz_choices, quiz_variants
 from lexidesk.database import WordRepository
 from lexidesk.dictionary import OfflineDictionary
 from lexidesk.service import LexiDeskService
@@ -72,9 +72,7 @@ def test_quiz_choices_use_deck_and_offline_dictionary(tmp_path: Path) -> None:
     repository.close()
 
 
-def test_quiz_payload_supports_reverse_cloze_and_context(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_quiz_payload_supports_reverse_cloze_and_context(tmp_path: Path) -> None:
     repository = WordRepository(tmp_path / "formats.db")
     records = [
         ("ambiguous", "двусмысленный", "An ambiguous answer has two meanings."),
@@ -94,9 +92,9 @@ def test_quiz_payload_supports_reverse_cloze_and_context(
     ]
     word = repository.get_word(ids[0])
 
+    variants = quiz_variants(word, repository)
     for kind in ("reverse", "cloze", "context"):
-        monkeypatch.setattr("lexidesk.api.random.choice", lambda values, k=kind: k)
-        payload = quiz_payload(word, repository)
+        payload = variants[kind]
         assert payload["type"] == kind
         assert payload["answer"]
         assert len(payload["choices"]) == 4
