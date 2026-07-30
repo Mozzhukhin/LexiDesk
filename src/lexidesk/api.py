@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import random
+import re
 from typing import Any
 
 from .answers import evaluate_answer
@@ -112,10 +113,91 @@ def card_payload(
     dictionary: OfflineDictionary | None = None,
 ) -> dict[str, Any]:
     payload = word_payload(word, repository)
-    payload["choices"] = (
-        quiz_choices(word, repository, dictionary) if word is not None else []
+    quiz = quiz_payload(word, repository, dictionary) if word is not None else {}
+    payload["quiz"] = quiz
+    payload["choices"] = quiz.get("choices", [])
+    payload["quiz_probability"] = (
+        quiz_probability(word, repository) if word is not None else 0
     )
     return payload
+
+
+def quiz_probability(word: Word, repository: WordRepository) -> float:
+    reviews = word.know_count + word.dont_know_count
+    if reviews == 0:
+        return 0.55
+    miss_rate = word.dont_know_count / reviews
+    if miss_rate >= 0.4:
+        return 0.8
+    recall = repository.card_retrievability(word)
+    if recall is not None and recall < 0.8:
+        return 0.7
+    if (word.stability or 0) >= 30:
+        return 0.2
+    return 0.42
+
+
+def quiz_payload(
+    word: Word,
+    repository: WordRepository,
+    dictionary: OfflineDictionary | None = None,
+) -> dict[str, Any]:
+    candidates = _ranked_candidates(word, repository)
+    translation_choices = quiz_choices(word, repository, dictionary)
+    reverse_choices = _distinct_choices(
+        word.source_text,
+        [candidate.source_text for candidate in candidates],
+    )
+    kinds = ["translation", "reverse", "typing"]
+    cloze = _cloze_sentence(word)
+    if cloze and len(reverse_choices) == 4:
+        kinds.append("cloze")
+    context_choices = _distinct_choices(
+        word.example,
+        [candidate.example for candidate in candidates if candidate.example],
+    )
+    if word.example and len(context_choices) == 4:
+        kinds.append("context")
+    kind = random.choice(kinds)
+    if kind == "reverse":
+        return {
+            "type": kind,
+            "prompt": word.target_text,
+            "answer": word.source_text,
+            "choices": reverse_choices,
+            "instruction": "Choose the English word",
+        }
+    if kind == "cloze":
+        return {
+            "type": kind,
+            "prompt": cloze,
+            "answer": word.source_text,
+            "choices": reverse_choices,
+            "instruction": "Complete the sentence",
+        }
+    if kind == "context":
+        return {
+            "type": kind,
+            "prompt": f"Which sentence uses “{word.source_text}” correctly?",
+            "answer": word.example,
+            "choices": context_choices,
+            "instruction": "Choose the matching context",
+        }
+    if kind == "typing":
+        return {
+            "type": kind,
+            "prompt": word.source_text,
+            "answer": word.target_text,
+            "choices": [],
+            "instruction": "Type the translation",
+        }
+    return {
+        "type": "translation",
+        "prompt": word.source_text,
+        "answer": word.target_text,
+        "choices": translation_choices,
+        "instruction": "Choose the translation",
+    }
 
 
 def quiz_choices(
@@ -127,7 +209,7 @@ def quiz_choices(
     seen = {normalize_headword(value) for value in excluded}
     distractors: list[str] = []
 
-    for candidate in repository.list_words():
+    for candidate in _ranked_candidates(word, repository):
         value = candidate.target_text.strip()
         key = normalize_headword(value)
         if (
@@ -136,16 +218,6 @@ def quiz_choices(
             and value
             and key not in seen
         ):
-            distractors.append(value)
-            seen.add(key)
-        if len(distractors) == 3:
-            break
-
-    common_candidates = list(COMMON_DISTRACTORS[word.source_lang])
-    random.shuffle(common_candidates)
-    for value in common_candidates:
-        key = normalize_headword(value)
-        if key not in seen:
             distractors.append(value)
             seen.add(key)
         if len(distractors) == 3:
@@ -161,11 +233,66 @@ def quiz_choices(
         )
         distractors.extend(additions)
 
+    common_candidates = list(COMMON_DISTRACTORS[word.source_lang])
+    random.shuffle(common_candidates)
+    for value in common_candidates:
+        key = normalize_headword(value)
+        if key not in seen:
+            distractors.append(value)
+            seen.add(key)
+        if len(distractors) == 3:
+            break
+
     if len(distractors) < 3:
         return []
     choices = [word.target_text, *distractors[:3]]
     random.shuffle(choices)
     return choices
+
+
+def _ranked_candidates(word: Word, repository: WordRepository) -> list[Word]:
+    category = word.part_of_speech.split(",", 1)[0].strip().casefold()
+    candidates = [
+        candidate
+        for candidate in repository.list_words()
+        if candidate.id != word.id and candidate.source_lang == word.source_lang
+    ]
+    candidates.sort(
+        key=lambda candidate: (
+            candidate.part_of_speech.split(",", 1)[0].strip().casefold() != category,
+            -candidate.dont_know_count,
+            abs((candidate.difficulty or 5) - (word.difficulty or 5)),
+        )
+    )
+    return candidates
+
+
+def _distinct_choices(answer: str, candidates: list[str]) -> list[str]:
+    if not answer:
+        return []
+    values = [answer]
+    seen = {normalize_headword(answer)}
+    for value in candidates:
+        key = normalize_headword(value)
+        if value and key not in seen:
+            values.append(value)
+            seen.add(key)
+        if len(values) == 4:
+            break
+    if len(values) < 4:
+        return []
+    random.shuffle(values)
+    return values
+
+
+def _cloze_sentence(word: Word) -> str:
+    if not word.example:
+        return ""
+    pattern = re.compile(
+        rf"(?<!\w){re.escape(word.source_text)}(?!\w)",
+        flags=re.IGNORECASE,
+    )
+    return pattern.sub("___", word.example, count=1)
 
 
 def execute_request(
@@ -190,6 +317,9 @@ def execute_request(
             word_id,
             str(request["rating"]),
             _optional_int(request.get("duration_ms")),
+            quiz_type=str(request.get("quiz_type", "")),
+            selected_answer=str(request.get("selected_answer", "")),
+            correct_answer=str(request.get("correct_answer", "")),
         )
         return card_payload(repository.next_word(word_id), repository)
     if command == "undo":
@@ -216,6 +346,8 @@ def execute_request(
                 word_payload(word, repository)
                 for word in repository.difficult_words(int(request.get("limit", 10)))
             ],
+            "quiz_breakdown": repository.quiz_breakdown(),
+            "confusions": repository.common_confusions(),
         }
     if command == "configure":
         retention = float(request.get("desired_retention", 0.9))

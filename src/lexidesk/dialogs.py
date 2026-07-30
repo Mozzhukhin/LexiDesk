@@ -99,6 +99,9 @@ class AddWordDialog(QDialog):
         self.spelling_widget = spelling_widget
         self.target_edit = QLineEdit()
         self.target_edit.setPlaceholderText("Translation (you can correct it)")
+        self.meaning_combo = QComboBox()
+        self.meaning_combo.setToolTip("Choose the meaning you want this card to teach")
+        self.meaning_combo.currentIndexChanged.connect(self._use_selected_meaning)
         self.alternatives_edit = QLineEdit()
         self.alternatives_edit.setPlaceholderText("Comma-separated, optional")
 
@@ -130,6 +133,7 @@ class AddWordDialog(QDialog):
         form.addRow("", direction_widget)
         form.addRow("Did you mean", spelling_widget)
         form.addRow("Primary translation", self.target_edit)
+        form.addRow("Meaning to learn", self.meaning_combo)
         form.addRow("Other meanings", self.alternatives_edit)
         form.addRow("Part of speech", self.part_of_speech)
         form.addRow("Transcription", self.transcription_edit)
@@ -168,6 +172,7 @@ class AddWordDialog(QDialog):
                 f"{'RU' if word.source_lang == 'en' else 'EN'}"
             )
             self.target_edit.setText(word.target_text)
+            self.meaning_combo.addItems([word.target_text, *word.alternatives])
             self.alternatives_edit.setText(", ".join(word.alternatives))
             self.part_of_speech.setCurrentText(word.part_of_speech)
             self.transcription_edit.setText(word.transcription)
@@ -214,6 +219,10 @@ class AddWordDialog(QDialog):
         self.spelling_widget.setVisible(bool(result.spelling_suggestions))
         self.target_edit.setText(result.translation)
         self.alternatives_edit.setText(", ".join(result.alternatives))
+        self.meaning_combo.blockSignals(True)
+        self.meaning_combo.clear()
+        self.meaning_combo.addItems([result.translation, *result.alternatives[:3]])
+        self.meaning_combo.blockSignals(False)
         if result.part_of_speech:
             self.part_of_speech.setCurrentText(result.part_of_speech)
         if result.source_language == "en" and not self.example_edit.text().strip():
@@ -249,6 +258,31 @@ class AddWordDialog(QDialog):
         self.direction_label.setText(direction)
         self.target_edit.setFocus()
         self.target_edit.selectAll()
+
+    def _use_selected_meaning(self, index: int) -> None:
+        selected = self.meaning_combo.itemText(index).strip()
+        if not selected:
+            return
+        meanings = [
+            self.meaning_combo.itemText(item).strip()
+            for item in range(self.meaning_combo.count())
+            if self.meaning_combo.itemText(item).strip()
+        ]
+        self.target_edit.setText(selected)
+        self.alternatives_edit.setText(
+            ", ".join(meaning for meaning in meanings if meaning != selected)
+        )
+        self.example_edit.clear()
+        self.example_translation_edit.clear()
+        with suppress(TranslationError):
+            if detect_language(self.source_edit.text().strip()) == "en":
+                self.example_edit.setText(
+                    self.translator.example_sentence(
+                        self.source_edit.text().strip(),
+                        "en",
+                        self.part_of_speech.currentText(),
+                    )
+                )
 
     def _translation_failed(self, message: str) -> None:
         QMessageBox.warning(self, "Translation unavailable", message)

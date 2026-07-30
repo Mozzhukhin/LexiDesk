@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import sqlite3
+from collections import Counter
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -26,6 +27,64 @@ from .service_client import schedule_example_enrichment
 from .translation import OfflineTranslator, TranslationError, detect_language
 
 WORD_RE = re.compile(r"[A-Za-zА-Яа-яЁё][A-Za-zА-Яа-яЁё'-]{2,}")
+STOPWORDS = {
+    "en": {
+        "the",
+        "and",
+        "that",
+        "this",
+        "with",
+        "from",
+        "have",
+        "were",
+        "been",
+        "they",
+        "their",
+        "about",
+        "would",
+        "there",
+        "which",
+        "when",
+        "what",
+        "your",
+        "into",
+        "than",
+        "then",
+        "also",
+        "just",
+        "does",
+        "for",
+        "are",
+    },
+    "ru": {
+        "это",
+        "как",
+        "что",
+        "для",
+        "или",
+        "его",
+        "она",
+        "они",
+        "был",
+        "была",
+        "были",
+        "при",
+        "также",
+        "только",
+        "когда",
+        "если",
+        "чтобы",
+        "который",
+        "которая",
+        "которые",
+        "этот",
+        "того",
+        "есть",
+        "уже",
+        "еще",
+        "ещё",
+    },
+}
 
 
 class BatchAddDialog(QDialog):
@@ -51,7 +110,7 @@ class BatchAddDialog(QDialog):
 
         self.mode = QComboBox()
         self.mode.addItem("One card per line", "lines")
-        self.mode.addItem("Extract words from text", "extract")
+        self.mode.addItem("Smart words from article", "extract")
 
         self.input = QPlainTextEdit()
         self.input.setPlaceholderText(
@@ -92,11 +151,32 @@ class BatchAddDialog(QDialog):
     def _sources(self) -> list[tuple[str, str]]:
         text = self.input.toPlainText()
         if self.mode.currentData() == "extract":
-            unique: dict[str, str] = {}
+            counts: Counter[tuple[str, str]] = Counter()
             for match in WORD_RE.finditer(text):
                 word = match.group(0)
-                unique.setdefault(word.casefold(), word)
-            return [(word, "") for word in list(unique.values())[:100]]
+                try:
+                    language = detect_language(word)
+                except TranslationError:
+                    continue
+                normalized = word.casefold()
+                if normalized in STOPWORDS[language]:
+                    continue
+                counts[(normalized, language)] += 1
+            existing = {
+                (word.source_text.casefold(), word.source_lang)
+                for word in self.repository.list_words()
+            }
+            ranked: list[tuple[int, str, str]] = []
+            for (normalized, language), count in counts.items():
+                if (normalized, language) in existing:
+                    continue
+                entry = self.translator.dictionary.lookup(normalized, language)
+                if entry is None or not entry.translations:
+                    continue
+                score = count * 10 + min(len(normalized), 12)
+                ranked.append((score, entry.headword, entry.translations[0]))
+            ranked.sort(key=lambda item: (-item[0], item[1].casefold()))
+            return [(source, target) for _, source, target in ranked[:50]]
 
         records: list[tuple[str, str]] = []
         for raw_line in text.splitlines():

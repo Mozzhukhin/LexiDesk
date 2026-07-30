@@ -2,7 +2,7 @@ import json
 import sqlite3
 from pathlib import Path
 
-from lexidesk.api import quiz_choices
+from lexidesk.api import quiz_choices, quiz_payload
 from lexidesk.database import WordRepository
 from lexidesk.dictionary import OfflineDictionary
 from lexidesk.service import LexiDeskService
@@ -69,4 +69,55 @@ def test_quiz_choices_use_deck_and_offline_dictionary(tmp_path: Path) -> None:
     assert len(set(choices)) == 4
     assert "предложение" in choices
     assert "разрушение" in choices
+    repository.close()
+
+
+def test_quiz_payload_supports_reverse_cloze_and_context(
+    tmp_path: Path, monkeypatch
+) -> None:
+    repository = WordRepository(tmp_path / "formats.db")
+    records = [
+        ("ambiguous", "двусмысленный", "An ambiguous answer has two meanings."),
+        ("reliable", "надёжный", "A reliable source checks every fact."),
+        ("plural", "множественный", "The word plural refers to several items."),
+        ("careful", "осторожный", "A careful person checks the details."),
+    ]
+    ids = [
+        repository.add_word(
+            source_text=source,
+            source_lang="en",
+            target_text=target,
+            part_of_speech="adjective",
+            example=example,
+        )
+        for source, target, example in records
+    ]
+    word = repository.get_word(ids[0])
+
+    for kind in ("reverse", "cloze", "context"):
+        monkeypatch.setattr("lexidesk.api.random.choice", lambda values, k=kind: k)
+        payload = quiz_payload(word, repository)
+        assert payload["type"] == kind
+        assert payload["answer"]
+        assert len(payload["choices"]) == 4
+    repository.close()
+
+
+def test_quiz_mistakes_are_available_to_analytics(tmp_path: Path) -> None:
+    repository = WordRepository(tmp_path / "analytics.db")
+    word_id = repository.add_word(
+        source_text="ambiguous",
+        source_lang="en",
+        target_text="двусмысленный",
+    )
+    repository.review(
+        word_id,
+        "again",
+        quiz_type="translation",
+        selected_answer="очевидный",
+        correct_answer="двусмысленный",
+    )
+
+    assert repository.quiz_breakdown()[0]["accuracy"] == 0.0
+    assert repository.common_confusions()[0]["selected"] == "очевидный"
     repository.close()

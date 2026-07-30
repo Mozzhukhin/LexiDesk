@@ -89,6 +89,16 @@ class WordRepository:
 
             CREATE INDEX IF NOT EXISTS idx_words_due ON words(due_at);
             CREATE INDEX IF NOT EXISTS idx_review_word ON review_log(word_id);
+
+            CREATE TABLE IF NOT EXISTS quiz_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                review_id INTEGER NOT NULL REFERENCES review_log(id) ON DELETE CASCADE,
+                word_id INTEGER NOT NULL REFERENCES words(id) ON DELETE CASCADE,
+                quiz_type TEXT NOT NULL,
+                selected_answer TEXT NOT NULL,
+                correct_answer TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_quiz_word ON quiz_log(word_id);
             """
         )
         columns = {
@@ -146,7 +156,7 @@ class WordRepository:
         }
         if "rating" not in review_columns:
             self._migrate_review_log()
-        self.connection.execute("PRAGMA user_version=4")
+        self.connection.execute("PRAGMA user_version=5")
         self.connection.commit()
 
     def _migrate_review_log(self) -> None:
@@ -378,6 +388,18 @@ class WordRepository:
               AND date(reviewed_at, 'localtime') = date('now', 'localtime')
             """
         ).fetchone()["total"]
+        quiz_summary = self.connection.execute(
+            """
+            SELECT
+                COUNT(*) AS attempts,
+                COUNT(DISTINCT q.word_id) AS checked_cards,
+                SUM(CASE WHEN r.reviewed_at >= datetime('now', '-7 days')
+                    THEN 1 ELSE 0 END) AS week_attempts
+            FROM quiz_log q
+            JOIN review_log r ON r.id = q.review_id
+            WHERE r.undone = 0
+            """
+        ).fetchone()
         active_days = [
             date.fromisoformat(row["day"])
             for row in self.connection.execute(
@@ -415,6 +437,9 @@ class WordRepository:
             "due": int(row["due_count"] or 0),
             "forecast_7_days": int(row["forecast_count"] or 0),
             "reviews_today": int(reviews_today or 0),
+            "quiz_attempts": int(quiz_summary["attempts"] or 0),
+            "checked_cards": int(quiz_summary["checked_cards"] or 0),
+            "quiz_attempts_7_days": int(quiz_summary["week_attempts"] or 0),
             "accuracy": round((knows / reviews * 100), 1) if reviews else 0.0,
             "streak": streak,
             "average_difficulty": round(
@@ -460,6 +485,10 @@ class WordRepository:
         word_id: int,
         rating: ReviewRating | str | bool,
         review_duration_ms: int | None = None,
+        *,
+        quiz_type: str = "",
+        selected_answer: str = "",
+        correct_answer: str = "",
     ) -> Word:
         row = self.connection.execute(
             "SELECT * FROM words WHERE id = ?", (word_id,)
@@ -515,7 +544,7 @@ class WordRepository:
                     word_id,
                 ),
             )
-            self.connection.execute(
+            cursor = self.connection.execute(
                 """
                 INSERT INTO review_log (
                     word_id, rating, reviewed_at,
@@ -545,6 +574,22 @@ class WordRepository:
                     review_duration_ms,
                 ),
             )
+            if quiz_type and cursor.lastrowid is not None:
+                self.connection.execute(
+                    """
+                    INSERT INTO quiz_log (
+                        review_id, word_id, quiz_type,
+                        selected_answer, correct_answer
+                    ) VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (
+                        cursor.lastrowid,
+                        word_id,
+                        quiz_type,
+                        selected_answer,
+                        correct_answer,
+                    ),
+                )
         return self.get_word(word_id)
 
     def undo_last_review(self) -> Word | None:
@@ -644,6 +689,56 @@ class WordRepository:
             (max(1, limit),),
         ).fetchall()
         return [self._to_word(row) for row in rows]
+
+    def quiz_breakdown(self) -> list[dict[str, int | float | str]]:
+        rows = self.connection.execute(
+            """
+            SELECT q.quiz_type,
+                   COUNT(*) AS attempts,
+                   SUM(CASE WHEN r.rating > 1 THEN 1 ELSE 0 END) AS correct
+            FROM quiz_log q
+            JOIN review_log r ON r.id = q.review_id
+            WHERE r.undone = 0
+            GROUP BY q.quiz_type
+            ORDER BY attempts DESC
+            """
+        ).fetchall()
+        return [
+            {
+                "type": row["quiz_type"],
+                "attempts": int(row["attempts"]),
+                "accuracy": round(
+                    int(row["correct"] or 0) / int(row["attempts"]) * 100, 1
+                ),
+            }
+            for row in rows
+        ]
+
+    def common_confusions(self, limit: int = 10) -> list[dict[str, int | str]]:
+        rows = self.connection.execute(
+            """
+            SELECT w.source_text AS word, q.selected_answer, q.correct_answer,
+                   COUNT(*) AS mistakes
+            FROM quiz_log q
+            JOIN review_log r ON r.id = q.review_id
+            JOIN words w ON w.id = q.word_id
+            WHERE r.undone = 0 AND r.rating = 1
+              AND q.selected_answer != ''
+            GROUP BY w.source_text, q.selected_answer, q.correct_answer
+            ORDER BY mistakes DESC, w.source_text
+            LIMIT ?
+            """,
+            (max(1, limit),),
+        ).fetchall()
+        return [
+            {
+                "word": row["word"],
+                "selected": row["selected_answer"],
+                "correct": row["correct_answer"],
+                "mistakes": int(row["mistakes"]),
+            }
+            for row in rows
+        ]
 
     def close(self) -> None:
         self.connection.close()

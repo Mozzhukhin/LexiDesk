@@ -22,10 +22,12 @@ every 90 seconds by default.
 - Short sense-specific examples that contain the studied word
 - Conservative offline autocorrection for misspelled English and Russian words
 - Words and short phrases in either language
+- Explicit selection among up to four offline translation meanings
 - Editable translations, meanings, transcription, forms, frequency, and sources
 - Three modes: always visible, click-to-reveal, and typed translation
 - Passive **Next** browsing that never changes learning statistics
-- Periodic four-choice cards with colored feedback and automatic advance
+- Adaptive quizzes: translation, reverse, cloze, context, and typed answer
+- Same-part-of-speech distractors weighted toward previously difficult cards
 - Soft card-change animations designed for an always-visible desktop widget
 - One-click undo for the most recent review
 - Automatic 90-second card rotation
@@ -35,7 +37,7 @@ every 90 seconds by default.
 - Tags, editable examples, alternative meanings, and parts of speech
 - Daily goals, 30-day activity, recall accuracy, streak, and review forecast
 - Difficult-card ranking based on FSRS difficulty and stability
-- Batch creation from lines, translated pairs, or words extracted from text
+- Smart article import that removes stopwords, duplicates, names, and unknown noise
 - JSON/CSV import and export
 - Daily SQLite backups with seven-day retention
 - KDE shortcut `Ctrl+Alt+L` to add the current clipboard text
@@ -48,7 +50,8 @@ every 90 seconds by default.
 
 LexiDesk uses the official FSRS 6 implementation with 90% desired retention by
 default. Ordinary cards are passive: **Next** and automatic rotation only
-change the visible word. Every third displayed card becomes a four-choice quiz.
+change the visible word. LexiDesk inserts a quiz adaptively after two to four
+cards, based on difficulty, recall probability, and earlier mistakes.
 A correct choice records a successful review; a wrong choice records a failed
 review. Those quiz results produce individualized intervals instead of a fixed
 ladder. The desired retention can be adjusted between 70% and 99%.
@@ -68,8 +71,9 @@ restores the complete state before the most recent new-format review.
    and is limited to one compact sentence.
 3. **Next** requests another card without recording whether the word is known.
    The 90-second timer performs the same passive change automatically.
-4. Every third displayed card is a four-choice quiz. The translation remains
-   hidden until an answer is selected.
+4. After two to four displayed cards, LexiDesk chooses an adaptive quiz:
+   translation, reverse translation, sentence gap, matching context, or typing.
+   New and difficult cards are tested more often than stable cards.
 5. A correct answer turns green. A wrong selected answer turns red while the
    correct answer turns green. The result remains visible for one second.
 6. The widget then records only that quiz result in FSRS and advances

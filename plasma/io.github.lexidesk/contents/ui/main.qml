@@ -35,7 +35,13 @@ PlasmoidItem {
     property bool choiceAnswered: false
     property string selectedChoice: ""
     property string quizRating: ""
+    property string quizType: ""
+    property string quizPrompt: ""
+    property string quizAnswer: ""
+    property string quizInstruction: ""
+    property real quizProbability: 0.4
     property int cardsSeen: 0
+    property int cardsSinceQuiz: 0
     property int cardRevision: 0
     property string pendingKind: ""
     property string bridgePath: findExecutable(
@@ -70,6 +76,21 @@ PlasmoidItem {
         return "'" + String(value).replace(/'/g, "'\\''") + "'"
     }
 
+    function htmlEscape(value) {
+        return String(value).replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    }
+
+    function highlightTerm(sentence, term) {
+        var position = sentence.toLowerCase().indexOf(term.toLowerCase())
+        if (position < 0)
+            return htmlEscape(sentence)
+        return htmlEscape(sentence.substring(0, position))
+            + "<b>" + htmlEscape(sentence.substring(
+                position, position + term.length)) + "</b>"
+            + htmlEscape(sentence.substring(position + term.length))
+    }
+
     function runBridge(arguments, kind) {
         if (busy)
             return
@@ -85,8 +106,13 @@ PlasmoidItem {
     }
 
     function review(result) {
-        if (cardId > 0)
-            runBridge("review " + cardId + " " + result, "card")
+        if (cardId > 0) {
+            var metadata = " --quiz-type " + shellQuote(quizType)
+                + " --selected " + shellQuote(
+                    selectedChoice || typedAnswer.trim())
+                + " --correct " + shellQuote(quizAnswer)
+            runBridge("review " + cardId + " " + result + metadata, "card")
+        }
     }
 
     function checkAnswer() {
@@ -104,7 +130,7 @@ PlasmoidItem {
         choiceAnswered = true
         answerChecked = true
         revealed = true
-        if (answer === translationText) {
+        if (answer === quizAnswer) {
             suggestedRating = "good"
             quizRating = "know"
             answerFeedback = i18n("Correct — next word…")
@@ -113,7 +139,7 @@ PlasmoidItem {
             quizRating = "dont-know"
             answerFeedback = i18n(
                 "Incorrect — correct answer: %1",
-                translationText)
+                quizAnswer)
         }
         choiceAdvanceTimer.restart()
     }
@@ -154,10 +180,22 @@ PlasmoidItem {
         retrievability = card.retrievability === null
             || card.retrievability === undefined
             ? -1 : Number(card.retrievability)
-        choiceOptions = card.choices || []
+        var quiz = card.quiz || {}
+        quizType = quiz.type || ""
+        quizPrompt = quiz.prompt || sourceText
+        quizAnswer = quiz.answer || translationText
+        quizInstruction = quiz.instruction || ""
+        quizProbability = Number(card.quiz_probability || 0.4)
+        choiceOptions = quiz.choices || card.choices || []
         cardsSeen++
-        choiceMode = !empty && choiceOptions.length === 4
-            && cardsSeen % 3 === 0
+        cardsSinceQuiz++
+        var quizAvailable = quizType === "typing"
+            || choiceOptions.length === 4
+        choiceMode = !empty && cardsSeen > 1 && quizAvailable
+            && (cardsSinceQuiz >= 4
+                || (cardsSinceQuiz >= 2 && Math.random() < quizProbability))
+        if (choiceMode)
+            cardsSinceQuiz = 0
         revealed = !choiceMode
             && plasmoid.configuration.revealMode === "both"
         choiceAnswered = false
@@ -218,17 +256,22 @@ PlasmoidItem {
                     if (payload.grade === "correct") {
                         suggestedRating = "good"
                         answerFeedback = i18n("Correct")
+                        quizRating = "know"
                     } else if (payload.grade === "close") {
                         suggestedRating = "again"
                         answerFeedback = i18n(
                             "Almost correct: %1",
                             payload.matched)
+                        quizRating = "dont-know"
                     } else {
                         suggestedRating = "again"
                         answerFeedback = i18n(
                             "Expected: %1",
                             payload.expected)
+                        quizRating = "dont-know"
                     }
+                    if (choiceMode)
+                        choiceAdvanceTimer.restart()
                 } else if (pendingKind === "undo") {
                     if (payload.undone)
                         applyCard(payload)
@@ -400,9 +443,13 @@ PlasmoidItem {
                         horizontalAlignment: Text.AlignHCenter
                         text: !loaded
                             ? i18n("Loading vocabulary…")
-                            : (empty ? i18n("Your vocabulary is empty") : sourceText)
+                            : (empty ? i18n("Your vocabulary is empty")
+                            : (choiceMode ? quizPrompt : sourceText))
                         wrapMode: Text.Wrap
-                        font.pixelSize: empty ? 18 : 26
+                        font.pixelSize: empty ? 18
+                            : (choiceMode
+                            && (quizType === "context"
+                            || quizType === "cloze") ? 16 : 26)
                         font.bold: true
                     }
 
@@ -413,7 +460,7 @@ PlasmoidItem {
                             ? ""
                             : (empty
                             ? i18n("Press + to add a word or phrase")
-                            : translationText)
+                            : (choiceMode ? quizAnswer : translationText))
                         visible: loaded && (empty || revealed)
                         wrapMode: Text.Wrap
                         color: Kirigami.Theme.highlightColor
@@ -429,16 +476,18 @@ PlasmoidItem {
                         Layout.alignment: Qt.AlignHCenter
                         text: i18n("Reveal translation")
                         visible: loaded && !empty && !revealed
+                            && !choiceMode
                             && plasmoid.configuration.revealMode === "quiz"
                         onClicked: revealed = true
                     }
 
                     GridLayout {
                         Layout.fillWidth: true
-                        columns: 2
+                        columns: quizType === "context" ? 1 : 2
                         columnSpacing: 6
                         rowSpacing: 5
                         visible: loaded && choiceMode
+                            && quizType !== "typing"
 
                         Repeater {
                             model: root.choiceOptions
@@ -446,13 +495,14 @@ PlasmoidItem {
                             delegate: PlasmaComponents.Button {
                                 required property string modelData
                                 readonly property bool correctOption:
-                                    text === root.translationText
+                                    text === root.quizAnswer
                                 readonly property bool selectedOption:
                                     text === root.selectedChoice
 
                                 Layout.fillWidth: true
-                                implicitHeight: 32
+                                implicitHeight: root.quizType === "context" ? 38 : 32
                                 text: modelData
+                                font.pixelSize: root.quizType === "context" ? 10 : 12
                                 enabled: !busy
                                 background: Rectangle {
                                     radius: 7
@@ -492,8 +542,9 @@ PlasmoidItem {
                     RowLayout {
                         Layout.fillWidth: true
                         visible: loaded && !empty
-                            && !choiceMode
-                            && plasmoid.configuration.revealMode === "typing"
+                            && ((choiceMode && quizType === "typing")
+                            || (!choiceMode
+                            && plasmoid.configuration.revealMode === "typing"))
                             && !answerChecked
 
                         PlasmaComponents.TextField {
@@ -562,7 +613,9 @@ PlasmoidItem {
                             PlasmaComponents.Label {
                                 Layout.fillWidth: true
                                 horizontalAlignment: Text.AlignHCenter
-                                text: exampleText
+                                textFormat: Text.RichText
+                                text: root.highlightTerm(
+                                    root.exampleText, root.sourceText)
                                 wrapMode: Text.Wrap
                                 font.italic: true
                                 font.pixelSize: 12

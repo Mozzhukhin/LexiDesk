@@ -28,6 +28,9 @@ def parser() -> argparse.ArgumentParser:
         choices=("again", "hard", "good", "easy", "know", "dont-know"),
     )
     review.add_argument("--duration-ms", type=int)
+    review.add_argument("--quiz-type", default="")
+    review.add_argument("--selected", default="")
+    review.add_argument("--correct", default="")
 
     check = subparsers.add_parser("check", help="Check a typed translation")
     check.add_argument("word_id", type=int)
@@ -55,6 +58,9 @@ def request_from_arguments(args: argparse.Namespace) -> dict[str, Any]:
                 "word_id": args.word_id,
                 "rating": aliases.get(args.rating, args.rating),
                 "duration_ms": args.duration_ms,
+                "quiz_type": args.quiz_type,
+                "selected_answer": args.selected,
+                "correct_answer": args.correct,
             }
         )
     elif args.command == "check":
