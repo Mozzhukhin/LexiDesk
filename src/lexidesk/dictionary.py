@@ -155,6 +155,80 @@ class OfflineDictionary:
         )
         return tuple(suggestions[: max(1, limit)])
 
+    def random_translations(
+        self,
+        source_language: str,
+        *,
+        excluded: set[str] | None = None,
+        part_of_speech: str = "",
+        limit: int = 3,
+    ) -> tuple[str, ...]:
+        """Return distinct offline translations suitable as quiz distractors."""
+        if not self.available or source_language not in {"en", "ru"} or limit < 1:
+            return ()
+
+        excluded_keys = {
+            normalize_headword(value) for value in (excluded or set()) if value.strip()
+        }
+        connection: sqlite3.Connection | None = None
+        try:
+            connection = sqlite3.connect(f"file:{self.path}?mode=ro", uri=True)
+            connection.row_factory = sqlite3.Row
+            rows = connection.execute(
+                """
+                SELECT headword, translations_json, part_of_speech
+                FROM entries
+                WHERE source_lang = ?
+                  AND translations_json != '[]'
+                ORDER BY
+                    CASE
+                        WHEN ? != '' AND part_of_speech = ? THEN 0
+                        ELSE 1
+                    END,
+                    RANDOM()
+                LIMIT 80
+                """,
+                (source_language, part_of_speech, part_of_speech),
+            ).fetchall()
+        except (sqlite3.Error, OSError):
+            return ()
+        finally:
+            if connection is not None:
+                connection.close()
+
+        result: list[str] = []
+        seen = set(excluded_keys)
+        for row in rows:
+            headword = str(row["headword"]).strip()
+            if not headword or headword != headword.casefold():
+                continue
+            try:
+                translations = json.loads(row["translations_json"])
+            except (json.JSONDecodeError, TypeError):
+                continue
+            if not isinstance(translations, list):
+                continue
+            for raw_value in translations:
+                value = str(raw_value).strip()
+                key = normalize_headword(value)
+                if (
+                    len(key.replace(" ", "").replace("-", "")) < 3
+                    or len(value) > 36
+                    or value != value.casefold()
+                    or not all(
+                        character.isalpha() or character in {" ", "-", "'"}
+                        for character in value
+                    )
+                    or key in seen
+                ):
+                    continue
+                result.append(value)
+                seen.add(key)
+                break
+            if len(result) >= limit:
+                break
+        return tuple(result)
+
 
 def _damerau_levenshtein(left: str, right: str) -> int:
     """Measure edits while treating an adjacent transposition as one typo."""

@@ -25,3 +25,16 @@ def test_widget_distinguishes_json_and_display_failures() -> None:
     assert "Could not parse LexiDesk response:" in qml
     assert "Could not apply LexiDesk response:" in qml
     assert "could not display the local response" in qml
+
+
+def test_widget_uses_simple_reviews_and_four_choice_quizzes() -> None:
+    qml = QML_PATH.read_text(encoding="utf-8")
+
+    assert 'text: i18n("Don’t know")' in qml
+    assert 'text: i18n("Know")' in qml
+    assert 'review("dont-know")' in qml
+    assert 'review("know")' in qml
+    assert "choiceOptions.length === 4" in qml
+    assert "cardsSeen % 3 === 0" in qml
+    assert 'text: i18n("Hard")' not in qml
+    assert 'text: i18n("Easy")' not in qml

@@ -30,6 +30,11 @@ PlasmoidItem {
     property string answerFeedback: ""
     property string suggestedRating: ""
     property string typedAnswer: ""
+    property var choiceOptions: []
+    property bool choiceMode: false
+    property bool choiceAnswered: false
+    property string selectedChoice: ""
+    property int cardsSeen: 0
     property string pendingKind: ""
     property string bridgePath: findExecutable(
         "lexidesk-bridge", "lexidesk-cli")
@@ -90,6 +95,22 @@ PlasmoidItem {
                 "check")
     }
 
+    function chooseAnswer(answer) {
+        if (!choiceMode || choiceAnswered || busy)
+            return
+        selectedChoice = answer
+        choiceAnswered = true
+        answerChecked = true
+        revealed = true
+        if (answer === translationText) {
+            suggestedRating = "good"
+            answerFeedback = i18n("Correct")
+        } else {
+            suggestedRating = "again"
+            answerFeedback = i18n("Correct answer: %1", translationText)
+        }
+    }
+
     function undoReview() {
         runBridge("undo", "undo")
     }
@@ -126,7 +147,14 @@ PlasmoidItem {
         retrievability = card.retrievability === null
             || card.retrievability === undefined
             ? -1 : Number(card.retrievability)
-        revealed = plasmoid.configuration.revealMode === "both"
+        choiceOptions = card.choices || []
+        cardsSeen++
+        choiceMode = !empty && choiceOptions.length === 4
+            && cardsSeen % 3 === 0
+        revealed = !choiceMode
+            && plasmoid.configuration.revealMode === "both"
+        choiceAnswered = false
+        selectedChoice = ""
         answerChecked = false
         answerFeedback = ""
         suggestedRating = ""
@@ -177,17 +205,20 @@ PlasmoidItem {
                 } else if (pendingKind === "check") {
                     answerChecked = true
                     revealed = true
-                    suggestedRating = payload.suggested_rating || ""
-                    if (payload.grade === "correct")
-                        answerFeedback = i18n("Correct — Good is suggested")
-                    else if (payload.grade === "close")
+                    if (payload.grade === "correct") {
+                        suggestedRating = "good"
+                        answerFeedback = i18n("Correct")
+                    } else if (payload.grade === "close") {
+                        suggestedRating = "again"
                         answerFeedback = i18n(
-                            "Almost correct: %1 — Hard is suggested",
+                            "Almost correct: %1",
                             payload.matched)
-                    else
+                    } else {
+                        suggestedRating = "again"
                         answerFeedback = i18n(
-                            "Expected: %1 — Again is suggested",
+                            "Expected: %1",
                             payload.expected)
+                    }
                 } else if (pendingKind === "undo") {
                     if (payload.undone)
                         applyCard(payload)
@@ -354,9 +385,34 @@ PlasmoidItem {
                         onClicked: revealed = true
                     }
 
+                    GridLayout {
+                        Layout.fillWidth: true
+                        columns: 2
+                        columnSpacing: 6
+                        rowSpacing: 5
+                        visible: loaded && choiceMode
+
+                        Repeater {
+                            model: root.choiceOptions
+
+                            delegate: PlasmaComponents.Button {
+                                required property string modelData
+
+                                Layout.fillWidth: true
+                                implicitHeight: 32
+                                text: modelData
+                                enabled: !busy && !root.choiceAnswered
+                                highlighted: root.choiceAnswered
+                                    && text === root.translationText
+                                onClicked: root.chooseAnswer(text)
+                            }
+                        }
+                    }
+
                     RowLayout {
                         Layout.fillWidth: true
                         visible: loaded && !empty
+                            && !choiceMode
                             && plasmoid.configuration.revealMode === "typing"
                             && !answerChecked
 
@@ -394,7 +450,7 @@ PlasmoidItem {
                         Layout.fillWidth: true
                         horizontalAlignment: Text.AlignHCenter
                         text: metadataText
-                        visible: revealed && text.length > 0
+                        visible: revealed && !choiceMode && text.length > 0
                         wrapMode: Text.Wrap
                         opacity: 0.7
                         font.pixelSize: 12
@@ -404,7 +460,7 @@ PlasmoidItem {
                         Layout.fillWidth: true
                         horizontalAlignment: Text.AlignHCenter
                         text: exampleText
-                        visible: revealed && text.length > 0
+                        visible: revealed && !choiceMode && text.length > 0
                         wrapMode: Text.Wrap
                         opacity: 0.85
                         font.italic: true
@@ -416,7 +472,7 @@ PlasmoidItem {
                         Layout.fillWidth: true
                         horizontalAlignment: Text.AlignHCenter
                         text: exampleTranslationText
-                        visible: revealed && text.length > 0
+                        visible: revealed && !choiceMode && text.length > 0
                         wrapMode: Text.Wrap
                         opacity: 0.62
                         font.pixelSize: 12
@@ -453,44 +509,27 @@ PlasmoidItem {
 
             GridLayout {
                 Layout.fillWidth: true
-                columns: 4
+                columns: 2
                 columnSpacing: 6
                 rowSpacing: 0
 
                 PlasmaComponents.Button {
                     Layout.fillWidth: true
                     implicitHeight: 34
-                    text: i18n("Again")
+                    text: i18n("Don’t know")
                     enabled: loaded && !empty && !busy && revealed
                     highlighted: suggestedRating === "again"
-                    onClicked: review("again")
+                    onClicked: review("dont-know")
                 }
 
                 PlasmaComponents.Button {
                     Layout.fillWidth: true
                     implicitHeight: 34
-                    text: i18n("Hard")
+                    text: i18n("Know")
                     enabled: loaded && !empty && !busy && revealed
-                    highlighted: suggestedRating === "hard"
-                    onClicked: review("hard")
-                }
-
-                PlasmaComponents.Button {
-                    Layout.fillWidth: true
-                    implicitHeight: 34
-                    text: i18n("Good")
-                    enabled: loaded && !empty && !busy && revealed
-                    highlighted: suggestedRating === "good"
-                    onClicked: review("good")
-                }
-
-                PlasmaComponents.Button {
-                    Layout.fillWidth: true
-                    implicitHeight: 34
-                    text: i18n("Easy")
-                    enabled: loaded && !empty && !busy && revealed
-                    highlighted: suggestedRating === "easy"
-                    onClicked: review("easy")
+                    highlighted: suggestedRating.length > 0
+                        && suggestedRating !== "again"
+                    onClicked: review("know")
                 }
             }
 

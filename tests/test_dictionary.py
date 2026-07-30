@@ -72,6 +72,13 @@ def test_dictionary_lookup(tmp_path: Path) -> None:
         "distraction",
     ]
     assert all(suggestion.distance == 1 for suggestion in suggestions)
+    distractors = OfflineDictionary(path).random_translations(
+        "en",
+        excluded={"разрушение"},
+        limit=2,
+    )
+    assert len(distractors) == 2
+    assert "разрушение" not in distractors
 
 
 def test_corrupt_dictionary_falls_back_to_no_result(tmp_path: Path) -> None:
