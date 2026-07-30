@@ -8,6 +8,7 @@ from collections import defaultdict
 from pathlib import Path, PurePosixPath
 
 from lexidesk.config import data_dir, examples_path
+from lexidesk.examples import select_human_example
 
 WORDNET_URL = (
     "https://raw.githubusercontent.com/nltk/nltk_data/"
@@ -72,10 +73,13 @@ def build_index(nltk_root: Path, target: Path) -> None:
         batch: list[tuple[str, str, str, str, int, int]] = []
         for synset in wordnet.all_synsets():
             examples = synset.examples()
-            example = examples[0] if examples else ""
             definition = synset.definition()
             pos = synset.pos()
             for lemma in synset.lemmas():
+                example = select_human_example(
+                    examples,
+                    lemma.name().replace("_", " "),
+                )
                 key = (lemma.name().casefold(), pos)
                 rank = ranks[key]
                 ranks[key] += 1
@@ -92,6 +96,7 @@ def build_index(nltk_root: Path, target: Path) -> None:
                 batch,
             )
         connection.commit()
+        connection.execute("PRAGMA user_version=2")
         connection.execute("VACUUM")
     finally:
         connection.close()
@@ -103,13 +108,10 @@ def main() -> int:
     if target.exists():
         connection = sqlite3.connect(target)
         try:
-            columns = {
-                row[1]
-                for row in connection.execute("PRAGMA table_info(examples)").fetchall()
-            }
+            version = connection.execute("PRAGMA user_version").fetchone()[0]
         finally:
             connection.close()
-        if "frequency" in columns:
+        if version >= 2:
             print(f"Semantic examples are already installed: {target}")
             return 0
         target.unlink()

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import sqlite3
 from pathlib import Path
 
@@ -12,6 +13,7 @@ POS_CODES = {
     "adjective": "a",
     "adverb": "r",
 }
+MAX_EXAMPLE_LENGTH = 70
 
 
 class SemanticExampleIndex:
@@ -37,32 +39,84 @@ class SemanticExampleIndex:
         try:
             connection = sqlite3.connect(f"file:{self.path}?mode=ro", uri=True)
             connection.row_factory = sqlite3.Row
-            row = connection.execute(
+            rows = connection.execute(
                 """
                 SELECT example, definition
                 FROM examples
                 WHERE lemma = ?
                   AND (? = '' OR pos = ? OR (? = 'a' AND pos = 's'))
                 ORDER BY frequency DESC, sense_rank
-                LIMIT 1
+                LIMIT 12
                 """,
                 (normalized, pos, pos, pos),
-            ).fetchone()
+            ).fetchall()
         except (sqlite3.Error, OSError):
             return ""
         finally:
             if connection is not None:
                 connection.close()
-        if row is None:
+        if not rows:
             return ""
-        example = str(row["example"]).strip()
-        if example:
-            return _sentence_case(example)
-        definition = str(row["definition"]).strip().rstrip(".")
+        for row in rows:
+            example = _sentence_case(str(row["example"]))
+            if example_is_suitable(example, word):
+                return example
+        definition = str(rows[0]["definition"]).strip()
         if definition:
-            term = word.strip().casefold()
-            return f"In this context, {term} means {definition}."
+            return _definition_example(word, definition)
         return ""
+
+
+def example_is_suitable(example: str, word: str) -> bool:
+    sentence = " ".join(example.strip().split())
+    term = " ".join(word.strip().split())
+    if (
+        not sentence
+        or not term
+        or len(sentence) > MAX_EXAMPLE_LENGTH
+        or len(sentence.rstrip(".!?").split()) < 4
+    ):
+        return False
+    pattern = rf"(?<![\w]){re.escape(term)}(?![\w])"
+    return re.search(pattern, sentence, flags=re.IGNORECASE) is not None
+
+
+def select_human_example(examples: list[str], word: str) -> str:
+    for candidate in examples:
+        sentence = _sentence_case(candidate)
+        if example_is_suitable(sentence, word):
+            return sentence
+    return ""
+
+
+def _definition_example(word: str, definition: str) -> str:
+    term = " ".join(word.strip().split()).casefold()
+    meaning = " ".join(definition.strip().rstrip(".").split())
+    meaning = re.split(r"\s*(?:;|--)\s*", meaning, maxsplit=1)[0]
+    meaning = meaning.replace(" referring to ", " for ")
+    meaning = meaning.replace(" two or more ", " multiple ")
+    prefix = f"The word “{term}” means "
+    budget = MAX_EXAMPLE_LENGTH - len(prefix) - 1
+    if len(meaning) > budget:
+        for marker in (
+            " by ",
+            " that ",
+            " which ",
+            " with ",
+            " involving ",
+            " for ",
+        ):
+            shortened = meaning.split(marker, 1)[0]
+            if len(shortened.split()) >= 3 and len(shortened) <= budget:
+                meaning = shortened
+                break
+        else:
+            shortened = meaning[: max(1, budget - 1)].rsplit(" ", 1)[0]
+            meaning = f"{shortened}…"
+    sentence = f"{prefix}{meaning}"
+    return (
+        sentence if sentence[-1] in ".!?" or sentence.endswith("…") else sentence + "."
+    )
 
 
 def _sentence_case(text: str) -> str:

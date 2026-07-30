@@ -184,35 +184,17 @@ class LexiDeskWindow(QMainWindow):
         card_layout.addWidget(self.example_label)
         card_layout.addStretch()
 
-        self.again_button = QPushButton("Don’t know")
-        self.again_button.setObjectName("unknown")
-        self.again_button.setToolTip("Forgot — review again soon (1)")
-        self.again_button.setShortcut("1")
-        self.again_button.clicked.connect(lambda: self.review("again"))
-
-        self.good_button = QPushButton("Know")
-        self.good_button.setObjectName("know")
-        self.good_button.setToolTip("Remembered — schedule a longer interval (2)")
-        self.good_button.setShortcut("2")
-        self.good_button.clicked.connect(lambda: self.review("good"))
-
-        self.rating_buttons = (
-            self.again_button,
-            self.good_button,
-        )
-        for button in self.rating_buttons:
-            button.setProperty("role", "rating")
-
         undo_button = QPushButton("Undo")
         undo_button.setObjectName("secondary")
         undo_button.setToolTip("Undo the most recent review")
         undo_button.setShortcut("Ctrl+Z")
         undo_button.clicked.connect(self.undo_review)
 
-        next_button = QPushButton("Next")
-        next_button.setObjectName("secondary")
-        next_button.setShortcut("N")
-        next_button.clicked.connect(self.next_card)
+        self.next_button = QPushButton("Next")
+        self.next_button.setObjectName("know")
+        self.next_button.setShortcut("N")
+        self.next_button.setToolTip("Show another card without recording a review")
+        self.next_button.clicked.connect(self.next_card)
 
         self.countdown_label = QLabel("1:30")
         self.countdown_label.setObjectName("countdown")
@@ -220,10 +202,8 @@ class LexiDeskWindow(QMainWindow):
         footer = QGridLayout()
         footer.setHorizontalSpacing(6)
         footer.setVerticalSpacing(3)
-        for column, button in enumerate(self.rating_buttons):
-            footer.addWidget(button, 0, column)
-        footer.addWidget(next_button, 1, 0)
-        footer.addWidget(undo_button, 1, 1)
+        footer.addWidget(self.next_button, 0, 0, 1, 2)
+        footer.addWidget(undo_button, 1, 0)
         for column in range(2):
             footer.setColumnStretch(column, 1)
         footer.addWidget(
@@ -254,8 +234,7 @@ class LexiDeskWindow(QMainWindow):
     def _render_card(self) -> None:
         word = self.current_word
         enabled = word is not None
-        for button in self.rating_buttons:
-            button.setEnabled(enabled and self.settings.reveal_mode == "both")
+        self.next_button.setEnabled(enabled)
         stats = self.repository.statistics()
         reviews_today = int(stats["reviews_today"])
         self.goal_label.setText(
@@ -318,8 +297,6 @@ class LexiDeskWindow(QMainWindow):
         self.alternatives_label.show()
         self.example_label.show()
         self.reveal_button.hide()
-        for button in self.rating_buttons:
-            button.setEnabled(self.current_word is not None)
 
     def check_typed_answer(self) -> None:
         if self.current_word is None or not self.answer_edit.text().strip():

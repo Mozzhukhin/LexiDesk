@@ -30,10 +30,11 @@ def test_widget_distinguishes_json_and_display_failures() -> None:
 def test_widget_uses_simple_reviews_and_four_choice_quizzes() -> None:
     qml = QML_PATH.read_text(encoding="utf-8")
 
-    assert 'text: i18n("Don’t know")' in qml
-    assert 'text: i18n("Know")' in qml
-    assert 'review("dont-know")' in qml
-    assert 'review("know")' in qml
+    assert 'text: i18n("Don’t know")' not in qml
+    assert 'text: i18n("Know")' not in qml
+    assert 'text: i18n("Next")' in qml
+    assert 'quizRating = "dont-know"' in qml
+    assert 'quizRating = "know"' in qml
     assert "choiceOptions.length === 4" in qml
     assert "cardsSeen % 3 === 0" in qml
     assert "parent.correctOption" in qml
@@ -46,5 +47,7 @@ def test_widget_uses_simple_reviews_and_four_choice_quizzes() -> None:
     assert "exampleColumn.implicitHeight" in qml
     assert "id: examplePanel" in qml
     assert "&& exampleText.length > 0" in qml
+    assert "id: cardEnterAnimation" in qml
+    assert "Easing.OutCubic" in qml
     assert 'text: i18n("Hard")' not in qml
     assert 'text: i18n("Easy")' not in qml

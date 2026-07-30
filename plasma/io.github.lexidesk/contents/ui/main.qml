@@ -36,6 +36,7 @@ PlasmoidItem {
     property string selectedChoice: ""
     property string quizRating: ""
     property int cardsSeen: 0
+    property int cardRevision: 0
     property string pendingKind: ""
     property string bridgePath: findExecutable(
         "lexidesk-bridge", "lexidesk-cli")
@@ -170,6 +171,7 @@ PlasmoidItem {
         secondsLeft = plasmoid.configuration.rotationSeconds
         failureCount = 0
         errorText = ""
+        cardRevision++
     }
 
     function requestStats() {
@@ -351,6 +353,7 @@ PlasmoidItem {
             }
 
             Rectangle {
+                id: contentFrame
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 Layout.minimumHeight: 165
@@ -358,6 +361,33 @@ PlasmoidItem {
                 color: Qt.alpha(Kirigami.Theme.textColor, 0.035)
                 border.width: 1
                 border.color: Qt.alpha(Kirigami.Theme.textColor, 0.1)
+
+                Connections {
+                    target: root
+                    function onCardRevisionChanged() {
+                        contentFrame.opacity = 0
+                        contentFrame.scale = 0.985
+                        cardEnterAnimation.restart()
+                    }
+                }
+
+                ParallelAnimation {
+                    id: cardEnterAnimation
+                    NumberAnimation {
+                        target: contentFrame
+                        property: "opacity"
+                        to: 1
+                        duration: 220
+                        easing.type: Easing.OutCubic
+                    }
+                    NumberAnimation {
+                        target: contentFrame
+                        property: "scale"
+                        to: 1
+                        duration: 260
+                        easing.type: Easing.OutCubic
+                    }
+                }
 
                 ColumnLayout {
                     anchors.fill: parent
@@ -581,45 +611,18 @@ PlasmoidItem {
                 }
             }
 
-            GridLayout {
+            PlasmaComponents.Button {
                 Layout.fillWidth: true
-                columns: 2
-                columnSpacing: 6
-                rowSpacing: 0
                 visible: !choiceMode
-
-                PlasmaComponents.Button {
-                    Layout.fillWidth: true
-                    implicitHeight: 34
-                    text: i18n("Don’t know")
-                    enabled: loaded && !empty && !busy && revealed
-                    highlighted: suggestedRating === "again"
-                    onClicked: review("dont-know")
-                }
-
-                PlasmaComponents.Button {
-                    Layout.fillWidth: true
-                    implicitHeight: 34
-                    text: i18n("Know")
-                    enabled: loaded && !empty && !busy && revealed
-                    highlighted: suggestedRating.length > 0
-                        && suggestedRating !== "again"
-                    onClicked: review("know")
-                }
+                implicitHeight: 36
+                text: i18n("Next")
+                icon.name: "go-next"
+                enabled: loaded && !empty && !busy
+                onClicked: loadNext()
             }
 
             RowLayout {
                 Layout.fillWidth: true
-
-                PlasmaComponents.ToolButton {
-                    icon.name: "go-next"
-                    text: i18n("Next")
-                    display: PlasmaComponents.AbstractButton.IconOnly
-                    enabled: loaded && !busy
-                    onClicked: loadNext()
-                    PlasmaComponents.ToolTip.text: text
-                    PlasmaComponents.ToolTip.visible: hovered
-                }
 
                 PlasmaComponents.ToolButton {
                     icon.name: "edit-undo"

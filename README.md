@@ -19,13 +19,14 @@ every 90 seconds by default.
 - Fully offline EN ↔ RU translation after initial language-data installation
 - A 99,000-headword FreeDict index for precise word meanings and parts of speech
 - Argos neural translation fallback for phrases and missing dictionary entries
-- Sense-specific WordNet examples with background offline translation
+- Short sense-specific examples that contain the studied word
 - Conservative offline autocorrection for misspelled English and Russian words
 - Words and short phrases in either language
 - Editable translations, meanings, transcription, forms, frequency, and sources
 - Three modes: always visible, click-to-reveal, and typed translation
-- Simple **Don’t know** / **Know** reviews backed by official FSRS 6 scheduling
+- Passive **Next** browsing that never changes learning statistics
 - Periodic four-choice cards with colored feedback and automatic advance
+- Soft card-change animations designed for an always-visible desktop widget
 - One-click undo for the most recent review
 - Automatic 90-second card rotation
 - A native Plasma 6 widget with system, OLED, Forest, and Purple themes
@@ -46,15 +47,37 @@ every 90 seconds by default.
 ## Learning model
 
 LexiDesk uses the official FSRS 6 implementation with 90% desired retention by
-default. Each card tracks memory stability, difficulty, state, and its latest
-review. **Don’t know** and **Know** map to the FSRS Again and Good ratings and
-produce individualized intervals instead of a fixed ladder. The desired
-retention can be adjusted between 70% and 99%.
+default. Ordinary cards are passive: **Next** and automatic rotation only
+change the visible word. Every third displayed card becomes a four-choice quiz.
+A correct choice records a successful review; a wrong choice records a failed
+review. Those quiz results produce individualized intervals instead of a fixed
+ladder. The desired retention can be adjusted between 70% and 99%.
 
 Legacy review history is migrated automatically. LexiDesk prioritizes due cards;
 when nothing is due, it displays the least recently shown card so the desktop
 never becomes empty. **Next** does not alter learning history, and **Undo**
 restores the complete state before the most recent new-format review.
+
+## Widget workflow
+
+1. At startup the QML widget asks the local D-Bus service for the next card.
+   Due cards are preferred; otherwise LexiDesk selects the least recently shown
+   card.
+2. A regular card shows the source, translation, compact metadata, and a short
+   example for the selected meaning. The example must contain the studied term
+   and is limited to one compact sentence.
+3. **Next** requests another card without recording whether the word is known.
+   The 90-second timer performs the same passive change automatically.
+4. Every third displayed card is a four-choice quiz. The translation remains
+   hidden until an answer is selected.
+5. A correct answer turns green. A wrong selected answer turns red while the
+   correct answer turns green. The result remains visible for one second.
+6. The widget then records only that quiz result in FSRS and advances
+   automatically. Statistics, recall, difficulty, and the next due date are
+   based on these quiz results.
+7. The arrow in the footer undoes the latest recorded quiz result. Adding and
+   editing cards opens the Python application, while all vocabulary remains in
+   the same local SQLite database.
 
 ## Install on Arch Linux
 
