@@ -26,17 +26,18 @@
   </categories>
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/OWNER/LexiDesk/main/docs/images/desktop-window.png</image>
+      <image>https://raw.githubusercontent.com/Mozzhukhin/LexiDesk/main/docs/images/desktop-window.png</image>
       <caption>Desktop vocabulary card</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/OWNER/LexiDesk/main/docs/images/library.png</image>
+      <image>https://raw.githubusercontent.com/Mozzhukhin/LexiDesk/main/docs/images/library.png</image>
       <caption>Searchable vocabulary library</caption>
     </screenshot>
   </screenshots>
-  <url type="homepage">https://github.com/OWNER/LexiDesk</url>
+  <url type="homepage">https://github.com/Mozzhukhin/LexiDesk</url>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.1.0" date="2026-07-30"/>
     <release version="1.0.0" date="2026-07-30"/>
   </releases>
 </component>

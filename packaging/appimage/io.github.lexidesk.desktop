@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=LexiDesk
+GenericName=Vocabulary Trainer
+Comment=Learn English and Russian vocabulary offline
+Exec=LexiDesk
+Icon=io.github.lexidesk
+Terminal=false
+Categories=Education;Languages;

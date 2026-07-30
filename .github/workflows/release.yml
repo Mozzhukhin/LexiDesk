@@ -1,6 +1,7 @@
-name: release
+name: build downloads
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - "v*"
@@ -9,24 +10,131 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  validate:
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.13"
+          enable-cache: true
       - run: uv sync --extra dev
       - run: uv run ruff format --check .
       - run: uv run ruff check .
       - run: uv run mypy
       - run: uv run pytest -q
+
+  linux:
+    needs: validate
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+          enable-cache: true
+      - run: uv sync --extra bundle
+      - name: Build standalone application
+        run: uv run pyinstaller --clean --noconfirm packaging/pyinstaller/lexidesk.spec
+      - name: Build AppImage and portable archive
+        run: |
+          mkdir -p release LexiDesk.AppDir/usr/lib/lexidesk
+          cp -a dist/LexiDesk/. LexiDesk.AppDir/usr/lib/lexidesk/
+          cp packaging/appimage/AppRun LexiDesk.AppDir/AppRun
+          cp packaging/appimage/io.github.lexidesk.desktop \
+            LexiDesk.AppDir/io.github.lexidesk.desktop
+          cp assets/lexidesk.svg LexiDesk.AppDir/io.github.lexidesk.svg
+          chmod +x LexiDesk.AppDir/AppRun
+          tar -C dist -czf "release/LexiDesk-Linux-x86_64.tar.gz" LexiDesk
+          curl -L --fail --retry 3 \
+            -o appimagetool \
+            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool
+          ARCH=x86_64 ./appimagetool --appimage-extract-and-run \
+            LexiDesk.AppDir release/LexiDesk-Linux-x86_64.AppImage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-downloads
+          path: release/*
+          if-no-files-found: error
+
+  windows:
+    needs: validate
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+          enable-cache: true
+      - run: uv sync --extra bundle
+      - name: Build standalone application
+        run: uv run pyinstaller --clean --noconfirm packaging/pyinstaller/lexidesk.spec
+      - name: Build portable archive
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release | Out-Null
+          Compress-Archive -Path dist/LexiDesk/* `
+            -DestinationPath release/LexiDesk-Windows-x64-portable.zip
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          $version = '${{ github.ref_name }}'.TrimStart('v')
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" `
+            "/DAppVersion=$version" packaging/windows/LexiDesk.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-downloads
+          path: release/*
+          if-no-files-found: error
+
+  python-and-plasma:
+    needs: validate
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+          enable-cache: true
       - run: uv build
       - name: Package Plasma widget
         run: |
-          tar -C plasma -czf dist/lexidesk-plasma-${GITHUB_REF_NAME}.tar.gz \
-            io.github.lexidesk
-      - name: Create GitHub release
+          mkdir -p release
+          (
+            cd plasma
+            zip -r ../release/LexiDesk-Plasma6.plasmoid io.github.lexidesk
+          )
+          cp dist/* release/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-and-plasma-downloads
+          path: release/*
+          if-no-files-found: error
+
+  release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - linux
+      - windows
+      - python-and-plasma
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: "*-downloads"
+          path: release
+          merge-multiple: true
+      - name: Create checksums
+        working-directory: release
+        run: sha256sum * > SHA256SUMS.txt
+      - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/* --generate-notes
+        run: |
+          gh release create "${GITHUB_REF_NAME}" release/* \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "LexiDesk ${GITHUB_REF_NAME}" \
+            --generate-notes \
+            --verify-tag

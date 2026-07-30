@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import sys
 from pathlib import Path
 
 from platformdirs import user_config_path, user_data_path
@@ -35,4 +37,15 @@ def settings_path() -> Path:
 
 
 def autostart_path() -> Path:
+    if sys.platform == "win32":
+        appdata = Path(os.environ.get("APPDATA", config_dir()))
+        return (
+            appdata
+            / "Microsoft"
+            / "Windows"
+            / "Start Menu"
+            / "Programs"
+            / "Startup"
+            / "LexiDesk.cmd"
+        )
     return Path.home() / ".config" / "autostart" / "lexidesk.desktop"

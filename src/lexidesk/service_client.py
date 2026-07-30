@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import json
+import sys
 from typing import Any
-
-from PySide6.QtDBus import QDBusConnection, QDBusInterface, QDBusMessage
 
 SERVICE_NAME = "io.github.lexidesk"
 OBJECT_PATH = "/LexiDesk"
@@ -11,6 +10,13 @@ INTERFACE_NAME = "io.github.lexidesk.Service"
 
 
 def request_service(request: dict[str, Any]) -> dict[str, Any] | None:
+    if sys.platform == "win32":
+        return None
+
+    # QtDBus is a Unix-only optional Qt module. Import it lazily so the
+    # standalone desktop application can start normally on Windows.
+    from PySide6.QtDBus import QDBusConnection, QDBusInterface, QDBusMessage
+
     bus = QDBusConnection.sessionBus()
     interface = QDBusInterface(
         SERVICE_NAME,

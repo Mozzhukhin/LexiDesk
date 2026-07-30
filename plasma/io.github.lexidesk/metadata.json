@@ -11,8 +11,8 @@
         "Id": "io.github.lexidesk",
         "License": "MIT",
         "Name": "LexiDesk",
-        "Version": "1.0.0",
-        "Website": "https://github.com/"
+        "Version": "1.1.0",
+        "Website": "https://github.com/Mozzhukhin/LexiDesk"
     },
     "X-Plasma-API-Minimum-Version": "6.0",
     "KPackageStructure": "Plasma/Applet"

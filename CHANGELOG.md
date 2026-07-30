@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.0 — 2026-07-30
+
+- Add native Windows installer and portable Windows build.
+- Add universal Linux AppImage and portable Linux archive.
+- Publish separate, clearly named Plasma and Python downloads.
+- Add SHA-256 checksums for every release artifact.
+- Make D-Bus integration optional and add native Windows autostart.
+
 ## 1.0.0 — 2026-07-30
 
 - Replace fixed intervals with the official FSRS 6 scheduler.

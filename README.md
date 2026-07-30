@@ -1,8 +1,8 @@
 # LexiDesk
 
-LexiDesk is an offline English–Russian vocabulary companion for KDE Plasma 6
-and other Linux desktops. Its application core is written in Python with
-PySide6, and its native Plasma widget uses QML.
+LexiDesk is an offline English–Russian vocabulary companion for Windows,
+KDE Plasma 6, and other Linux desktops. Its application core is written in
+Python with PySide6, and its optional native Plasma widget uses QML.
 
 The app starts with an empty vocabulary. Add an English or Russian word/phrase,
 let the local model suggest a translation, review it, and save it. Cards rotate
@@ -13,6 +13,25 @@ every 90 seconds by default.
 ![LexiDesk vocabulary library](docs/images/library.png)
 
 ![LexiDesk learning analytics](docs/images/analytics.png)
+
+## Download
+
+Ready-to-run packages are published on the
+[GitHub Releases page](https://github.com/Mozzhukhin/LexiDesk/releases/latest):
+
+| System | Download | How to use it |
+| --- | --- | --- |
+| Windows 10/11 x64 | `LexiDesk-Setup-Windows-x64.exe` | Run the installer. It can create desktop and automatic-start shortcuts. |
+| Windows x64, portable | `LexiDesk-Windows-x64-portable.zip` | Extract the whole archive and run `LexiDesk.exe`. |
+| Linux x86_64 | `LexiDesk-Linux-x86_64.AppImage` | Make it executable and open it. No system Python is required. |
+| Linux x86_64, portable | `LexiDesk-Linux-x86_64.tar.gz` | Extract it and run `LexiDesk/LexiDesk`. |
+| KDE Plasma 6 | `LexiDesk-Plasma6.plasmoid` | Optional native desktop add-on; install the Linux core first. |
+| Python 3.12–3.14 | `.whl` or `.tar.gz` source package | Intended for distributions and developers. |
+
+GitHub builds Windows and Linux packages on their corresponding operating
+systems from the same source code. `SHA256SUMS.txt` lets you verify every
+release download. Translation remains offline at runtime, but the language
+models and dictionaries require a one-time download during initial setup.
 
 ## Features
 
@@ -94,7 +113,7 @@ LexiDesk cycles through every other available card before allowing a repeat.
    editing cards opens the Python application, while all vocabulary remains in
    the same local SQLite database.
 
-## Install on Arch Linux
+## Install from source on Arch Linux
 
 Requirements:
 
@@ -158,9 +177,13 @@ uv run lexidesk
 The GitHub Actions workflow runs the same formatting, lint, type, and test
 checks on every push and pull request.
 
-Release tags build a wheel, source archive, and Plasma archive automatically.
-Packaging sources for Arch/AUR and Flatpak are under `packaging/`; see
-`packaging/flatpak/README.md` for the sandbox-specific language-data step.
+Release tags build a Windows installer and portable ZIP on Windows, an AppImage
+and portable archive on Ubuntu 22.04, a Python wheel/source archive, and the
+Plasma add-on. A manually started workflow builds the same downloadable
+artifacts without publishing a release, which makes packaging changes safe to
+test first. Packaging sources for Windows, AppImage, Arch/AUR, Flatpak, and
+PyInstaller are under `packaging/`; see `packaging/flatpak/README.md` for the
+sandbox-specific language-data step.
 
 ## Repair and diagnostics
 
