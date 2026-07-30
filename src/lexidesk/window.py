@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 
-from PySide6.QtCore import QElapsedTimer, QEvent, QPoint, Qt, QTimer
+from PySide6.QtCore import QElapsedTimer, QEvent, QObject, QPoint, Qt, QTimer
 from PySide6.QtGui import QCloseEvent, QMouseEvent, QResizeEvent
 from PySide6.QtWidgets import (
     QFrame,
@@ -27,7 +27,7 @@ from .dialogs import AddWordDialog, SettingsDialog
 from .insights import AnalyticsDialog
 from .library import LibraryDialog
 from .models import Word
-from .service_client import request_service
+from .service_client import request_service, schedule_example_enrichment
 from .settings import SettingsStore
 from .themes import stylesheet
 from .translation import OfflineTranslator
@@ -166,10 +166,10 @@ class LexiDeskWindow(QMainWindow):
         self.alternatives_label.setWordWrap(True)
 
         self.example_label = QLabel()
-        self.example_label.setObjectName("metadata")
+        self.example_label.setObjectName("example")
         self.example_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.example_label.setWordWrap(True)
-        self.example_label.setMaximumHeight(34)
+        self.example_label.setMaximumHeight(82)
 
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(18, 12, 18, 12)
@@ -184,35 +184,21 @@ class LexiDeskWindow(QMainWindow):
         card_layout.addWidget(self.example_label)
         card_layout.addStretch()
 
-        self.again_button = QPushButton("Again")
+        self.again_button = QPushButton("Don’t know")
         self.again_button.setObjectName("unknown")
         self.again_button.setToolTip("Forgot — review again soon (1)")
         self.again_button.setShortcut("1")
         self.again_button.clicked.connect(lambda: self.review("again"))
 
-        self.hard_button = QPushButton("Hard")
-        self.hard_button.setObjectName("hard")
-        self.hard_button.setToolTip("Remembered with serious difficulty (2)")
-        self.hard_button.setShortcut("2")
-        self.hard_button.clicked.connect(lambda: self.review("hard"))
-
-        self.good_button = QPushButton("Good")
+        self.good_button = QPushButton("Know")
         self.good_button.setObjectName("know")
-        self.good_button.setToolTip("Remembered after some hesitation (3)")
-        self.good_button.setShortcut("3")
+        self.good_button.setToolTip("Remembered — schedule a longer interval (2)")
+        self.good_button.setShortcut("2")
         self.good_button.clicked.connect(lambda: self.review("good"))
-
-        self.easy_button = QPushButton("Easy")
-        self.easy_button.setObjectName("easy")
-        self.easy_button.setToolTip("Remembered immediately (4)")
-        self.easy_button.setShortcut("4")
-        self.easy_button.clicked.connect(lambda: self.review("easy"))
 
         self.rating_buttons = (
             self.again_button,
-            self.hard_button,
             self.good_button,
-            self.easy_button,
         )
         for button in self.rating_buttons:
             button.setProperty("role", "rating")
@@ -238,12 +224,12 @@ class LexiDeskWindow(QMainWindow):
             footer.addWidget(button, 0, column)
         footer.addWidget(next_button, 1, 0)
         footer.addWidget(undo_button, 1, 1)
-        for column in range(4):
+        for column in range(2):
             footer.setColumnStretch(column, 1)
         footer.addWidget(
             self.countdown_label,
             1,
-            3,
+            2,
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
         )
 
@@ -310,7 +296,7 @@ class LexiDeskWindow(QMainWindow):
         example_parts = [
             part for part in (word.example, word.example_translation) if part
         ]
-        self.example_label.setText("  ·  ".join(example_parts))
+        self.example_label.setText("\n".join(example_parts))
         if self.settings.reveal_mode == "quiz":
             self.translation_label.hide()
             self.alternatives_label.hide()
@@ -342,17 +328,13 @@ class LexiDeskWindow(QMainWindow):
         self.reveal_translation()
         self.answer_feedback.show()
         if result.grade == AnswerGrade.CORRECT:
-            self.answer_feedback.setText("Correct — Good is suggested")
+            self.answer_feedback.setText("Correct")
             self.answer_feedback.setObjectName("know")
         elif result.grade == AnswerGrade.CLOSE:
-            self.answer_feedback.setText(
-                f"Almost correct: {result.matched} — Hard is suggested"
-            )
+            self.answer_feedback.setText(f"Almost correct: {result.matched}")
             self.answer_feedback.setObjectName("metadata")
         else:
-            self.answer_feedback.setText(
-                f"Not matched. Expected: {result.expected} — Again is suggested"
-            )
+            self.answer_feedback.setText(f"Not matched. Expected: {result.expected}")
             self.answer_feedback.setObjectName("unknown")
         self.style().unpolish(self.answer_feedback)
         self.style().polish(self.answer_feedback)
@@ -387,6 +369,7 @@ class LexiDeskWindow(QMainWindow):
             return
         try:
             word_id = self.repository.add_word(**dialog.word_data)
+            schedule_example_enrichment(word_id)
         except sqlite3.IntegrityError:
             QMessageBox.information(
                 self,
@@ -455,6 +438,7 @@ class LexiDeskWindow(QMainWindow):
             return
         try:
             self.repository.update_word(self.current_word.id, **dialog.word_data)
+            schedule_example_enrichment(self.current_word.id)
         except sqlite3.IntegrityError:
             QMessageBox.information(
                 self,
@@ -487,7 +471,7 @@ class LexiDeskWindow(QMainWindow):
         minutes, seconds = divmod(max(0, self.seconds_left), 60)
         self.countdown_label.setText(f"{minutes}:{seconds:02d}")
 
-    def eventFilter(self, watched: QWidget, event: QEvent) -> bool:
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
         if watched is self.centralWidget():
             if event.type() == QEvent.Type.MouseButtonPress:
                 mouse_event = event

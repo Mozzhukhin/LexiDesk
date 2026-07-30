@@ -23,5 +23,15 @@ TEI files are removed after indexing to avoid duplicate disk usage.
 - Software license: MIT / CC0; individual model metadata is retained inside
   each installed model package
 
+## Princeton WordNet
+
+- Project: [Princeton WordNet](https://wordnet.princeton.edu/)
+- Distribution: [NLTK Data](https://www.nltk.org/howto/wordnet.html)
+- Purpose: sense-specific English example sentences and definitions
+- License: Princeton WordNet License
+
+LexiDesk converts WordNet records into a compact local SQLite index. Runtime
+lookups are offline and do not import or scan the full corpus.
+
 LexiDesk itself is licensed under MIT. Third-party data keeps its original
 license and attribution requirements.

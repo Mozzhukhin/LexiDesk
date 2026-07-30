@@ -4,6 +4,7 @@ import re
 from dataclasses import dataclass
 
 from .dictionary import OfflineDictionary, SpellingSuggestion, normalize_headword
+from .examples import SemanticExampleIndex
 
 CYRILLIC_RE = re.compile(r"[\u0400-\u04ff]")
 LATIN_RE = re.compile(r"[A-Za-z]")
@@ -47,10 +48,12 @@ class OfflineTranslator:
         dictionary: OfflineDictionary | None = None,
         *,
         autocorrect: bool = True,
+        examples: SemanticExampleIndex | None = None,
     ) -> None:
         self._translate_module = None
         self.dictionary = dictionary or OfflineDictionary()
         self.autocorrect = autocorrect
+        self.examples = examples or SemanticExampleIndex()
 
     def _module(self):
         if self._translate_module is None:
@@ -128,9 +131,29 @@ class OfflineTranslator:
         part_of_speech: str = "",
     ) -> ExampleResult:
         language = source_language or detect_language(source_text)
-        sentence = build_example_sentence(source_text, language, part_of_speech)
+        if language == "ru":
+            english_term = self.translate(source_text).translation
+            english_example = self.examples.lookup(english_term, part_of_speech)
+            if english_example:
+                russian_example = self.translate(english_example).translation
+                return ExampleResult(russian_example, english_example)
+        sentence = self.example_sentence(source_text, language, part_of_speech)
         translation = self.translate(sentence).translation
         return ExampleResult(sentence, translation)
+
+    def example_sentence(
+        self,
+        source_text: str,
+        source_language: str = "",
+        part_of_speech: str = "",
+    ) -> str:
+        language = source_language or detect_language(source_text)
+        return build_example_sentence(
+            source_text,
+            language,
+            part_of_speech,
+            self.examples,
+        )
 
     def _model_candidates(self, cleaned: str, source: str, target: str) -> list[str]:
         module = self._module()
@@ -225,6 +248,7 @@ def build_example_sentence(
     source_text: str,
     source_language: str,
     part_of_speech: str = "",
+    examples: SemanticExampleIndex | None = None,
 ) -> str:
     term = " ".join(source_text.strip().split())
     if not term:
@@ -233,6 +257,10 @@ def build_example_sentence(
         raise TranslationError("Examples are supported for English and Russian.")
 
     category = part_of_speech.strip().casefold()
+    if source_language == "en":
+        semantic = (examples or SemanticExampleIndex()).lookup(term, category)
+        if semantic:
+            return semantic
     if source_language == "ru":
         if category.startswith("noun") or category.startswith("сущ"):
             return f"В тексте встретилось существительное «{term}»."

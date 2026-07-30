@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from .database import WordRepository
+from .service_client import schedule_example_enrichment
 from .translation import OfflineTranslator, TranslationError, detect_language
 
 WORD_RE = re.compile(r"[A-Za-zА-Яа-яЁё][A-Za-zА-Яа-яЁё'-]{2,}")
@@ -140,16 +141,14 @@ class BatchAddDialog(QDialog):
                     target = result.translation
                     part_of_speech = result.part_of_speech
                 try:
-                    generated = self.translator.generate_example(
+                    example = self.translator.example_sentence(
                         corrected,
                         source_language,
                         part_of_speech,
                     )
-                    example = generated.source
-                    example_translation = generated.translation
                 except TranslationError:
                     example = ""
-                    example_translation = ""
+                example_translation = ""
                 prepared.append(
                     (
                         corrected,
@@ -185,19 +184,24 @@ class BatchAddDialog(QDialog):
             check = self.table.item(row, 0)
             if check is None or check.checkState() != Qt.CheckState.Checked:
                 continue
-            source = self.table.item(row, 1).text().strip()
-            target = self.table.item(row, 2).text().strip()
+            source_item = self.table.item(row, 1)
+            target_item = self.table.item(row, 2)
+            if source_item is None or target_item is None:
+                skipped += 1
+                continue
+            source = source_item.text().strip()
+            target = target_item.text().strip()
             if not source or not target:
                 skipped += 1
                 continue
             try:
-                metadata = self.table.item(row, 1).data(Qt.ItemDataRole.UserRole)
+                metadata = source_item.data(Qt.ItemDataRole.UserRole)
                 source_language, part_of_speech, example, example_translation = (
                     metadata
                     if isinstance(metadata, (list, tuple)) and len(metadata) == 4
                     else (detect_language(source), "", "", "")
                 )
-                self.repository.add_word(
+                word_id = self.repository.add_word(
                     source_text=source,
                     source_lang=source_language,
                     target_text=target,
@@ -206,6 +210,7 @@ class BatchAddDialog(QDialog):
                     example_translation=example_translation,
                     source_info="Batch import",
                 )
+                schedule_example_enrichment(word_id)
                 imported += 1
             except (sqlite3.IntegrityError, TranslationError):
                 skipped += 1

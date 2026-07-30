@@ -93,6 +93,13 @@ def stylesheet(name: str, scale: int = 100) -> str:
         QLabel#muted, QLabel#metadata, QLabel#countdown {{
             color: {colors["muted"]};
         }}
+        QLabel#example {{
+            color: {colors["muted"]};
+            background: {colors["window"]};
+            border: 1px solid {colors["border"]};
+            border-radius: 8px;
+            padding: 6px;
+        }}
         QLabel#brand {{
             font-size: {round(11 * factor)}px;
             font-weight: 800;

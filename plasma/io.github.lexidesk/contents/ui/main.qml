@@ -34,6 +34,7 @@ PlasmoidItem {
     property bool choiceMode: false
     property bool choiceAnswered: false
     property string selectedChoice: ""
+    property string quizRating: ""
     property int cardsSeen: 0
     property string pendingKind: ""
     property string bridgePath: findExecutable(
@@ -104,11 +105,16 @@ PlasmoidItem {
         revealed = true
         if (answer === translationText) {
             suggestedRating = "good"
-            answerFeedback = i18n("Correct")
+            quizRating = "know"
+            answerFeedback = i18n("Correct — next word…")
         } else {
             suggestedRating = "again"
-            answerFeedback = i18n("Correct answer: %1", translationText)
+            quizRating = "dont-know"
+            answerFeedback = i18n(
+                "Incorrect — correct answer: %1",
+                translationText)
         }
+        choiceAdvanceTimer.restart()
     }
 
     function undoReview() {
@@ -155,6 +161,8 @@ PlasmoidItem {
             && plasmoid.configuration.revealMode === "both"
         choiceAnswered = false
         selectedChoice = ""
+        quizRating = ""
+        choiceAdvanceTimer.stop()
         answerChecked = false
         answerFeedback = ""
         suggestedRating = ""
@@ -244,6 +252,16 @@ PlasmoidItem {
     }
 
     Timer {
+        id: choiceAdvanceTimer
+        interval: 1000
+        repeat: false
+        onTriggered: {
+            if (cardId > 0 && quizRating.length > 0)
+                review(quizRating)
+        }
+    }
+
+    Timer {
         interval: 1000
         running: true
         repeat: true
@@ -271,9 +289,9 @@ PlasmoidItem {
     fullRepresentation: Rectangle {
         id: card
         implicitWidth: 390
-        implicitHeight: 300
+        implicitHeight: 320
         Layout.minimumWidth: 330
-        Layout.minimumHeight: 260
+        Layout.minimumHeight: 312
         radius: 16
         color: {
             switch (plasmoid.configuration.colorTheme) {
@@ -335,7 +353,7 @@ PlasmoidItem {
             Rectangle {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                Layout.minimumHeight: 125
+                Layout.minimumHeight: 165
                 radius: 13
                 color: Qt.alpha(Kirigami.Theme.textColor, 0.035)
                 border.width: 1
@@ -405,7 +423,7 @@ PlasmoidItem {
                                 Layout.fillWidth: true
                                 implicitHeight: 32
                                 text: modelData
-                                enabled: !busy && !root.choiceAnswered
+                                enabled: !busy
                                 background: Rectangle {
                                     radius: 7
                                     color: {
@@ -469,10 +487,13 @@ PlasmoidItem {
 
                     PlasmaComponents.Label {
                         Layout.fillWidth: true
+                        Layout.minimumHeight: visible ? 20 : 0
                         horizontalAlignment: Text.AlignHCenter
                         text: answerFeedback
                         visible: answerChecked
                         wrapMode: Text.Wrap
+                        font.bold: choiceMode
+                        font.pixelSize: choiceMode ? 13 : 12
                         color: suggestedRating === "again"
                             ? Kirigami.Theme.negativeTextColor
                             : Kirigami.Theme.positiveTextColor
@@ -482,34 +503,55 @@ PlasmoidItem {
                         Layout.fillWidth: true
                         horizontalAlignment: Text.AlignHCenter
                         text: metadataText
-                        visible: revealed && !choiceMode && text.length > 0
+                        visible: revealed && !choiceMode
+                            && metadataText.length > 0
                         wrapMode: Text.Wrap
                         opacity: 0.7
                         font.pixelSize: 12
-                    }
-
-                    PlasmaComponents.Label {
-                        Layout.fillWidth: true
-                        horizontalAlignment: Text.AlignHCenter
-                        text: exampleText
-                        visible: revealed && !choiceMode && text.length > 0
-                        wrapMode: Text.Wrap
-                        opacity: 0.85
-                        font.italic: true
-                        maximumLineCount: 2
-                        elide: Text.ElideRight
-                    }
-
-                    PlasmaComponents.Label {
-                        Layout.fillWidth: true
-                        horizontalAlignment: Text.AlignHCenter
-                        text: exampleTranslationText
-                        visible: revealed && !choiceMode && text.length > 0
-                        wrapMode: Text.Wrap
-                        opacity: 0.62
-                        font.pixelSize: 12
                         maximumLineCount: 1
                         elide: Text.ElideRight
+                    }
+
+                    Rectangle {
+                        id: examplePanel
+                        Layout.fillWidth: true
+                        visible: revealed && !choiceMode
+                            && exampleText.length > 0
+                        implicitHeight: exampleColumn.implicitHeight + 12
+                        radius: 8
+                        color: Qt.alpha(Kirigami.Theme.highlightColor, 0.08)
+
+                        ColumnLayout {
+                            id: exampleColumn
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.margins: 8
+                            spacing: 2
+
+                            PlasmaComponents.Label {
+                                Layout.fillWidth: true
+                                horizontalAlignment: Text.AlignHCenter
+                                text: exampleText
+                                wrapMode: Text.Wrap
+                                font.italic: true
+                                font.pixelSize: 12
+                                maximumLineCount: 2
+                                elide: Text.ElideRight
+                            }
+
+                            PlasmaComponents.Label {
+                                Layout.fillWidth: true
+                                horizontalAlignment: Text.AlignHCenter
+                                text: exampleTranslationText
+                                visible: text.length > 0
+                                wrapMode: Text.Wrap
+                                opacity: 0.7
+                                font.pixelSize: 11
+                                maximumLineCount: 2
+                                elide: Text.ElideRight
+                            }
+                        }
                     }
 
                     Item { Layout.fillHeight: true }
@@ -544,6 +586,7 @@ PlasmoidItem {
                 columns: 2
                 columnSpacing: 6
                 rowSpacing: 0
+                visible: !choiceMode
 
                 PlasmaComponents.Button {
                     Layout.fillWidth: true

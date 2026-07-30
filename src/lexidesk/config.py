@@ -26,6 +26,10 @@ def dictionary_path() -> Path:
     return data_dir() / "freedict-en-ru.db"
 
 
+def examples_path() -> Path:
+    return data_dir() / "wordnet-examples.db"
+
+
 def settings_path() -> Path:
     return config_dir() / "settings.json"
 

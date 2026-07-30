@@ -24,6 +24,7 @@ from .batch import BatchAddDialog
 from .database import WordRepository
 from .dialogs import AddWordDialog
 from .insights import AnalyticsDialog
+from .service_client import schedule_example_enrichment
 from .transfer import export_words, import_words
 from .translation import OfflineTranslator
 
@@ -171,7 +172,8 @@ class LibraryDialog(QDialog):
         if dialog.exec() != dialog.DialogCode.Accepted or dialog.word_data is None:
             return
         try:
-            self.repository.add_word(**dialog.word_data)
+            word_id = self.repository.add_word(**dialog.word_data)
+            schedule_example_enrichment(word_id)
         except sqlite3.IntegrityError:
             QMessageBox.information(self, "Already saved", "This card already exists.")
         self.refresh()
@@ -187,6 +189,7 @@ class LibraryDialog(QDialog):
             return
         try:
             self.repository.update_word(word_id, **dialog.word_data)
+            schedule_example_enrichment(word_id)
         except sqlite3.IntegrityError:
             QMessageBox.information(
                 self, "Already saved", "Another card already uses this source."

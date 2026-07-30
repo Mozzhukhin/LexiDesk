@@ -24,6 +24,14 @@ def test_add_select_and_review(tmp_path: Path) -> None:
     assert word.tags == ["career"]
     assert word.status == "New"
     assert repository.get_word(word_id).target_text == "возможность"
+    repository.update_example(
+        word_id,
+        "The opportunity changed everything.",
+        "Возможность изменила всё.",
+    )
+    assert (
+        repository.get_word(word_id).example_translation == "Возможность изменила всё."
+    )
     assert repository.statistics()["total"] == 1
     backup = ensure_daily_backup(repository)
     assert backup.exists()

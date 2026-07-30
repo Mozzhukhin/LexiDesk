@@ -14,6 +14,7 @@ from .database import WordRepository
 from .dialogs import AddWordDialog
 from .insights import AnalyticsDialog
 from .library import LibraryDialog
+from .service_client import schedule_example_enrichment
 from .settings import SettingsStore
 from .themes import stylesheet
 from .translation import OfflineTranslator
@@ -67,25 +68,29 @@ def main() -> int:
 
     if arguments.add or arguments.add_clipboard:
         initial_text = app.clipboard().text() if arguments.add_clipboard else ""
-        dialog = AddWordDialog(translator, initial_text=initial_text)
-        dialog.setStyleSheet(stylesheet(settings.theme, settings.font_scale))
-        result = dialog.exec()
-        if result == dialog.DialogCode.Accepted and dialog.word_data is not None:
+        add_dialog = AddWordDialog(translator, initial_text=initial_text)
+        add_dialog.setStyleSheet(stylesheet(settings.theme, settings.font_scale))
+        result = add_dialog.exec()
+        if (
+            result == add_dialog.DialogCode.Accepted
+            and add_dialog.word_data is not None
+        ):
             try:
-                repository.add_word(**dialog.word_data)
+                word_id = repository.add_word(**add_dialog.word_data)
+                schedule_example_enrichment(word_id)
             except Exception as error:
                 QMessageBox.warning(None, "Could not save card", str(error))
         repository.close()
         return 0
 
     if arguments.library:
-        dialog = LibraryDialog(
+        library_dialog = LibraryDialog(
             repository,
             translator,
             daily_goal=settings.daily_goal,
         )
-        dialog.setStyleSheet(stylesheet(settings.theme, settings.font_scale))
-        dialog.exec()
+        library_dialog.setStyleSheet(stylesheet(settings.theme, settings.font_scale))
+        library_dialog.exec()
         repository.close()
         return 0
 
@@ -96,27 +101,31 @@ def main() -> int:
             QMessageBox.warning(None, "Card not found", "That card no longer exists.")
             repository.close()
             return 1
-        dialog = AddWordDialog(translator, word=word)
-        dialog.setStyleSheet(stylesheet(settings.theme, settings.font_scale))
-        if dialog.exec() == dialog.DialogCode.Accepted and dialog.word_data is not None:
+        edit_dialog = AddWordDialog(translator, word=word)
+        edit_dialog.setStyleSheet(stylesheet(settings.theme, settings.font_scale))
+        if (
+            edit_dialog.exec() == edit_dialog.DialogCode.Accepted
+            and edit_dialog.word_data is not None
+        ):
             try:
-                repository.update_word(word.id, **dialog.word_data)
+                repository.update_word(word.id, **edit_dialog.word_data)
+                schedule_example_enrichment(word.id)
             except sqlite3.IntegrityError:
                 QMessageBox.warning(None, "Could not save card", "This card exists.")
         repository.close()
         return 0
 
     if arguments.batch:
-        dialog = BatchAddDialog(repository, translator)
-        dialog.setStyleSheet(stylesheet(settings.theme, settings.font_scale))
-        dialog.exec()
+        batch_dialog = BatchAddDialog(repository, translator)
+        batch_dialog.setStyleSheet(stylesheet(settings.theme, settings.font_scale))
+        batch_dialog.exec()
         repository.close()
         return 0
 
     if arguments.analytics:
-        dialog = AnalyticsDialog(repository, settings.daily_goal)
-        dialog.setStyleSheet(stylesheet(settings.theme, settings.font_scale))
-        dialog.exec()
+        analytics_dialog = AnalyticsDialog(repository, settings.daily_goal)
+        analytics_dialog.setStyleSheet(stylesheet(settings.theme, settings.font_scale))
+        analytics_dialog.exec()
         repository.close()
         return 0
 

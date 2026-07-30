@@ -9,8 +9,10 @@ authors = [{ name = "LexiDesk contributors" }]
 dependencies = [
     "argostranslate>=1.11.0",
     "fsrs>=6.3,<7",
+    "nltk>=3.9,<4",
     "platformdirs>=4.3",
     "pyside6-essentials>=6.10",
+    "spacy==3.8.13; python_version >= '3.14'",
     "torch>=2.2",
 ]
 

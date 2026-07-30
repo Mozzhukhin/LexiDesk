@@ -303,6 +303,24 @@ class WordRepository:
         self.connection.execute("DELETE FROM words WHERE id = ?", (word_id,))
         self.connection.commit()
 
+    def update_example(
+        self,
+        word_id: int,
+        example: str,
+        example_translation: str,
+    ) -> None:
+        cursor = self.connection.execute(
+            """
+            UPDATE words
+            SET example = ?, example_translation = ?
+            WHERE id = ?
+            """,
+            (example.strip(), example_translation.strip(), word_id),
+        )
+        if cursor.rowcount == 0:
+            raise KeyError(f"Unknown word id: {word_id}")
+        self.connection.commit()
+
     def get_word(self, word_id: int) -> Word:
         row = self.connection.execute(
             "SELECT * FROM words WHERE id = ?", (word_id,)

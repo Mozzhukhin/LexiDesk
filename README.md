@@ -19,11 +19,13 @@ every 90 seconds by default.
 - Fully offline EN ↔ RU translation after initial language-data installation
 - A 99,000-headword FreeDict index for precise word meanings and parts of speech
 - Argos neural translation fallback for phrases and missing dictionary entries
+- Sense-specific WordNet examples with background offline translation
 - Conservative offline autocorrection for misspelled English and Russian words
 - Words and short phrases in either language
 - Editable translations, meanings, transcription, forms, frequency, and sources
 - Three modes: always visible, click-to-reveal, and typed translation
-- Official FSRS 6 scheduling with **Again**, **Hard**, **Good**, and **Easy**
+- Simple **Don’t know** / **Know** reviews backed by official FSRS 6 scheduling
+- Periodic four-choice cards with colored feedback and automatic advance
 - One-click undo for the most recent review
 - Automatic 90-second card rotation
 - A native Plasma 6 widget with system, OLED, Forest, and Purple themes
@@ -45,9 +47,9 @@ every 90 seconds by default.
 
 LexiDesk uses the official FSRS 6 implementation with 90% desired retention by
 default. Each card tracks memory stability, difficulty, state, and its latest
-review. **Again**, **Hard**, **Good**, and **Easy** produce individualized
-intervals instead of a fixed ladder. The desired retention can be adjusted
-between 70% and 99%.
+review. **Don’t know** and **Know** map to the FSRS Again and Good ratings and
+produce individualized intervals instead of a fixed ladder. The desired
+retention can be adjusted between 70% and 99%.
 
 Legacy review history is migrated automatically. LexiDesk prioritizes due cards;
 when nothing is due, it displays the least recently shown card so the desktop
@@ -177,8 +179,9 @@ are translated as entered.
 
 The regular application, widget, CLI, database, review system, and translation
 engine run locally. Network access is used only by `scripts/install_models.py`
-during the initial EN↔RU model installation and by
-`scripts/install_dictionary.py` while building the local FreeDict index.
+during the initial EN↔RU model installation,
+`scripts/install_dictionary.py` while building the local FreeDict index, and
+`scripts/install_examples.py` while building the local WordNet example index.
 LexiDesk has no account, analytics, advertising, or telemetry. See
 [THIRD_PARTY.md](THIRD_PARTY.md) for data attribution and licenses.
 

@@ -10,6 +10,7 @@ depends=(
   'python'
   'python-argostranslate'
   'python-fsrs'
+  'python-nltk'
   'python-platformdirs'
   'python-pyside6'
 )
@@ -45,4 +46,6 @@ package() {
     "$pkgdir/usr/bin/lexidesk-install-models"
   install -Dm755 scripts/install_dictionary.py \
     "$pkgdir/usr/bin/lexidesk-install-dictionary"
+  install -Dm755 scripts/install_examples.py \
+    "$pkgdir/usr/bin/lexidesk-install-examples"
 }

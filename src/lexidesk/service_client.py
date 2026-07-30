@@ -31,3 +31,8 @@ def request_service(request: dict[str, Any]) -> dict[str, Any] | None:
         return None
     payload = json.loads(str(arguments[0]))
     return payload if isinstance(payload, dict) else None
+
+
+def schedule_example_enrichment(word_id: int) -> bool:
+    response = request_service({"command": "enrich", "word_id": word_id})
+    return bool(response and response.get("scheduled"))

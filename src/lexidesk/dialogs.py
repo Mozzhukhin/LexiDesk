@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from contextlib import suppress
 from typing import Any
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -23,7 +24,28 @@ from PySide6.QtWidgets import (
 from .models import Word
 from .settings import Settings
 from .themes import THEMES
-from .translation import OfflineTranslator, TranslationError, detect_language
+from .translation import (
+    OfflineTranslator,
+    TranslationError,
+    TranslationResult,
+    detect_language,
+)
+
+
+class TranslationWorker(QThread):
+    completed = Signal(object)
+    failed = Signal(str)
+
+    def __init__(self, translator: OfflineTranslator, text: str) -> None:
+        super().__init__()
+        self.translator = translator
+        self.text = text
+
+    def run(self) -> None:
+        try:
+            self.completed.emit(self.translator.translate(self.text))
+        except TranslationError as error:
+            self.failed.emit(str(error))
 
 
 class AddWordDialog(QDialog):
@@ -38,6 +60,7 @@ class AddWordDialog(QDialog):
         self.translator = translator
         self.word_data: dict[str, Any] | None = None
         self._correction_original = ""
+        self._translation_worker: TranslationWorker | None = None
         self.setWindowTitle("Add a word or phrase")
         self.setMinimumWidth(500)
 
@@ -130,6 +153,7 @@ class AddWordDialog(QDialog):
         )
         buttons.accepted.connect(self._validate_and_accept)
         buttons.rejected.connect(self.reject)
+        self.buttons = buttons
 
         layout = QVBoxLayout(self)
         layout.addLayout(form)
@@ -159,68 +183,90 @@ class AddWordDialog(QDialog):
 
     def translate(self) -> None:
         text = self.source_edit.text().strip()
-        if not text:
+        if not text or self._translation_worker is not None:
             self.source_edit.setFocus()
             return
         self.translate_button.setEnabled(False)
         self.translate_button.setText("Translating…")
+        self.buttons.setEnabled(False)
         self.setCursor(Qt.CursorShape.WaitCursor)
-        try:
-            result = self.translator.translate(text)
-            if result.corrected_source:
-                self._correction_original = text
-                self.source_edit.setText(result.corrected_source)
-                self.undo_correction_button.show()
-            else:
-                self._correction_original = ""
-                self.undo_correction_button.hide()
-            self.spelling_suggestions.clear()
-            self.spelling_suggestions.addItems(result.spelling_suggestions)
-            show_suggestions = bool(result.spelling_suggestions)
-            self.spelling_widget.setVisible(show_suggestions)
-            self.target_edit.setText(result.translation)
-            self.alternatives_edit.setText(", ".join(result.alternatives))
-            if result.part_of_speech:
-                self.part_of_speech.setCurrentText(result.part_of_speech)
-            if not self.example_edit.text().strip():
-                try:
-                    generated = self.translator.generate_example(
-                        self.source_edit.text().strip(),
-                        result.source_language,
-                        result.part_of_speech,
-                    )
-                    self.example_edit.setText(generated.source)
-                    self.example_translation_edit.setText(generated.translation)
-                except TranslationError:
-                    pass
-            if not self.source_info_edit.text().strip():
-                self.source_info_edit.setText(
-                    "FreeDict offline dictionary"
-                    if result.dictionary_match
-                    else "Argos offline model"
+        worker = TranslationWorker(self.translator, text)
+        self._translation_worker = worker
+        worker.completed.connect(lambda result: self._apply_translation(result, text))
+        worker.failed.connect(self._translation_failed)
+        worker.finished.connect(self._translation_finished)
+        worker.start()
+
+    def _apply_translation(
+        self,
+        result: TranslationResult,
+        original_text: str,
+    ) -> None:
+        if result.corrected_source:
+            self._correction_original = original_text
+            self.source_edit.setText(result.corrected_source)
+            self.undo_correction_button.show()
+        else:
+            self._correction_original = ""
+            self.undo_correction_button.hide()
+        self.spelling_suggestions.clear()
+        self.spelling_suggestions.addItems(result.spelling_suggestions)
+        self.spelling_widget.setVisible(bool(result.spelling_suggestions))
+        self.target_edit.setText(result.translation)
+        self.alternatives_edit.setText(", ".join(result.alternatives))
+        if result.part_of_speech:
+            self.part_of_speech.setCurrentText(result.part_of_speech)
+        if result.source_language == "en" and not self.example_edit.text().strip():
+            try:
+                example = self.translator.example_sentence(
+                    self.source_edit.text().strip(),
+                    result.source_language,
+                    result.part_of_speech,
                 )
-            direction = (
-                f"{result.source_language.upper()} → {result.target_language.upper()}"
+                self.example_edit.setText(example)
+                self.example_translation_edit.clear()
+            except TranslationError:
+                pass
+        if not self.source_info_edit.text().strip():
+            self.source_info_edit.setText(
+                "FreeDict offline dictionary"
+                if result.dictionary_match
+                else "Argos offline model"
             )
-            if result.corrected_source:
-                direction += (
-                    f"  •  Auto-corrected “{text}” → “{result.corrected_source}”"
-                )
-            elif result.dictionary_match:
-                direction += "  •  Local dictionary match"
-            elif len(text.split()) == 1:
-                direction += "  •  Offline model — check spelling"
-            else:
-                direction += "  •  Offline phrase model"
-            self.direction_label.setText(direction)
-            self.target_edit.setFocus()
-            self.target_edit.selectAll()
-        except TranslationError as error:
-            QMessageBox.warning(self, "Translation unavailable", str(error))
-        finally:
-            self.unsetCursor()
-            self.translate_button.setText("Translate offline")
-            self.translate_button.setEnabled(True)
+        direction = (
+            f"{result.source_language.upper()} → {result.target_language.upper()}"
+        )
+        if result.corrected_source:
+            direction += (
+                f"  •  Auto-corrected “{original_text}” → “{result.corrected_source}”"
+            )
+        elif result.dictionary_match:
+            direction += "  •  Local dictionary match"
+        elif len(original_text.split()) == 1:
+            direction += "  •  Offline model — check spelling"
+        else:
+            direction += "  •  Offline phrase model"
+        self.direction_label.setText(direction)
+        self.target_edit.setFocus()
+        self.target_edit.selectAll()
+
+    def _translation_failed(self, message: str) -> None:
+        QMessageBox.warning(self, "Translation unavailable", message)
+
+    def _translation_finished(self) -> None:
+        worker = self._translation_worker
+        self._translation_worker = None
+        if worker is not None:
+            worker.deleteLater()
+        self.unsetCursor()
+        self.translate_button.setText("Translate offline")
+        self.translate_button.setEnabled(True)
+        self.buttons.setEnabled(True)
+
+    def reject(self) -> None:
+        if self._translation_worker is not None:
+            return
+        super().reject()
 
     def undo_correction(self) -> None:
         if not self._correction_original:
@@ -262,23 +308,13 @@ class AddWordDialog(QDialog):
         ]
         example = self.example_edit.text().strip()
         example_translation = self.example_translation_edit.text().strip()
-        if not example:
-            try:
-                generated = self.translator.generate_example(
+        if not example and source_language == "en":
+            with suppress(TranslationError):
+                example = self.translator.example_sentence(
                     source,
                     source_language,
                     self.part_of_speech.currentText(),
                 )
-                example = generated.source
-                example_translation = generated.translation
-            except TranslationError:
-                pass
-        if example and not example_translation:
-            try:
-                if detect_language(example) == source_language:
-                    example_translation = self.translator.translate(example).translation
-            except TranslationError:
-                pass
         self.word_data = {
             "source_text": source,
             "source_lang": source_language,
@@ -311,7 +347,7 @@ class SettingsDialog(QDialog):
         self.setMinimumWidth(410)
 
         self.theme_combo = QComboBox()
-        self.theme_combo.addItems(THEMES.keys())
+        self.theme_combo.addItems(list(THEMES))
         self.theme_combo.setCurrentText(settings.theme)
 
         self.reveal_combo = QComboBox()
