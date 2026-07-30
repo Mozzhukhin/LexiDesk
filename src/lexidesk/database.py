@@ -455,9 +455,11 @@ class WordRepository:
 
     def next_word(self, exclude_id: int | None = None) -> Word | None:
         """
-        Show every unseen card before repeating one, then use the card that has
-        gone unseen the longest. Due state and learning difficulty break close
-        ties; RANDOM is only the final tie-breaker.
+        Never repeat a card within the next five displays. For decks smaller
+        than six cards, the cooldown becomes ``deck size - 1`` so every other
+        card is shown before a repeat. Within the eligible pool, unseen and
+        least recently shown cards come first. Due state and learning
+        difficulty break close ties; RANDOM is only the final tie-breaker.
 
         Passive desktop rotation must cover the entire deck. A strict due-first
         order would let overdue cards monopolize the widget because browsing a
@@ -466,8 +468,26 @@ class WordRepository:
         now = to_storage(utc_now())
         row = self.connection.execute(
             """
+            WITH deck_size(total) AS (
+                SELECT COUNT(*) FROM words
+            ),
+            recent_cards(id) AS (
+                SELECT id
+                FROM words
+                WHERE last_shown_at IS NOT NULL
+                ORDER BY last_shown_at DESC, id DESC
+                LIMIT MIN(5, MAX(0, (SELECT total FROM deck_size) - 1))
+            )
             SELECT * FROM words
-            WHERE (? IS NULL OR id != ? OR (SELECT COUNT(*) FROM words) = 1)
+            WHERE (
+                    (SELECT total FROM deck_size) = 1
+                    OR id NOT IN (SELECT id FROM recent_cards)
+                )
+              AND (
+                    ? IS NULL
+                    OR id != ?
+                    OR (SELECT total FROM deck_size) = 1
+                )
             ORDER BY
                 CASE WHEN last_shown_at IS NULL THEN 0 ELSE 1 END,
                 COALESCE(last_shown_at, created_at),

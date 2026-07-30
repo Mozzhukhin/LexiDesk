@@ -45,3 +45,8 @@ then the oldest `last_shown_at` across the entire deck, followed by due state,
 miss rate, FSRS difficulty, and due time. This prevents overdue cards from
 starving future cards during passive browsing. Random ordering is only the final
 tie-breaker.
+
+The selector excludes the five most recently displayed card IDs. Its SQL limit
+is `min(5, deck_size - 1)`, so decks containing fewer than six cards remain
+usable while still cycling through every other word before a repeat. A one-card
+deck is the only intentional immediate-repeat case.

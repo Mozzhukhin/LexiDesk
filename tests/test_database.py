@@ -2,6 +2,8 @@ import sqlite3
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import pytest
+
 from lexidesk.backup import ensure_daily_backup
 from lexidesk.database import WordRepository
 
@@ -151,6 +153,52 @@ def test_passive_rotation_does_not_starve_a_future_card(tmp_path: Path) -> None:
 
     assert selected is not None
     assert selected.id == future_id
+    repository.close()
+
+
+@pytest.mark.parametrize(("deck_size", "minimum_distance"), [(7, 6), (4, 4)])
+def test_recent_word_cooldown_adapts_to_deck_size(
+    tmp_path: Path,
+    deck_size: int,
+    minimum_distance: int,
+) -> None:
+    repository = WordRepository(tmp_path / f"cooldown-{deck_size}.db")
+    for index in range(deck_size):
+        repository.add_word(
+            source_text=f"word-{index}",
+            source_lang="en",
+            target_text=f"слово-{index}",
+        )
+
+    sequence: list[int] = []
+    previous: int | None = None
+    for _ in range(deck_size * 4):
+        selected = repository.next_word(previous)
+        assert selected is not None
+        sequence.append(selected.id)
+        previous = selected.id
+
+    last_position: dict[int, int] = {}
+    for position, word_id in enumerate(sequence):
+        if word_id in last_position:
+            assert position - last_position[word_id] >= minimum_distance
+        last_position[word_id] = position
+    repository.close()
+
+
+def test_single_card_deck_can_repeat(tmp_path: Path) -> None:
+    repository = WordRepository(tmp_path / "single-card.db")
+    word_id = repository.add_word(
+        source_text="only",
+        source_lang="en",
+        target_text="единственный",
+    )
+
+    first = repository.next_word()
+    second = repository.next_word(word_id)
+
+    assert first is not None and second is not None
+    assert first.id == second.id == word_id
     repository.close()
 
 

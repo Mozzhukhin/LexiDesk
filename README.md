@@ -65,13 +65,16 @@ card before repeating one. It then selects the least recently shown item across
 the whole deck; due state, mistakes, and FSRS difficulty break close ties
 without starving scheduled cards. **Next** does not alter learning history, and
 **Undo** restores the complete state before the most recent new-format review.
+The same card cannot reappear during the next five displays. In a smaller deck,
+LexiDesk cycles through every other available card before allowing a repeat.
 
 ## Widget workflow
 
 1. At startup the QML widget asks the local D-Bus service for the next card.
    Unseen cards are covered first; subsequent selection balances due status,
    time since display, mistake rate, and FSRS difficulty without repeating a
-   small overdue subset forever.
+   small overdue subset forever. A five-card cooldown guarantees spacing
+   between repeated words and automatically adapts to small vocabularies.
 2. A regular card shows the source, translation, compact metadata, and a short
    example for the selected meaning. The example must contain the studied term
    and is limited to one compact sentence.
