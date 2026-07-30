@@ -1,0 +1,48 @@
+# Maintainer: LexiDesk contributors
+pkgname=lexidesk
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Offline English-Russian vocabulary trainer and Plasma widget"
+arch=('any')
+url="https://github.com/OWNER/LexiDesk"
+license=('MIT')
+depends=(
+  'python'
+  'python-argostranslate'
+  'python-fsrs'
+  'python-platformdirs'
+  'python-pyside6'
+)
+makedepends=('python-build' 'python-installer' 'python-wheel')
+optdepends=('plasma-workspace: native KDE Plasma desktop widget')
+source=("$pkgname-$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+  cd "$srcdir/$pkgname-$pkgver"
+  python -m build --wheel --no-isolation
+}
+
+package() {
+  cd "$srcdir/$pkgname-$pkgver"
+  python -m installer --destdir="$pkgdir" dist/*.whl
+
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 assets/lexidesk.svg \
+    "$pkgdir/usr/share/icons/hicolor/scalable/apps/io.github.lexidesk.svg"
+  install -Dm644 packaging/io.github.lexidesk.desktop \
+    "$pkgdir/usr/share/applications/io.github.lexidesk.desktop"
+  install -Dm644 packaging/io.github.lexidesk.metainfo.xml \
+    "$pkgdir/usr/share/metainfo/io.github.lexidesk.metainfo.xml"
+  install -Dm644 packaging/systemd/lexidesk.service \
+    "$pkgdir/usr/lib/systemd/user/lexidesk.service"
+  install -Dm644 packaging/dbus/io.github.lexidesk.service \
+    "$pkgdir/usr/share/dbus-1/services/io.github.lexidesk.service"
+  install -d "$pkgdir/usr/share/plasma/plasmoids"
+  cp -a plasma/io.github.lexidesk \
+    "$pkgdir/usr/share/plasma/plasmoids/io.github.lexidesk"
+  install -Dm755 scripts/install_models.py \
+    "$pkgdir/usr/bin/lexidesk-install-models"
+  install -Dm755 scripts/install_dictionary.py \
+    "$pkgdir/usr/bin/lexidesk-install-dictionary"
+}

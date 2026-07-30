@@ -1,0 +1,13 @@
+[Unit]
+Description=LexiDesk local vocabulary service
+After=graphical-session.target
+
+[Service]
+Type=dbus
+BusName=io.github.lexidesk
+ExecStart=/usr/bin/lexidesk-service
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

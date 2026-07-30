@@ -1,0 +1,19 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "LexiDesk contributors"
+            }
+        ],
+        "Category": "Utilities",
+        "Description": "Learn English and Russian words offline from your desktop",
+        "Icon": "accessories-dictionary",
+        "Id": "io.github.lexidesk",
+        "License": "MIT",
+        "Name": "LexiDesk",
+        "Version": "1.0.0",
+        "Website": "https://github.com/"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "KPackageStructure": "Plasma/Applet"
+}

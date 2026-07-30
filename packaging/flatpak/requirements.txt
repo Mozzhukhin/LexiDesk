@@ -1,0 +1,5 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+argostranslate>=1.11.0
+fsrs>=6.3,<7
+platformdirs>=4.3
+torch>=2.2

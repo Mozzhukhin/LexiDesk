@@ -1,0 +1,24 @@
+[Desktop Entry]
+Type=Application
+Name=LexiDesk
+GenericName=Vocabulary Trainer
+Comment=Learn English and Russian vocabulary completely offline
+Exec=lexidesk
+Icon=io.github.lexidesk
+Terminal=false
+Categories=Education;Languages;
+StartupNotify=true
+Keywords=vocabulary;language;English;Russian;flashcards;FSRS;
+Actions=Library;Batch;Analytics;
+
+[Desktop Action Library]
+Name=Open vocabulary library
+Exec=lexidesk --library
+
+[Desktop Action Batch]
+Name=Batch add vocabulary
+Exec=lexidesk --batch
+
+[Desktop Action Analytics]
+Name=Open learning analytics
+Exec=lexidesk --analytics

@@ -1,0 +1,60 @@
+from __future__ import annotations
+
+import json
+import sys
+
+from PySide6.QtCore import QCoreApplication, QObject, Slot
+from PySide6.QtDBus import QDBusConnection
+
+from .api import execute_request
+from .backup import ensure_daily_backup
+from .config import APP_NAME, database_path, settings_path
+from .database import WordRepository
+from .service_client import INTERFACE_NAME, OBJECT_PATH, SERVICE_NAME
+from .settings import SettingsStore
+
+
+class LexiDeskService(QObject):
+    def __init__(self, repository: WordRepository) -> None:
+        super().__init__()
+        self.repository = repository
+
+    @Slot(str, result=str)
+    def Request(self, raw_request: str) -> str:  # noqa: N802
+        try:
+            decoded = json.loads(raw_request)
+            if not isinstance(decoded, dict):
+                raise ValueError("The request must be a JSON object.")
+            payload = execute_request(self.repository, decoded)
+        except Exception as error:
+            payload = {"error": str(error), "type": type(error).__name__}
+        return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+
+
+def main() -> int:
+    app = QCoreApplication(sys.argv)
+    app.setApplicationName(f"{APP_NAME} Service")
+    settings = SettingsStore(settings_path()).load()
+    repository = WordRepository(
+        database_path(),
+        desired_retention=settings.desired_retention,
+    )
+    ensure_daily_backup(repository)
+
+    bus = QDBusConnection.sessionBus()
+    if not bus.registerService(SERVICE_NAME):
+        repository.close()
+        return 1
+    service = LexiDeskService(repository)
+    registration = QDBusConnection.RegisterOption.ExportAllSlots
+    if not bus.registerObject(OBJECT_PATH, INTERFACE_NAME, service, registration):
+        bus.unregisterService(SERVICE_NAME)
+        repository.close()
+        return 1
+    result = app.exec()
+    repository.close()
+    return result
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

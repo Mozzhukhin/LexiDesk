@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=io.github.lexidesk
+Exec=/usr/bin/lexidesk-service
+SystemdService=lexidesk.service

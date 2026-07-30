@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.lexidesk</id>
+  <name>LexiDesk</name>
+  <summary>Offline English–Russian vocabulary trainer for Linux desktops</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <description>
+    <p>
+      LexiDesk combines a native KDE Plasma widget with a Python desktop
+      application, offline translation, conservative spelling correction,
+      typed-answer practice, and FSRS 6 spaced repetition.
+    </p>
+    <p>
+      Vocabulary, review history, analytics, and language data stay on the
+      local computer. No account or telemetry is used.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.lexidesk.desktop</launchable>
+  <provides>
+    <binary>lexidesk</binary>
+  </provides>
+  <categories>
+    <category>Education</category>
+    <category>Languages</category>
+  </categories>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/OWNER/LexiDesk/main/docs/images/desktop-window.png</image>
+      <caption>Desktop vocabulary card</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/OWNER/LexiDesk/main/docs/images/library.png</image>
+      <caption>Searchable vocabulary library</caption>
+    </screenshot>
+  </screenshots>
+  <url type="homepage">https://github.com/OWNER/LexiDesk</url>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="1.0.0" date="2026-07-30"/>
+  </releases>
+</component>
