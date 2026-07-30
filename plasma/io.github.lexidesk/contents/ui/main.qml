@@ -29,6 +29,7 @@ PlasmoidItem {
     property bool answerChecked: false
     property string answerFeedback: ""
     property string suggestedRating: ""
+    property string typedAnswer: ""
     property string pendingKind: ""
     property string bridgePath: findExecutable(
         "lexidesk-bridge", "lexidesk-cli")
@@ -82,9 +83,10 @@ PlasmoidItem {
     }
 
     function checkAnswer() {
-        if (cardId > 0 && answerField.text.trim().length > 0)
+        var answer = typedAnswer.trim()
+        if (cardId > 0 && answer.length > 0)
             runBridge(
-                "check " + cardId + " " + shellQuote(answerField.text.trim()),
+                "check " + cardId + " " + shellQuote(answer),
                 "check")
     }
 
@@ -128,7 +130,7 @@ PlasmoidItem {
         answerChecked = false
         answerFeedback = ""
         suggestedRating = ""
-        answerField.text = ""
+        typedAnswer = ""
         secondsLeft = plasmoid.configuration.rotationSeconds
         failureCount = 0
         errorText = ""
@@ -157,8 +159,16 @@ PlasmoidItem {
                 loadNext()
                 return
             }
+            var payload
             try {
-                var payload = JSON.parse(stdout.trim())
+                payload = JSON.parse(stdout.trim())
+            } catch (error) {
+                errorText = i18n("LexiDesk returned an invalid local response.")
+                retryTimer.restart()
+                console.error("Could not parse LexiDesk response:", error, stdout)
+                return
+            }
+            try {
                 if (payload.error) {
                     errorText = payload.error
                 } else if (pendingKind === "stats") {
@@ -188,9 +198,9 @@ PlasmoidItem {
                     Qt.callLater(requestStats)
                 }
             } catch (error) {
-                errorText = i18n("LexiDesk returned an invalid local response.")
+                errorText = i18n("LexiDesk could not display the local response.")
                 retryTimer.restart()
-                console.error(error, stdout)
+                console.error("Could not apply LexiDesk response:", error, stdout)
             }
         }
     }
@@ -351,16 +361,20 @@ PlasmoidItem {
                             && !answerChecked
 
                         PlasmaComponents.TextField {
-                            id: answerField
                             Layout.fillWidth: true
+                            text: root.typedAnswer
                             placeholderText: i18n("Type the translation…")
                             enabled: !busy
+                            onTextChanged: {
+                                if (root.typedAnswer !== text)
+                                    root.typedAnswer = text
+                            }
                             onAccepted: checkAnswer()
                         }
 
                         PlasmaComponents.Button {
                             text: i18n("Check")
-                            enabled: !busy && answerField.text.trim().length > 0
+                            enabled: !busy && root.typedAnswer.trim().length > 0
                             onClicked: checkAnswer()
                         }
                     }
