@@ -100,6 +100,9 @@ def test_quiz_payload_supports_reverse_cloze_and_context(
         assert payload["type"] == kind
         assert payload["answer"]
         assert len(payload["choices"]) == 4
+        if kind == "context":
+            assert all("___" in choice for choice in payload["choices"])
+            assert all("ambiguous" not in choice for choice in payload["choices"])
     repository.close()
 
 

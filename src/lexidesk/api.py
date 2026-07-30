@@ -152,11 +152,22 @@ def quiz_payload(
     cloze = _cloze_sentence(word)
     if cloze and len(reverse_choices) == 4:
         kinds.append("cloze")
+    category = word.part_of_speech.split(",", 1)[0].strip().casefold()
+    same_category = [
+        candidate
+        for candidate in candidates
+        if candidate.part_of_speech.split(",", 1)[0].strip().casefold() == category
+    ]
+    correct_context = _masked_context(word)
     context_choices = _distinct_choices(
-        word.example,
-        [candidate.example for candidate in candidates if candidate.example],
+        correct_context,
+        [
+            masked
+            for candidate in same_category
+            if (masked := _masked_context(candidate))
+        ],
     )
-    if word.example and len(context_choices) == 4:
+    if correct_context and len(context_choices) == 4:
         kinds.append("context")
     kind = random.choice(kinds)
     if kind == "reverse":
@@ -178,8 +189,8 @@ def quiz_payload(
     if kind == "context":
         return {
             "type": kind,
-            "prompt": f"Which sentence uses “{word.source_text}” correctly?",
-            "answer": word.example,
+            "prompt": f"Where does “{word.source_text}” fit best?",
+            "answer": correct_context,
             "choices": context_choices,
             "instruction": "Choose the matching context",
         }
@@ -293,6 +304,10 @@ def _cloze_sentence(word: Word) -> str:
         flags=re.IGNORECASE,
     )
     return pattern.sub("___", word.example, count=1)
+
+
+def _masked_context(word: Word) -> str:
+    return _cloze_sentence(word)
 
 
 def execute_request(
