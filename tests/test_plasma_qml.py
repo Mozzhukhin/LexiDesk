@@ -60,3 +60,11 @@ def test_widget_uses_simple_reviews_and_four_choice_quizzes() -> None:
     assert "Easing.OutCubic" in qml
     assert 'text: i18n("Hard")' not in qml
     assert 'text: i18n("Easy")' not in qml
+
+
+def test_widget_keeps_the_entered_source_above_its_translation() -> None:
+    qml = QML_PATH.read_text(encoding="utf-8")
+
+    source_binding = "(choiceMode ? quizPrompt : sourceText)"
+    translation_binding = "(choiceMode ? quizAnswer : translationText)"
+    assert qml.index(source_binding) < qml.index(translation_binding)

@@ -72,6 +72,23 @@ def test_add_select_and_review(tmp_path: Path) -> None:
     repository.close()
 
 
+def test_card_meanings_drop_sentence_periods_and_duplicates(tmp_path: Path) -> None:
+    repository = WordRepository(tmp_path / "clean-meanings.db")
+    word_id = repository.add_word(
+        source_text="Ограниченный",
+        source_lang="ru",
+        target_text="Restricted.",
+        alternatives=["Limited.", "Restricted", "Limited"],
+    )
+
+    word = repository.get_word(word_id)
+
+    assert word.source_text == "Ограниченный"
+    assert word.target_text == "Restricted"
+    assert word.alternatives == ["Limited"]
+    repository.close()
+
+
 def test_next_word_covers_unseen_cards_before_repeating(tmp_path: Path) -> None:
     repository = WordRepository(tmp_path / "rotation.db")
     ids = [

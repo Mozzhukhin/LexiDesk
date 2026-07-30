@@ -84,7 +84,7 @@ def example_is_suitable(
         or not term
         or len(sentence) > MAX_EXAMPLE_LENGTH
         or len(sentence.rstrip(".!?").split()) < 4
-        or sentence.endswith("…")
+        or sentence.endswith(("…", "..."))
     ):
         return False
     pattern = rf"(?<![\w]){re.escape(term)}(?![\w])"

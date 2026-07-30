@@ -142,7 +142,7 @@ class OfflineDictionary:
         normalized = normalize_headword(text)
         if (
             not self.available
-            or not normalized.isalpha()
+            or not _is_alphabetic_normalized(normalized)
             or len(normalized) < 3
             or source_language not in {"en", "ru"}
         ):
@@ -296,7 +296,7 @@ def _clean_translations(values: object) -> tuple[str, ...]:
     result: list[str] = []
     seen: set[str] = set()
     for raw_value in values:
-        value = clean_dictionary_text(str(raw_value))
+        value = clean_dictionary_text(str(raw_value)).replace(".", "")
         key = normalize_headword(value)
         if (
             not value
@@ -323,6 +323,12 @@ def _has_wrong_script(value: str) -> bool:
     has_latin = any("a" <= character.casefold() <= "z" for character in value)
     has_cyrillic = any("\u0400" <= character <= "\u04ff" for character in value)
     return has_latin and has_cyrillic
+
+
+def _is_alphabetic_normalized(value: str) -> bool:
+    return bool(value) and all(
+        character.isalpha() or unicodedata.combining(character) for character in value
+    )
 
 
 def _damerau_levenshtein(left: str, right: str) -> int:

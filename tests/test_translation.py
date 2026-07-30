@@ -15,7 +15,9 @@ from lexidesk.translation import (
     TranslationResult,
     _align_quoted_term,
     _best_correction,
+    _clean_model_candidate,
     _english_stems,
+    _match_source_case,
     build_example_sentence,
     detect_language,
 )
@@ -75,6 +77,21 @@ def test_ambiguous_short_word_is_not_changed() -> None:
 def test_dictionary_text_removes_stress_and_inline_markup() -> None:
     assert clean_dictionary_text(" altog<u>e</u>ther ") == "altogether"
     assert clean_dictionary_text("предложе́ние") == "предложение"
+
+
+def test_single_word_model_results_drop_sentence_periods() -> None:
+    assert _clean_model_candidate(" Restricted. ", single_word=True) == "Restricted"
+    assert _clean_model_candidate("Limited.", single_word=True) == "Limited"
+    assert (
+        _clean_model_candidate("A complete sentence.", single_word=False)
+        == "A complete sentence."
+    )
+
+
+def test_autocorrection_preserves_the_entered_case() -> None:
+    assert _match_source_case("ограниченный", "Ограниченый") == "Ограниченный"
+    assert _match_source_case("restricted", "RESTRCTED") == "RESTRICTED"
+    assert _match_source_case("restricted", "restrcted") == "restricted"
 
 
 def test_translated_definition_uses_the_selected_meaning() -> None:

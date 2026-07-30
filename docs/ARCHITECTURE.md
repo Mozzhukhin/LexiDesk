@@ -34,6 +34,10 @@ confirmed headwords are preferred while markup, stress characters, mixed-script
 notes, and likely spelling variants are removed or demoted. This improves
 single-word quality without adding network access or Argos latency.
 
+All repository write paths normalize card meanings. Sentence-ending periods are
+removed from single-card translations and alternatives are de-duplicated after
+normalization, so GUI entry, batch import, and JSON/CSV import behave the same.
+
 The background example task validates both halves of every example. The source
 must contain the card headword and the translated sentence must contain the
 selected target meaning. WordNet examples from another sense and inconsistent

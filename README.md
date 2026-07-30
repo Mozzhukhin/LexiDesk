@@ -21,6 +21,7 @@ every 90 seconds by default.
 - Argos neural translation fallback for phrases and missing dictionary entries
 - Short examples validated against both the studied word and selected meaning
 - Conservative offline autocorrection for misspelled English and Russian words
+- Clean card meanings without sentence-ending periods or duplicate variants
 - Words and short phrases in either language
 - Explicit selection among up to four offline translation meanings
 - Editable translations, meanings, transcription, forms, frequency, and sources
@@ -207,6 +208,11 @@ stress marks and source markup, demotes likely misspellings, and keeps ambiguous
 meanings available for explicit selection. Argos remains a fallback for phrases
 and missing entries; no automatic system can infer the intended sense of an
 isolated word with certainty, so every translation remains editable.
+
+The text entered by the learner always remains the source heading, including
+RU→EN cards. Single-word Argos results are normalized as card meanings rather
+than sentences: trailing periods are removed and punctuation-only duplicates
+are collapsed before saving.
 
 Example generation is tied to the selected card meaning. Both sides must contain
 the corresponding studied term (including common inflected forms). A mismatched

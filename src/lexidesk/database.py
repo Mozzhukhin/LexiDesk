@@ -21,6 +21,29 @@ def from_storage(value: str | None) -> datetime | None:
     return datetime.fromisoformat(value) if value else None
 
 
+def _clean_meanings(
+    target_text: str,
+    alternatives: list[str] | None,
+) -> tuple[str, list[str]]:
+    """Remove sentence periods and duplicates from card-sized meanings."""
+
+    def clean(value: str) -> str:
+        return " ".join(value.strip().split()).replace(".", "").strip()
+
+    target = clean(target_text)
+    if not target:
+        raise ValueError("Translation cannot be empty.")
+    result: list[str] = []
+    seen = {target.casefold()}
+    for raw_value in alternatives or []:
+        value = clean(raw_value)
+        key = value.casefold()
+        if value and key not in seen:
+            result.append(value)
+            seen.add(key)
+    return target, result
+
+
 class WordRepository:
     def __init__(self, path: Path, desired_retention: float = 0.9) -> None:
         self.path = path
@@ -228,6 +251,10 @@ class WordRepository:
         source_info: str = "",
     ) -> int:
         now = utc_now()
+        cleaned_target, cleaned_alternatives = _clean_meanings(
+            target_text,
+            alternatives,
+        )
         cursor = self.connection.execute(
             """
             INSERT INTO words (
@@ -240,8 +267,8 @@ class WordRepository:
             (
                 source_text.strip(),
                 source_lang,
-                target_text.strip(),
-                json.dumps(alternatives or [], ensure_ascii=False),
+                cleaned_target,
+                json.dumps(cleaned_alternatives, ensure_ascii=False),
                 part_of_speech.strip(),
                 example.strip(),
                 example_translation.strip(),
@@ -280,6 +307,10 @@ class WordRepository:
         frequency: str = "",
         source_info: str = "",
     ) -> None:
+        cleaned_target, cleaned_alternatives = _clean_meanings(
+            target_text,
+            alternatives,
+        )
         cursor = self.connection.execute(
             """
             UPDATE words SET
@@ -292,8 +323,8 @@ class WordRepository:
             (
                 source_text.strip(),
                 source_lang,
-                target_text.strip(),
-                json.dumps(alternatives or [], ensure_ascii=False),
+                cleaned_target,
+                json.dumps(cleaned_alternatives, ensure_ascii=False),
                 part_of_speech.strip(),
                 example.strip(),
                 example_translation.strip(),

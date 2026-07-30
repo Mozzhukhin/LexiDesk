@@ -107,7 +107,7 @@ class OfflineTranslator:
                 entry.translations[1:8],
                 entry.part_of_speech,
                 True,
-                entry.headword,
+                _match_source_case(entry.headword, cleaned),
             )
         translation = candidates[0] if candidates else ""
         primary_tokens = set(translation.casefold().split())
@@ -223,7 +223,10 @@ class OfflineTranslator:
         candidates: list[str] = []
         seen: set[str] = set()
         for hypothesis in hypotheses:
-            value = hypothesis.value.strip()
+            value = _clean_model_candidate(
+                hypothesis.value,
+                single_word=len(cleaned.split()) == 1,
+            )
             key = value.casefold()
             if value and key not in seen:
                 candidates.append(value)
@@ -237,6 +240,19 @@ class OfflineTranslator:
             self.dictionary.lookup(stem, "en") is not None
             for stem in _english_stems(text.casefold())
         )
+
+
+def _clean_model_candidate(value: str, *, single_word: bool) -> str:
+    cleaned = " ".join(value.strip().split())
+    return cleaned.replace(".", "").strip() if single_word else cleaned
+
+
+def _match_source_case(correction: str, original: str) -> str:
+    if original.isupper():
+        return correction.upper()
+    if original[:1].isupper() and original[1:] == original[1:].casefold():
+        return correction[:1].upper() + correction[1:]
+    return correction
 
 
 def _rank_dictionary_translations(
