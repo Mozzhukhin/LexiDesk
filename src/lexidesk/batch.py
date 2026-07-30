@@ -121,7 +121,7 @@ class BatchAddDialog(QDialog):
             self,
         )
         progress.setWindowModality(Qt.WindowModality.WindowModal)
-        prepared: list[tuple[str, str]] = []
+        prepared: list[tuple[str, str, str, str, str, str]] = []
         for index, (source, supplied_target) in enumerate(records):
             progress.setValue(index)
             QApplication.processEvents()
@@ -129,27 +129,53 @@ class BatchAddDialog(QDialog):
                 break
             try:
                 if supplied_target:
-                    detect_language(source)
+                    source_language = detect_language(source)
                     corrected = source
                     target = supplied_target
+                    part_of_speech = ""
                 else:
                     result = self.translator.translate(source)
+                    source_language = result.source_language
                     corrected = result.corrected_source or source
                     target = result.translation
-                prepared.append((corrected, target))
+                    part_of_speech = result.part_of_speech
+                try:
+                    generated = self.translator.generate_example(
+                        corrected,
+                        source_language,
+                        part_of_speech,
+                    )
+                    example = generated.source
+                    example_translation = generated.translation
+                except TranslationError:
+                    example = ""
+                    example_translation = ""
+                prepared.append(
+                    (
+                        corrected,
+                        target,
+                        source_language,
+                        part_of_speech,
+                        example,
+                        example_translation,
+                    )
+                )
             except TranslationError:
                 continue
         progress.setValue(len(records))
 
         self.table.setRowCount(len(prepared))
-        for row, (source, target) in enumerate(prepared):
+        for row, record in enumerate(prepared):
+            source, target, *_metadata = record
             checked = QTableWidgetItem()
             checked.setFlags(
                 Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable
             )
             checked.setCheckState(Qt.CheckState.Checked)
             self.table.setItem(row, 0, checked)
-            self.table.setItem(row, 1, QTableWidgetItem(source))
+            source_item = QTableWidgetItem(source)
+            source_item.setData(Qt.ItemDataRole.UserRole, record[2:])
+            self.table.setItem(row, 1, source_item)
             self.table.setItem(row, 2, QTableWidgetItem(target))
 
     def save_selected(self) -> None:
@@ -165,10 +191,19 @@ class BatchAddDialog(QDialog):
                 skipped += 1
                 continue
             try:
+                metadata = self.table.item(row, 1).data(Qt.ItemDataRole.UserRole)
+                source_language, part_of_speech, example, example_translation = (
+                    metadata
+                    if isinstance(metadata, (list, tuple)) and len(metadata) == 4
+                    else (detect_language(source), "", "", "")
+                )
                 self.repository.add_word(
                     source_text=source,
-                    source_lang=detect_language(source),
+                    source_lang=source_language,
                     target_text=target,
+                    part_of_speech=part_of_speech,
+                    example=example,
+                    example_translation=example_translation,
                     source_info="Batch import",
                 )
                 imported += 1

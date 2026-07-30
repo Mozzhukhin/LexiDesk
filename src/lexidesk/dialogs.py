@@ -182,6 +182,17 @@ class AddWordDialog(QDialog):
             self.alternatives_edit.setText(", ".join(result.alternatives))
             if result.part_of_speech:
                 self.part_of_speech.setCurrentText(result.part_of_speech)
+            if not self.example_edit.text().strip():
+                try:
+                    generated = self.translator.generate_example(
+                        self.source_edit.text().strip(),
+                        result.source_language,
+                        result.part_of_speech,
+                    )
+                    self.example_edit.setText(generated.source)
+                    self.example_translation_edit.setText(generated.translation)
+                except TranslationError:
+                    pass
             if not self.source_info_edit.text().strip():
                 self.source_info_edit.setText(
                     "FreeDict offline dictionary"
@@ -251,6 +262,17 @@ class AddWordDialog(QDialog):
         ]
         example = self.example_edit.text().strip()
         example_translation = self.example_translation_edit.text().strip()
+        if not example:
+            try:
+                generated = self.translator.generate_example(
+                    source,
+                    source_language,
+                    self.part_of_speech.currentText(),
+                )
+                example = generated.source
+                example_translation = generated.translation
+            except TranslationError:
+                pass
         if example and not example_translation:
             try:
                 if detect_language(example) == source_language:

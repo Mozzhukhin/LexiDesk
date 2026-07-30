@@ -5,6 +5,7 @@ from lexidesk.translation import (
     TranslationError,
     _best_correction,
     _english_stems,
+    build_example_sentence,
     detect_language,
 )
 
@@ -58,3 +59,25 @@ def test_ambiguous_short_word_is_not_changed() -> None:
         SpellingSuggestion(DictionaryEntry("hello", "en", ("привет",), ""), 1),
     )
     assert _best_correction(suggestions, ["неоднозначно"], source_length=4) is None
+
+
+@pytest.mark.parametrize(
+    ("word", "language", "part_of_speech", "expected_fragment"),
+    [
+        ("suggestion", "en", "noun", "suggestion"),
+        ("improve", "en", "verb", "to improve"),
+        ("reliable", "en", "adjective", "seemed reliable"),
+        ("предложение", "ru", "noun", "«предложение»"),
+        ("как дела", "ru", "phrase", "«как дела»"),
+    ],
+)
+def test_generated_example_contains_the_current_term(
+    word: str,
+    language: str,
+    part_of_speech: str,
+    expected_fragment: str,
+) -> None:
+    sentence = build_example_sentence(word, language, part_of_speech)
+
+    assert expected_fragment in sentence
+    assert sentence[-1] in {".", "!", "?"}

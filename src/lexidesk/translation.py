@@ -35,6 +35,12 @@ class TranslationResult:
     spelling_suggestions: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True, slots=True)
+class ExampleResult:
+    source: str
+    translation: str
+
+
 class OfflineTranslator:
     def __init__(
         self,
@@ -114,6 +120,17 @@ class OfflineTranslator:
             alternatives,
             spelling_suggestions=nearby,
         )
+
+    def generate_example(
+        self,
+        source_text: str,
+        source_language: str = "",
+        part_of_speech: str = "",
+    ) -> ExampleResult:
+        language = source_language or detect_language(source_text)
+        sentence = build_example_sentence(source_text, language, part_of_speech)
+        translation = self.translate(sentence).translation
+        return ExampleResult(sentence, translation)
 
     def _model_candidates(self, cleaned: str, source: str, target: str) -> list[str]:
         module = self._module()
@@ -202,3 +219,44 @@ def _english_stems(word: str) -> tuple[str, ...]:
         if len(base) > 2 and base[-1] == base[-2]:
             stems.append(base[:-1])
     return tuple(dict.fromkeys(stem for stem in stems if len(stem) >= 3))
+
+
+def build_example_sentence(
+    source_text: str,
+    source_language: str,
+    part_of_speech: str = "",
+) -> str:
+    term = " ".join(source_text.strip().split())
+    if not term:
+        raise TranslationError("Cannot create an example for an empty word.")
+    if source_language not in {"en", "ru"}:
+        raise TranslationError("Examples are supported for English and Russian.")
+
+    category = part_of_speech.strip().casefold()
+    if source_language == "ru":
+        if category.startswith("noun") or category.startswith("сущ"):
+            return f"В тексте встретилось существительное «{term}»."
+        if category.startswith("verb") or category.startswith("глаг"):
+            return f"В этом предложении используется глагол «{term}»."
+        if category.startswith("adj") or category.startswith("прилаг"):
+            return f"В тексте встретилось прилагательное «{term}»."
+        if category.startswith("adv") or category.startswith("нареч"):
+            return f"В этом предложении используется наречие «{term}»."
+        if category.startswith("phrase") or category.startswith("фраз"):
+            return f"В разговоре прозвучала фраза «{term}»."
+        return f"В разговоре встретилось выражение «{term}»."
+
+    insertion = term
+    if len(term.split()) == 1 and not term.isupper():
+        insertion = term.casefold()
+    if category.startswith("noun"):
+        return f"The {insertion} changed the situation completely."
+    if category.startswith("verb"):
+        return f"They decided to {insertion} when the time was right."
+    if category.startswith("adj"):
+        return f"The result seemed {insertion} in this situation."
+    if category.startswith("adv"):
+        return f"They handled the situation {insertion}."
+    if category.startswith("phrase"):
+        return f"I heard the phrase “{term}” during the conversation."
+    return f"The term “{term}” appeared in the conversation."
