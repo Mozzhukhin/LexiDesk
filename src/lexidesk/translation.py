@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass
 
+from .config import bundled_language_data_dir
 from .dictionary import (
     OfflineDictionary,
     SpellingSuggestion,
@@ -62,6 +64,11 @@ class OfflineTranslator:
 
     def _module(self):
         if self._translate_module is None:
+            bundled = bundled_language_data_dir()
+            if bundled is not None:
+                packages = bundled / "argos-translate" / "packages"
+                if packages.is_dir():
+                    os.environ.setdefault("ARGOS_PACKAGES_DIR", str(packages))
             try:
                 import argostranslate.translate
             except ImportError as error:

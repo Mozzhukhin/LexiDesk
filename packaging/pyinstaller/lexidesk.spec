@@ -10,6 +10,10 @@ datas = [(str(root / "assets" / "lexidesk.svg"), "assets")]
 binaries = []
 hiddenimports = []
 
+language_data = root / "bundle-data"
+if language_data.is_dir():
+    datas.append((str(language_data), "language-data"))
+
 # Argos loads translation engines and tokenizers through package metadata and
 # dynamic imports. Collecting its package data keeps downloaded language models
 # usable in the frozen application.

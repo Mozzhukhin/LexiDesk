@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 from lexidesk.autostart import set_autostart
-from lexidesk.config import autostart_path
+from lexidesk.config import autostart_path, data_dir, dictionary_path
 from lexidesk.service_client import request_service
 
 
@@ -40,3 +40,26 @@ def test_windows_autostart_script(monkeypatch, tmp_path: Path) -> None:
 
     set_autostart(False)
     assert not path.exists()
+
+
+def test_data_directory_override(monkeypatch, tmp_path: Path) -> None:
+    target = tmp_path / "language-data"
+    monkeypatch.setenv("LEXIDESK_DATA_DIR", str(target))
+
+    assert data_dir() == target
+    assert target.is_dir()
+
+
+def test_bundled_dictionary_is_fallback(monkeypatch, tmp_path: Path) -> None:
+    user_data = tmp_path / "user"
+    bundled_data = tmp_path / "bundle"
+    bundled_dictionary = bundled_data / "LexiDesk" / "freedict-en-ru.db"
+    bundled_dictionary.parent.mkdir(parents=True)
+    bundled_dictionary.touch()
+    monkeypatch.setenv("LEXIDESK_DATA_DIR", str(user_data))
+    monkeypatch.setattr(
+        "lexidesk.config.bundled_language_data_dir",
+        lambda: bundled_data,
+    )
+
+    assert dictionary_path() == bundled_dictionary

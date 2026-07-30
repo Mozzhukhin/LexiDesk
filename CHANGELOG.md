@@ -5,6 +5,7 @@
 - Add native Windows installer and portable Windows build.
 - Add universal Linux AppImage and portable Linux archive.
 - Publish separate, clearly named Plasma and Python downloads.
+- Bundle the offline EN↔RU models, dictionary, and example index.
 - Add SHA-256 checksums for every release artifact.
 - Make D-Bus integration optional and add native Windows autostart.
 

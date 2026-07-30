@@ -30,8 +30,10 @@ Ready-to-run packages are published on the
 
 GitHub builds Windows and Linux packages on their corresponding operating
 systems from the same source code. `SHA256SUMS.txt` lets you verify every
-release download. Translation remains offline at runtime, but the language
-models and dictionaries require a one-time download during initial setup.
+release download. Ready-to-run Windows and Linux packages include the EN↔RU
+models, dictionary, and example index, so translation works immediately without
+a network connection. A source installation downloads this data once during
+`scripts/setup.sh`.
 
 ## Features
 
