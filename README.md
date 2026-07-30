@@ -26,7 +26,8 @@ every 90 seconds by default.
 - Editable translations, meanings, transcription, forms, frequency, and sources
 - Three modes: always visible, click-to-reveal, and typed translation
 - Passive **Next** browsing that never changes learning statistics
-- On-demand quiz menu: translation, reverse, cloze, context, and typed answer
+- Persistent Practice modes: Off, Mixed, translation, reverse, cloze, context,
+  and typed answer
 - Same-part-of-speech distractors weighted toward previously difficult cards
 - Soft card-change animations designed for an always-visible desktop widget
 - One-click undo for the most recent review
@@ -51,7 +52,10 @@ every 90 seconds by default.
 LexiDesk uses the official FSRS 6 implementation with 90% desired retention by
 default. Ordinary cards are passive: **Next** and automatic rotation only
 change the visible word. Quizzes never interrupt normal browsing: the user
-starts a chosen training mode from the dedicated Practice menu.
+chooses a persistent mode from the dedicated Practice menu. **Mixed** keeps
+normal cards and inserts a random non-typing quiz every fifth card. Selecting a
+specific quiz type applies that type to every available word until the mode is
+changed or switched Off.
 A correct choice records a successful review; a wrong choice records a failed
 review. Those quiz results produce individualized intervals instead of a fixed
 ladder. The desired retention can be adjusted between 70% and 99%.
@@ -71,9 +75,10 @@ restores the complete state before the most recent new-format review.
    and is limited to one compact sentence.
 3. **Next** requests another card without recording whether the word is known.
    The 90-second timer performs the same passive change automatically.
-4. The Practice button opens a separate menu for translation, reverse
-   translation, sentence gap, matching context, or typing. A quiz starts only
-   after the user chooses one of these modes.
+4. The Practice button opens a separate menu. Off keeps normal cards. Mixed
+   inserts translation, reverse, sentence-gap, or context practice every fifth
+   card. Selecting one exact quiz type uses only that type on subsequent words.
+   The active mode is check-marked and remembered by Plasma.
 5. A correct answer turns green. A wrong selected answer turns red while the
    correct answer turns green. The result remains visible for one second.
 6. The widget then records only that quiz result in FSRS and advances

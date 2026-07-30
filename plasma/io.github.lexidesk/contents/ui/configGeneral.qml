@@ -8,6 +8,7 @@ Kirigami.FormLayout {
     property alias cfg_revealMode: reveal.currentValue
     property alias cfg_colorTheme: colors.currentValue
     property alias cfg_dailyGoal: dailyGoal.value
+    property alias cfg_quizMode: quizMode.currentValue
 
     PlasmaComponents.SpinBox {
         id: rotation
@@ -18,6 +19,22 @@ Kirigami.FormLayout {
         textFromValue: function(value) {
             return i18np("%1 second", "%1 seconds", value)
         }
+    }
+
+    PlasmaComponents.ComboBox {
+        id: quizMode
+        Kirigami.FormData.label: i18n("Practice mode:")
+        textRole: "text"
+        valueRole: "value"
+        model: [
+            { text: i18n("Off"), value: "off" },
+            { text: i18n("Mixed — every fifth card"), value: "mixed" },
+            { text: i18n("Choose translation"), value: "translation" },
+            { text: i18n("Reverse translation"), value: "reverse" },
+            { text: i18n("Complete the sentence"), value: "cloze" },
+            { text: i18n("Choose the context"), value: "context" },
+            { text: i18n("Type the translation"), value: "typing" }
+        ]
     }
 
     PlasmaComponents.ComboBox {

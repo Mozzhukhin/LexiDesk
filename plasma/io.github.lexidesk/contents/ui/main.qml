@@ -41,6 +41,8 @@ PlasmoidItem {
     property string quizAnswer: ""
     property string quizInstruction: ""
     property var quizVariants: ({})
+    property string quizMode: plasmoid.configuration.quizMode || "off"
+    property int mixedCardCounter: 0
     property int cardRevision: 0
     property string pendingKind: ""
     property string bridgePath: findExecutable(
@@ -143,7 +145,7 @@ PlasmoidItem {
         choiceAdvanceTimer.restart()
     }
 
-    function startQuiz(kind) {
+    function startQuiz(kind, animate) {
         var quiz = quizVariants[kind]
         if (!quiz || busy || empty)
             return
@@ -162,7 +164,46 @@ PlasmoidItem {
         typedAnswer = ""
         revealed = false
         choiceAdvanceTimer.stop()
-        cardRevision++
+        if (animate !== false)
+            cardRevision++
+    }
+
+    function selectQuizMode(kind) {
+        plasmoid.configuration.quizMode = kind
+        mixedCardCounter = 0
+        if (kind === "off" || kind === "mixed") {
+            choiceMode = false
+            revealed = plasmoid.configuration.revealMode === "both"
+            answerChecked = false
+            answerFeedback = ""
+            choiceAdvanceTimer.stop()
+        } else {
+            startQuiz(kind)
+        }
+    }
+
+    function applyQuizMode() {
+        if (quizMode === "off")
+            return
+        if (quizMode !== "mixed") {
+            startQuiz(quizMode, false)
+            return
+        }
+        mixedCardCounter++
+        if (mixedCardCounter < 5)
+            return
+        mixedCardCounter = 0
+        var mixedKinds = ["translation", "reverse", "cloze", "context"]
+        var available = []
+        for (var index = 0; index < mixedKinds.length; index++) {
+            var kind = mixedKinds[index]
+            if (quizVariants[kind])
+                available.push(kind)
+        }
+        if (available.length > 0) {
+            var selected = available[Math.floor(Math.random() * available.length)]
+            startQuiz(selected, false)
+        }
     }
 
     function undoReview() {
@@ -222,6 +263,7 @@ PlasmoidItem {
         secondsLeft = plasmoid.configuration.rotationSeconds
         failureCount = 0
         errorText = ""
+        applyQuizMode()
         cardRevision++
     }
 
@@ -368,40 +410,51 @@ PlasmoidItem {
             placement: PlasmaExtras.Menu.BottomPosedLeftAlignedPopup
 
             PlasmaExtras.MenuItem {
+                text: i18n("Off — normal cards")
+                checkable: true
+                checked: root.quizMode === "off"
+                onClicked: root.selectQuizMode("off")
+            }
+            PlasmaExtras.MenuItem {
+                text: i18n("Mixed — every fifth card")
+                checkable: true
+                checked: root.quizMode === "mixed"
+                onClicked: root.selectQuizMode("mixed")
+            }
+            PlasmaExtras.MenuItem {
                 text: i18n("Choose translation")
+                checkable: true
+                checked: root.quizMode === "translation"
                 enabled: Boolean(root.quizVariants.translation)
-                onClicked: root.startQuiz("translation")
+                onClicked: root.selectQuizMode("translation")
             }
             PlasmaExtras.MenuItem {
                 text: i18n("Reverse translation")
+                checkable: true
+                checked: root.quizMode === "reverse"
                 enabled: Boolean(root.quizVariants.reverse)
-                onClicked: root.startQuiz("reverse")
+                onClicked: root.selectQuizMode("reverse")
             }
             PlasmaExtras.MenuItem {
                 text: i18n("Complete the sentence")
+                checkable: true
+                checked: root.quizMode === "cloze"
                 enabled: Boolean(root.quizVariants.cloze)
-                onClicked: root.startQuiz("cloze")
+                onClicked: root.selectQuizMode("cloze")
             }
             PlasmaExtras.MenuItem {
                 text: i18n("Choose the context")
+                checkable: true
+                checked: root.quizMode === "context"
                 enabled: Boolean(root.quizVariants.context)
-                onClicked: root.startQuiz("context")
+                onClicked: root.selectQuizMode("context")
             }
             PlasmaExtras.MenuItem {
                 text: i18n("Type the translation")
+                checkable: true
+                checked: root.quizMode === "typing"
                 enabled: Boolean(root.quizVariants.typing)
-                onClicked: root.startQuiz("typing")
-            }
-            PlasmaExtras.MenuItem {
-                text: i18n("Cancel quiz")
-                visible: root.choiceMode
-                onClicked: {
-                    root.choiceMode = false
-                    root.revealed = true
-                    root.answerChecked = false
-                    root.answerFeedback = ""
-                    root.choiceAdvanceTimer.stop()
-                }
+                onClicked: root.selectQuizMode("typing")
             }
         }
 
@@ -443,6 +496,7 @@ PlasmoidItem {
                     display: PlasmaComponents.AbstractButton.IconOnly
                     enabled: loaded && !empty && !busy
                     checked: quizMenu.status === PlasmaExtras.Menu.Open
+                        || root.quizMode !== "off"
                     onPressed: quizMenu.openRelative()
                     PlasmaComponents.ToolTip.text: i18n("Choose a quiz")
                     PlasmaComponents.ToolTip.visible: hovered

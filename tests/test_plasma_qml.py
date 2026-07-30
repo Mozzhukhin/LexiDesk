@@ -38,7 +38,11 @@ def test_widget_uses_simple_reviews_and_four_choice_quizzes() -> None:
     assert "choiceOptions = quiz.choices || []" in qml
     assert "choiceMode = false" in qml
     assert "id: quizMenu" in qml
-    assert 'root.startQuiz("typing")' in qml
+    assert 'root.selectQuizMode("typing")' in qml
+    assert 'text: i18n("Mixed — every fifth card")' in qml
+    assert "mixedCardCounter < 5" in qml
+    assert 'var mixedKinds = ["translation", "reverse", "cloze", "context"]' in qml
+    assert 'checked: root.quizMode === "mixed"' in qml
     assert "Math.random() < quizProbability" not in qml
     assert 'quizType === "typing"' in qml
     assert 'quizType === "context"' in qml

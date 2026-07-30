@@ -17,5 +17,8 @@
         <entry name="dailyGoal" type="Int">
             <default>20</default>
         </entry>
+        <entry name="quizMode" type="String">
+            <default>off</default>
+        </entry>
     </group>
 </kcfg>
