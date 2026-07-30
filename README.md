@@ -17,9 +17,9 @@ every 90 seconds by default.
 ## Features
 
 - Fully offline EN ↔ RU translation after initial language-data installation
-- A 99,000-headword FreeDict index for precise word meanings and parts of speech
+- A 99,000-headword FreeDict index cross-checked in both translation directions
 - Argos neural translation fallback for phrases and missing dictionary entries
-- Short sense-specific examples that contain the studied word
+- Short examples validated against both the studied word and selected meaning
 - Conservative offline autocorrection for misspelled English and Russian words
 - Words and short phrases in either language
 - Explicit selection among up to four offline translation meanings
@@ -60,16 +60,18 @@ A correct choice records a successful review; a wrong choice records a failed
 review. Those quiz results produce individualized intervals instead of a fixed
 ladder. The desired retention can be adjusted between 70% and 99%.
 
-Legacy review history is migrated automatically. LexiDesk prioritizes due cards;
-when nothing is due, it displays the least recently shown card so the desktop
-never becomes empty. **Next** does not alter learning history, and **Undo**
-restores the complete state before the most recent new-format review.
+Legacy review history is migrated automatically. LexiDesk shows every unseen
+card before repeating one. It then selects the least recently shown item across
+the whole deck; due state, mistakes, and FSRS difficulty break close ties
+without starving scheduled cards. **Next** does not alter learning history, and
+**Undo** restores the complete state before the most recent new-format review.
 
 ## Widget workflow
 
 1. At startup the QML widget asks the local D-Bus service for the next card.
-   Due cards are preferred; otherwise LexiDesk selects the least recently shown
-   card.
+   Unseen cards are covered first; subsequent selection balances due status,
+   time since display, mistake rate, and FSRS difficulty without repeating a
+   small overdue subset forever.
 2. A regular card shows the source, translation, compact metadata, and a short
    example for the selected meaning. The example must contain the studied term
    and is limited to one compact sentence.
@@ -197,9 +199,16 @@ Application core
 See [the architecture document](docs/ARCHITECTURE.md) for migration and
 service details.
 
-Argos provides a translation suggestion, not a guarantee of a single correct
-meaning. LexiDesk deliberately asks the learner to verify and edit a translation
-before saving it.
+For dictionary words, LexiDesk checks both EN→RU and RU→EN indexes, removes
+stress marks and source markup, demotes likely misspellings, and keeps ambiguous
+meanings available for explicit selection. Argos remains a fallback for phrases
+and missing entries; no automatic system can infer the intended sense of an
+isolated word with certainty, so every translation remains editable.
+
+Example generation is tied to the selected card meaning. Both sides must contain
+the corresponding studied term (including common inflected forms). A mismatched
+WordNet sense or Argos translation is rejected and replaced with a short safe
+example instead of being saved as misleading learning material.
 
 For an unknown single word, LexiDesk compares nearby dictionary spellings with
 the offline model's translation and automatically substitutes a correction only

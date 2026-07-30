@@ -115,6 +115,15 @@ def build_database(records: list[dict[str, object]], target: Path) -> None:
                 PRIMARY KEY(source_lang, normalized)
             ) WITHOUT ROWID;
             CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+            CREATE TABLE reverse_entries (
+                source_lang TEXT NOT NULL,
+                normalized TEXT NOT NULL,
+                target_text TEXT NOT NULL,
+                source_rank INTEGER NOT NULL,
+                PRIMARY KEY(source_lang, normalized, target_text)
+            ) WITHOUT ROWID;
+            CREATE INDEX idx_reverse_entries_lookup
+                ON reverse_entries(source_lang, normalized, source_rank);
             """
         )
         connection.executemany(
@@ -135,6 +144,14 @@ def build_database(records: list[dict[str, object]], target: Path) -> None:
             ],
         )
         connection.executemany(
+            """
+            INSERT OR IGNORE INTO reverse_entries (
+                source_lang, normalized, target_text, source_rank
+            ) VALUES (?, ?, ?, ?)
+            """,
+            _reverse_rows(records),
+        )
+        connection.executemany(
             "INSERT INTO metadata(key, value) VALUES (?, ?)",
             [
                 ("source", "FreeDict/WikDict"),
@@ -150,6 +167,76 @@ def build_database(records: list[dict[str, object]], target: Path) -> None:
     temporary.replace(target)
 
 
+def ensure_reverse_index(target: Path) -> None:
+    """Upgrade an already downloaded dictionary without another download."""
+    connection = sqlite3.connect(target)
+    try:
+        exists = connection.execute(
+            """
+            SELECT 1 FROM sqlite_master
+            WHERE type = 'table' AND name = 'reverse_entries'
+            """
+        ).fetchone()
+        if exists is not None:
+            return
+        connection.executescript(
+            """
+            CREATE TABLE reverse_entries (
+                source_lang TEXT NOT NULL,
+                normalized TEXT NOT NULL,
+                target_text TEXT NOT NULL,
+                source_rank INTEGER NOT NULL,
+                PRIMARY KEY(source_lang, normalized, target_text)
+            ) WITHOUT ROWID;
+            CREATE INDEX idx_reverse_entries_lookup
+                ON reverse_entries(source_lang, normalized, source_rank);
+            """
+        )
+        rows = connection.execute(
+            """
+            SELECT source_lang, headword, translations_json
+            FROM entries
+            """
+        ).fetchall()
+        records = [
+            {
+                "source_lang": source_lang,
+                "headword": headword,
+                "translations": json.loads(translations_json),
+            }
+            for source_lang, headword, translations_json in rows
+        ]
+        connection.executemany(
+            """
+            INSERT OR IGNORE INTO reverse_entries (
+                source_lang, normalized, target_text, source_rank
+            ) VALUES (?, ?, ?, ?)
+            """,
+            _reverse_rows(records),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+
+def _reverse_rows(
+    records: list[dict[str, object]],
+) -> list[tuple[str, str, str, int]]:
+    rows: list[tuple[str, str, str, int]] = []
+    for record in records:
+        source_language = str(record["source_lang"])
+        reverse_language = "ru" if source_language == "en" else "en"
+        target_text = str(record["headword"]).strip()
+        translations = record.get("translations", [])
+        if not isinstance(translations, list):
+            continue
+        for rank, translation in enumerate(translations):
+            normalized = normalize_headword(str(translation))
+            if normalized:
+                rows.append((reverse_language, normalized, target_text, rank))
+    return rows
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Install the FreeDict EN↔RU index")
     parser.add_argument(
@@ -157,6 +244,7 @@ def main() -> int:
     )
     arguments = parser.parse_args()
     if dictionary_path().exists() and not arguments.force:
+        ensure_reverse_index(dictionary_path())
         print(f"Offline dictionary is already installed: {dictionary_path()}")
         return 0
 

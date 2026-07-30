@@ -3,8 +3,13 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from .dictionary import OfflineDictionary, SpellingSuggestion, normalize_headword
-from .examples import SemanticExampleIndex
+from .dictionary import (
+    OfflineDictionary,
+    SpellingSuggestion,
+    _damerau_levenshtein,
+    normalize_headword,
+)
+from .examples import SemanticExampleIndex, example_is_suitable
 
 CYRILLIC_RE = re.compile(r"[\u0400-\u04ff]")
 LATIN_RE = re.compile(r"[A-Za-z]")
@@ -72,11 +77,19 @@ class OfflineTranslator:
         target = "ru" if source == "en" else "en"
         dictionary_entry = self.dictionary.lookup(cleaned, source)
         if dictionary_entry and dictionary_entry.translations:
+            reciprocal = self.dictionary.reciprocal_translations(cleaned, source)
+            ranked = _rank_dictionary_translations(
+                dictionary_entry.translations,
+                reciprocal,
+                cleaned,
+                source,
+                self.dictionary,
+            )
             return TranslationResult(
                 source,
                 target,
-                dictionary_entry.translations[0],
-                dictionary_entry.translations[1:8],
+                ranked[0],
+                ranked[1:8],
                 dictionary_entry.part_of_speech,
                 True,
             )
@@ -129,16 +142,52 @@ class OfflineTranslator:
         source_text: str,
         source_language: str = "",
         part_of_speech: str = "",
+        target_text: str = "",
     ) -> ExampleResult:
         language = source_language or detect_language(source_text)
         if language == "ru":
-            english_term = self.translate(source_text).translation
+            english_term = (
+                target_text.strip() or self.translate(source_text).translation
+            )
             english_example = self.examples.lookup(english_term, part_of_speech)
             if english_example:
                 russian_example = self.translate(english_example).translation
-                return ExampleResult(russian_example, english_example)
+                if example_is_suitable(
+                    russian_example,
+                    source_text,
+                    allow_inflection=True,
+                ):
+                    return ExampleResult(russian_example, english_example)
         sentence = self.example_sentence(source_text, language, part_of_speech)
+        return self.complete_example(
+            sentence,
+            source_text,
+            language,
+            target_text,
+        )
+
+    def complete_example(
+        self,
+        sentence: str,
+        source_text: str,
+        source_language: str,
+        target_text: str,
+    ) -> ExampleResult:
+        """Translate an example and keep both sides tied to the card meaning."""
         translation = self.translate(sentence).translation
+        if target_text:
+            translation = _align_quoted_term(translation, target_text)
+            if not example_is_suitable(
+                translation,
+                target_text,
+                allow_inflection=True,
+            ):
+                if source_language == "en":
+                    sentence = f"The word “{source_text}” is used in this example."
+                    translation = f"В этом примере используется слово «{target_text}»."
+                else:
+                    sentence = f"В этом примере используется слово «{source_text}»."
+                    translation = f"The word “{target_text}” is used in this example."
         return ExampleResult(sentence, translation)
 
     def example_sentence(
@@ -188,6 +237,85 @@ class OfflineTranslator:
             self.dictionary.lookup(stem, "en") is not None
             for stem in _english_stems(text.casefold())
         )
+
+
+def _rank_dictionary_translations(
+    direct: tuple[str, ...],
+    reciprocal: tuple[str, ...],
+    source_text: str,
+    source_language: str,
+    dictionary: OfflineDictionary,
+) -> tuple[str, ...]:
+    """Rank meanings using agreement between both dictionary directions."""
+    direct_ranks = {
+        normalize_headword(value): rank for rank, value in enumerate(direct)
+    }
+    reciprocal_ranks = {
+        normalize_headword(value): rank for rank, value in enumerate(reciprocal)
+    }
+    candidates = list(dict.fromkeys((*direct, *reciprocal)))
+    target_language = "ru" if source_language == "en" else "en"
+    scores: dict[str, int] = {}
+    for value in candidates:
+        key = normalize_headword(value)
+        direct_rank = direct_ranks.get(key)
+        score = max(0, 70 - direct_rank * 2) if direct_rank is not None else 0
+        reciprocal_rank = reciprocal_ranks.get(key)
+        if reciprocal_rank is not None:
+            score += 60
+        if dictionary.lookup(value, target_language) is not None:
+            score += 20
+        if source_text[:1].islower() and value[:1].isupper():
+            score -= 100
+        if len(value) <= 2 or value.endswith("."):
+            score -= 18
+        scores[key] = score
+
+    suspicious: set[str] = set()
+    for value in candidates:
+        key = normalize_headword(value)
+        if key in reciprocal_ranks or dictionary.lookup(value, target_language):
+            continue
+        for confirmed in reciprocal:
+            confirmed_key = normalize_headword(confirmed)
+            if len(key) >= 5 and _damerau_levenshtein(key, confirmed_key) == 1:
+                suspicious.add(key)
+                break
+
+    ranked = sorted(
+        candidates,
+        key=lambda value: (
+            normalize_headword(value) in suspicious,
+            -scores[normalize_headword(value)],
+            candidates.index(value),
+        ),
+    )
+    primary = ranked[0]
+    primary_key = normalize_headword(primary)
+    direct_primary_key = normalize_headword(direct[0])
+    alternatives = [
+        value
+        for value in direct
+        if normalize_headword(value) not in suspicious
+        and normalize_headword(value) != primary_key
+        and (
+            not reciprocal_ranks
+            or normalize_headword(value) in reciprocal_ranks
+            or normalize_headword(value) == direct_primary_key
+        )
+        and not (source_text[:1].islower() and value[:1].isupper())
+    ]
+    return tuple((primary, *alternatives))
+
+
+def _align_quoted_term(sentence: str, target_text: str) -> str:
+    """Replace a model-translated quoted headword with the selected meaning."""
+    pattern = re.compile(r"([«“\"])[^»”\"]+([»”\"])")
+    return pattern.sub(
+        lambda match: f"{match.group(1)}{target_text}{match.group(2)}",
+        sentence,
+        count=1,
+    )
 
 
 def _best_correction(

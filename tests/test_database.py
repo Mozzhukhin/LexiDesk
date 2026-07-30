@@ -1,4 +1,5 @@
 import sqlite3
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from lexidesk.backup import ensure_daily_backup
@@ -66,6 +67,90 @@ def test_add_select_and_review(tmp_path: Path) -> None:
     assert repaired.tags == []
     repository.delete_word(word_id)
     assert repository.count() == 0
+    repository.close()
+
+
+def test_next_word_covers_unseen_cards_before_repeating(tmp_path: Path) -> None:
+    repository = WordRepository(tmp_path / "rotation.db")
+    ids = [
+        repository.add_word(
+            source_text=source,
+            source_lang="en",
+            target_text=target,
+        )
+        for source, target in (
+            ("one", "один"),
+            ("two", "два"),
+            ("three", "три"),
+        )
+    ]
+
+    shown = [repository.next_word() for _ in ids]
+
+    assert {word.id for word in shown if word is not None} == set(ids)
+    repository.close()
+
+
+def test_next_word_prefers_oldest_shown_due_card(tmp_path: Path) -> None:
+    repository = WordRepository(tmp_path / "priority.db")
+    older_id = repository.add_word(
+        source_text="older",
+        source_lang="en",
+        target_text="старый",
+    )
+    newer_id = repository.add_word(
+        source_text="newer",
+        source_lang="en",
+        target_text="новый",
+    )
+    now = datetime.now(UTC)
+    repository.connection.executemany(
+        "UPDATE words SET last_shown_at = ? WHERE id = ?",
+        [
+            ((now - timedelta(hours=2)).isoformat(), older_id),
+            ((now - timedelta(minutes=2)).isoformat(), newer_id),
+        ],
+    )
+    repository.connection.commit()
+
+    selected = repository.next_word()
+
+    assert selected is not None
+    assert selected.id == older_id
+    repository.close()
+
+
+def test_passive_rotation_does_not_starve_a_future_card(tmp_path: Path) -> None:
+    repository = WordRepository(tmp_path / "no-starvation.db")
+    overdue_id = repository.add_word(
+        source_text="overdue",
+        source_lang="en",
+        target_text="просроченный",
+    )
+    future_id = repository.add_word(
+        source_text="future",
+        source_lang="en",
+        target_text="будущий",
+    )
+    now = datetime.now(UTC)
+    repository.connection.execute(
+        "UPDATE words SET last_shown_at = ? WHERE id = ?",
+        ((now - timedelta(minutes=2)).isoformat(), overdue_id),
+    )
+    repository.connection.execute(
+        "UPDATE words SET last_shown_at = ?, due_at = ? WHERE id = ?",
+        (
+            (now - timedelta(hours=2)).isoformat(),
+            (now + timedelta(days=2)).isoformat(),
+            future_id,
+        ),
+    )
+    repository.connection.commit()
+
+    selected = repository.next_word()
+
+    assert selected is not None
+    assert selected.id == future_id
     repository.close()
 
 

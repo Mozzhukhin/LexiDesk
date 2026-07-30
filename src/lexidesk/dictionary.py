@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import unicodedata
 from dataclasses import dataclass
@@ -12,6 +13,16 @@ from .config import dictionary_path
 def normalize_headword(value: str) -> str:
     normalized = unicodedata.normalize("NFKD", value.strip().casefold())
     return "".join(character for character in normalized if character != "\u0301")
+
+
+def clean_dictionary_text(value: str) -> str:
+    """Normalize dictionary markup and stress marks for user-facing text."""
+    without_markup = re.sub(r"<[^>]+>", "", value)
+    normalized = unicodedata.normalize("NFKD", without_markup.strip())
+    without_stress = "".join(
+        character for character in normalized if character != "\u0301"
+    )
+    return " ".join(unicodedata.normalize("NFC", without_stress).split())
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,11 +74,62 @@ class OfflineDictionary:
             if connection is not None:
                 connection.close()
         return DictionaryEntry(
-            headword=row["headword"],
+            headword=clean_dictionary_text(row["headword"]),
             source_language=row["source_lang"],
-            translations=tuple(str(item) for item in translations if str(item)),
+            translations=_clean_translations(translations),
             part_of_speech=row["part_of_speech"],
         )
+
+    def reciprocal_translations(
+        self,
+        text: str,
+        source_language: str,
+        *,
+        limit: int = 16,
+    ) -> tuple[str, ...]:
+        """
+        Return translations independently confirmed by the opposite dictionary.
+
+        For example, the RU→EN source may contain a weak entry while the EN→RU
+        entry explicitly maps the correct English headword back to the Russian
+        word. The generated reverse index makes that evidence fast to query.
+        """
+        if (
+            not self.available
+            or source_language not in {"en", "ru"}
+            or not text.strip()
+            or limit < 1
+        ):
+            return ()
+        connection: sqlite3.Connection | None = None
+        try:
+            connection = sqlite3.connect(f"file:{self.path}?mode=ro", uri=True)
+            connection.row_factory = sqlite3.Row
+            table = connection.execute(
+                """
+                SELECT 1
+                FROM sqlite_master
+                WHERE type = 'table' AND name = 'reverse_entries'
+                """
+            ).fetchone()
+            if table is None:
+                return ()
+            rows = connection.execute(
+                """
+                SELECT target_text
+                FROM reverse_entries
+                WHERE source_lang = ? AND normalized = ?
+                ORDER BY source_rank, target_text COLLATE NOCASE
+                LIMIT ?
+                """,
+                (source_language, normalize_headword(text), limit),
+            ).fetchall()
+        except (sqlite3.Error, OSError):
+            return ()
+        finally:
+            if connection is not None:
+                connection.close()
+        return _clean_translations([row["target_text"] for row in rows])
 
     def suggestions(
         self,
@@ -135,11 +197,9 @@ class OfflineDictionary:
             if not isinstance(translations, list):
                 continue
             entry = DictionaryEntry(
-                headword=row["headword"],
+                headword=clean_dictionary_text(row["headword"]),
                 source_language=row["source_lang"],
-                translations=tuple(
-                    str(item) for item in translations if str(item).strip()
-                ),
+                translations=_clean_translations(translations),
                 part_of_speech=row["part_of_speech"],
             )
             suggestions.append(SpellingSuggestion(entry, distance))
@@ -228,6 +288,41 @@ class OfflineDictionary:
             if len(result) >= limit:
                 break
         return tuple(result)
+
+
+def _clean_translations(values: object) -> tuple[str, ...]:
+    if not isinstance(values, (list, tuple)):
+        return ()
+    result: list[str] = []
+    seen: set[str] = set()
+    for raw_value in values:
+        value = clean_dictionary_text(str(raw_value))
+        key = normalize_headword(value)
+        if (
+            not value
+            or key in seen
+            or _looks_like_dictionary_note(value)
+            or _has_wrong_script(value)
+        ):
+            continue
+        result.append(value)
+        seen.add(key)
+    return tuple(result)
+
+
+def _looks_like_dictionary_note(value: str) -> bool:
+    lowered = value.casefold()
+    return (
+        lowered.startswith(("тж.", "см.", "ср.", "also ", "see "))
+        or value.count("(") != value.count(")")
+        or value.startswith(("(", ")", ",", ";"))
+    )
+
+
+def _has_wrong_script(value: str) -> bool:
+    has_latin = any("a" <= character.casefold() <= "z" for character in value)
+    has_cyrillic = any("\u0400" <= character <= "\u04ff" for character in value)
+    return has_latin and has_cyrillic
 
 
 def _damerau_levenshtein(left: str, right: str) -> int:

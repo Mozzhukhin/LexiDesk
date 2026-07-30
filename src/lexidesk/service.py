@@ -29,17 +29,20 @@ class ExampleEnrichmentTask(QRunnable):
         try:
             word = repository.get_word(self.word_id)
             example = word.example
+            translation = word.example_translation
             translator = OfflineTranslator()
             refresh_example = (
                 not example
                 or len(example) > MAX_EXAMPLE_LENGTH
+                or not example_is_suitable(
+                    example,
+                    word.source_text,
+                    allow_inflection=word.source_lang == "ru",
+                )
                 or (
                     word.source_lang == "en"
-                    and (
-                        not example_is_suitable(example, word.source_text)
-                        or example.casefold().startswith(
-                            f"{word.source_text.casefold()} means "
-                        )
+                    and example.casefold().startswith(
+                        f"{word.source_text.casefold()} means "
                     )
                 )
             )
@@ -48,13 +51,23 @@ class ExampleEnrichmentTask(QRunnable):
                     word.source_text,
                     word.source_lang,
                     word.part_of_speech,
+                    word.target_text,
                 )
                 example = generated.source
                 translation = generated.translation
-            else:
-                translation = word.example_translation
-            if example and not translation:
-                translation = translator.translate(example).translation
+            elif not example_is_suitable(
+                translation,
+                word.target_text,
+                allow_inflection=True,
+            ):
+                completed = translator.complete_example(
+                    example,
+                    word.source_text,
+                    word.source_lang,
+                    word.target_text,
+                )
+                example = completed.source
+                translation = completed.translation
             if example:
                 repository.update_example(word.id, example, translation)
         except Exception as error:

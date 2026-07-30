@@ -116,3 +116,43 @@ def test_semantic_example_rejects_a_synonym_only_sentence(tmp_path: Path) -> Non
     assert result == "The word “ambiguous” means open to multiple interpretations."
     assert "ambiguous" in result.casefold()
     assert len(result) <= MAX_EXAMPLE_LENGTH
+
+
+def test_rare_example_does_not_override_a_common_definition(tmp_path: Path) -> None:
+    path = tmp_path / "examples.db"
+    connection = sqlite3.connect(path)
+    connection.execute(
+        """
+        CREATE TABLE examples (
+            lemma TEXT, pos TEXT, example TEXT, definition TEXT,
+            frequency INTEGER, sense_rank INTEGER
+        )
+        """
+    )
+    connection.executemany(
+        "INSERT INTO examples VALUES (?, ?, ?, ?, ?, ?)",
+        [
+            (
+                "ambiguous",
+                "a",
+                "",
+                "open to two or more interpretations",
+                9,
+                0,
+            ),
+            (
+                "ambiguous",
+                "s",
+                "an ambiguous pattern with no frame of reference",
+                "having no intrinsic meaning",
+                1,
+                1,
+            ),
+        ],
+    )
+    connection.commit()
+    connection.close()
+
+    result = SemanticExampleIndex(path).lookup("ambiguous", "adjective")
+
+    assert result == "The word “ambiguous” means open to multiple interpretations."

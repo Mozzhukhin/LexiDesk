@@ -41,7 +41,7 @@ class SemanticExampleIndex:
             connection.row_factory = sqlite3.Row
             rows = connection.execute(
                 """
-                SELECT example, definition
+                SELECT example, definition, frequency
                 FROM examples
                 WHERE lemma = ?
                   AND (? = '' OR pos = ? OR (? = 'a' AND pos = 's'))
@@ -57,9 +57,13 @@ class SemanticExampleIndex:
                 connection.close()
         if not rows:
             return ""
+        best_frequency = max(int(row["frequency"]) for row in rows)
         for row in rows:
             example = _sentence_case(str(row["example"]))
-            if example_is_suitable(example, word):
+            frequency = int(row["frequency"])
+            if example_is_suitable(example, word) and frequency >= max(
+                2, best_frequency // 3
+            ):
                 return example
         definition = str(rows[0]["definition"]).strip()
         if definition:
@@ -67,7 +71,12 @@ class SemanticExampleIndex:
         return ""
 
 
-def example_is_suitable(example: str, word: str) -> bool:
+def example_is_suitable(
+    example: str,
+    word: str,
+    *,
+    allow_inflection: bool = False,
+) -> bool:
     sentence = " ".join(example.strip().split())
     term = " ".join(word.strip().split())
     if (
@@ -75,10 +84,23 @@ def example_is_suitable(example: str, word: str) -> bool:
         or not term
         or len(sentence) > MAX_EXAMPLE_LENGTH
         or len(sentence.rstrip(".!?").split()) < 4
+        or sentence.endswith("…")
     ):
         return False
     pattern = rf"(?<![\w]){re.escape(term)}(?![\w])"
-    return re.search(pattern, sentence, flags=re.IGNORECASE) is not None
+    if re.search(pattern, sentence, flags=re.IGNORECASE) is not None:
+        return True
+    if not allow_inflection or " " in term:
+        return False
+    normalized_term = normalize_headword(term)
+    if len(normalized_term) < 5:
+        return False
+    stem_length = max(4, len(normalized_term) - 3)
+    stem = normalized_term[:stem_length]
+    return any(
+        normalize_headword(token.strip(".,!?;:«»“”\"'()")).startswith(stem)
+        for token in sentence.split()
+    )
 
 
 def select_human_example(examples: list[str], word: str) -> str:

@@ -2,12 +2,18 @@ import sqlite3
 
 import pytest
 
-from lexidesk.dictionary import DictionaryEntry, SpellingSuggestion
+from lexidesk.dictionary import (
+    DictionaryEntry,
+    OfflineDictionary,
+    SpellingSuggestion,
+    clean_dictionary_text,
+)
 from lexidesk.examples import SemanticExampleIndex
 from lexidesk.translation import (
     OfflineTranslator,
     TranslationError,
     TranslationResult,
+    _align_quoted_term,
     _best_correction,
     _english_stems,
     build_example_sentence,
@@ -64,6 +70,61 @@ def test_ambiguous_short_word_is_not_changed() -> None:
         SpellingSuggestion(DictionaryEntry("hello", "en", ("привет",), ""), 1),
     )
     assert _best_correction(suggestions, ["неоднозначно"], source_length=4) is None
+
+
+def test_dictionary_text_removes_stress_and_inline_markup() -> None:
+    assert clean_dictionary_text(" altog<u>e</u>ther ") == "altogether"
+    assert clean_dictionary_text("предложе́ние") == "предложение"
+
+
+def test_translated_definition_uses_the_selected_meaning() -> None:
+    translated = "Слово «однозначный» означает открытый для разных толкований."
+
+    aligned = _align_quoted_term(translated, "двусмысленный")
+
+    assert aligned == ("Слово «двусмысленный» означает открытый для разных толкований.")
+
+
+def test_reciprocal_dictionary_evidence_repairs_weak_primary_translation(
+    tmp_path,
+) -> None:
+    path = tmp_path / "dictionary.db"
+    connection = sqlite3.connect(path)
+    connection.executescript(
+        """
+        CREATE TABLE entries (
+            source_lang TEXT,
+            normalized TEXT,
+            headword TEXT,
+            translations_json TEXT,
+            part_of_speech TEXT
+        );
+        CREATE TABLE reverse_entries (
+            source_lang TEXT,
+            normalized TEXT,
+            target_text TEXT,
+            source_rank INTEGER
+        );
+        """
+    )
+    connection.executemany(
+        "INSERT INTO entries VALUES (?, ?, ?, ?, ?)",
+        [
+            ("ru", "писька", "писька", '["weenie", "weiner"]', "noun"),
+            ("en", "wiener", "wiener", '["писька"]', "noun"),
+        ],
+    )
+    connection.execute(
+        "INSERT INTO reverse_entries VALUES (?, ?, ?, ?)",
+        ("ru", "писька", "wiener", 0),
+    )
+    connection.commit()
+    connection.close()
+
+    result = OfflineTranslator(dictionary=OfflineDictionary(path)).translate("писька")
+
+    assert result.translation == "wiener"
+    assert result.alternatives == ("weenie",)
 
 
 @pytest.mark.parametrize(

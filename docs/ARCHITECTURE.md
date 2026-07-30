@@ -27,3 +27,21 @@ upgrading a widget instance therefore cannot remove the user's data.
 Card creation performs the primary lookup and a fast SQLite WordNet example
 lookup in the UI. Translation of that example is queued in the D-Bus service
 after the card is committed, so loading Argos never blocks Save.
+
+The dictionary installer also builds a reverse index. A direct translation is
+ranked against independently matching entries in the opposite direction;
+confirmed headwords are preferred while markup, stress characters, mixed-script
+notes, and likely spelling variants are removed or demoted. This improves
+single-word quality without adding network access or Argos latency.
+
+The background example task validates both halves of every example. The source
+must contain the card headword and the translated sentence must contain the
+selected target meaning. WordNet examples from another sense and inconsistent
+Argos output are rejected. Quoted definition terms can be aligned safely; when
+that is not possible, the service stores a compact explicit fallback.
+
+Card rotation is deterministic until meaningful ties: unseen cards come first,
+then the oldest `last_shown_at` across the entire deck, followed by due state,
+miss rate, FSRS difficulty, and due time. This prevents overdue cards from
+starving future cards during passive browsing. Random ordering is only the final
+tie-breaker.

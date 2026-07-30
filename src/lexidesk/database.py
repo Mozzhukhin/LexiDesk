@@ -455,8 +455,13 @@ class WordRepository:
 
     def next_word(self, exclude_id: int | None = None) -> Word | None:
         """
-        Prefer due cards. If none are due, use the least recently shown card.
-        This keeps the 90-second desktop rotation alive even with a tiny deck.
+        Show every unseen card before repeating one, then use the card that has
+        gone unseen the longest. Due state and learning difficulty break close
+        ties; RANDOM is only the final tie-breaker.
+
+        Passive desktop rotation must cover the entire deck. A strict due-first
+        order would let overdue cards monopolize the widget because browsing a
+        normal card intentionally does not record an FSRS review.
         """
         now = to_storage(utc_now())
         row = self.connection.execute(
@@ -464,12 +469,20 @@ class WordRepository:
             SELECT * FROM words
             WHERE (? IS NULL OR id != ? OR (SELECT COUNT(*) FROM words) = 1)
             ORDER BY
+                CASE WHEN last_shown_at IS NULL THEN 0 ELSE 1 END,
+                COALESCE(last_shown_at, created_at),
                 CASE WHEN due_at <= ? THEN 0 ELSE 1 END,
-                CASE WHEN due_at <= ? THEN due_at ELSE COALESCE(last_shown_at, '') END,
+                CASE
+                    WHEN know_count + dont_know_count = 0 THEN 0
+                    ELSE CAST(dont_know_count AS REAL)
+                         / (know_count + dont_know_count)
+                END DESC,
+                COALESCE(difficulty, 5) DESC,
+                due_at,
                 RANDOM()
             LIMIT 1
             """,
-            (exclude_id, exclude_id, now, now),
+            (exclude_id, exclude_id, now),
         ).fetchone()
         if row is None:
             return None
