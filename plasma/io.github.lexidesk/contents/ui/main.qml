@@ -13,6 +13,15 @@ PlasmoidItem {
     property int cardId: 0
     property string sourceText: ""
     property string translationText: ""
+    property string sourceLanguage: ""
+    readonly property string primaryText: sourceLanguage === "ru"
+        ? translationText : sourceText
+    readonly property string secondaryText: sourceLanguage === "ru"
+        ? sourceText : translationText
+    readonly property string primaryExampleText: sourceLanguage === "ru"
+        ? exampleTranslationText : exampleText
+    readonly property string secondaryExampleText: sourceLanguage === "ru"
+        ? exampleText : exampleTranslationText
     property string directionText: "OFFLINE"
     property string metadataText: ""
     property string exampleText: ""
@@ -224,6 +233,7 @@ PlasmoidItem {
         cardId = Number(card.id || 0)
         sourceText = card.source || ""
         translationText = card.translation || ""
+        sourceLanguage = card.source_language || "en"
         directionText = card.direction || "OFFLINE"
         var metadata = []
         if (card.part_of_speech)
@@ -566,7 +576,7 @@ PlasmoidItem {
                         text: !loaded
                             ? i18n("Loading vocabulary…")
                             : (empty ? i18n("Your vocabulary is empty")
-                            : (choiceMode ? quizPrompt : sourceText))
+                            : (choiceMode ? quizPrompt : primaryText))
                         wrapMode: Text.Wrap
                         font.pixelSize: empty ? 18
                             : (choiceMode
@@ -582,7 +592,7 @@ PlasmoidItem {
                             ? ""
                             : (empty
                             ? i18n("Press + to add a word or phrase")
-                            : (choiceMode ? quizAnswer : translationText))
+                            : (choiceMode ? quizAnswer : secondaryText))
                         visible: loaded && (empty || revealed)
                         wrapMode: Text.Wrap
                         color: Kirigami.Theme.highlightColor
@@ -719,7 +729,7 @@ PlasmoidItem {
                         id: examplePanel
                         Layout.fillWidth: true
                         visible: revealed && !choiceMode
-                            && exampleText.length > 0
+                            && primaryExampleText.length > 0
                         implicitHeight: exampleColumn.implicitHeight + 12
                         radius: 8
                         color: Qt.alpha(Kirigami.Theme.highlightColor, 0.08)
@@ -737,7 +747,7 @@ PlasmoidItem {
                                 horizontalAlignment: Text.AlignHCenter
                                 textFormat: Text.RichText
                                 text: root.highlightTerm(
-                                    root.exampleText, root.sourceText)
+                                    root.primaryExampleText, root.primaryText)
                                 wrapMode: Text.Wrap
                                 font.italic: true
                                 font.pixelSize: 12
@@ -748,7 +758,7 @@ PlasmoidItem {
                             PlasmaComponents.Label {
                                 Layout.fillWidth: true
                                 horizontalAlignment: Text.AlignHCenter
-                                text: exampleTranslationText
+                                text: secondaryExampleText
                                 visible: text.length > 0
                                 wrapMode: Text.Wrap
                                 opacity: 0.7

@@ -55,16 +55,19 @@ def test_widget_uses_simple_reviews_and_four_choice_quizzes() -> None:
     assert "Incorrect — correct answer" in qml
     assert "exampleColumn.implicitHeight" in qml
     assert "id: examplePanel" in qml
-    assert "&& exampleText.length > 0" in qml
+    assert "&& primaryExampleText.length > 0" in qml
     assert "id: cardEnterAnimation" in qml
     assert "Easing.OutCubic" in qml
     assert 'text: i18n("Hard")' not in qml
     assert 'text: i18n("Easy")' not in qml
 
 
-def test_widget_keeps_the_entered_source_above_its_translation() -> None:
+def test_widget_keeps_english_above_russian_on_regular_cards() -> None:
     qml = QML_PATH.read_text(encoding="utf-8")
 
-    source_binding = "(choiceMode ? quizPrompt : sourceText)"
-    translation_binding = "(choiceMode ? quizAnswer : translationText)"
-    assert qml.index(source_binding) < qml.index(translation_binding)
+    assert 'sourceLanguage === "ru"' in qml
+    assert "? translationText : sourceText" in qml
+    assert "? sourceText : translationText" in qml
+    assert "(choiceMode ? quizPrompt : primaryText)" in qml
+    assert "(choiceMode ? quizAnswer : secondaryText)" in qml
+    assert "root.primaryExampleText, root.primaryText" in qml

@@ -260,8 +260,11 @@ class LexiDeskWindow(QMainWindow):
 
         target_language = "RU" if word.source_lang == "en" else "EN"
         self.direction_label.setText(f"{word.source_lang.upper()} → {target_language}")
-        self.word_label.setText(word.source_text)
-        self.translation_label.setText(word.target_text)
+        english_first = word.source_lang == "ru" and self.settings.reveal_mode == "both"
+        self.word_label.setText(word.target_text if english_first else word.source_text)
+        self.translation_label.setText(
+            word.source_text if english_first else word.target_text
+        )
         metadata = []
         if word.transcription:
             metadata.append(word.transcription)
@@ -272,9 +275,12 @@ class LexiDeskWindow(QMainWindow):
         metadata.extend(word.alternatives)
         metadata.extend(word.forms)
         self.alternatives_label.setText(" · ".join(metadata))
-        example_parts = [
-            part for part in (word.example, word.example_translation) if part
-        ]
+        examples = (
+            (word.example_translation, word.example)
+            if english_first
+            else (word.example, word.example_translation)
+        )
+        example_parts = [part for part in examples if part]
         self.example_label.setText("\n".join(example_parts))
         if self.settings.reveal_mode == "quiz":
             self.translation_label.hide()
