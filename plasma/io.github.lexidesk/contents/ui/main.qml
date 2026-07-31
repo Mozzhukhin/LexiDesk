@@ -26,7 +26,6 @@ PlasmoidItem {
     property string metadataText: ""
     property string exampleText: ""
     property string exampleTranslationText: ""
-    property real retrievability: -1
     property bool empty: true
     property bool loaded: false
     property bool revealed: plasmoid.configuration.revealMode === "both"
@@ -267,9 +266,6 @@ PlasmoidItem {
         metadataText = metadata.join("  •  ")
         exampleText = card.example || ""
         exampleTranslationText = card.example_translation || ""
-        retrievability = card.retrievability === null
-            || card.retrievability === undefined
-            ? -1 : Number(card.retrievability)
         quizVariants = card.quizzes || {}
         var quiz = card.quiz || {}
         quizType = quiz.type || ""
@@ -419,9 +415,10 @@ PlasmoidItem {
     fullRepresentation: Rectangle {
         id: card
         implicitWidth: 390
-        implicitHeight: 320
+        implicitHeight: 280
         Layout.minimumWidth: 330
-        Layout.minimumHeight: 312
+        Layout.minimumHeight: 270
+        Layout.preferredHeight: implicitHeight
         radius: 16
         color: {
             switch (plasmoid.configuration.colorTheme) {
@@ -457,7 +454,7 @@ PlasmoidItem {
             PlasmaExtras.MenuItem {
                 text: i18n("Settings")
                 icon: "configure"
-                onClicked: root.launchGui("--settings", "settings")
+                onClicked: Plasmoid.internalAction("configure").trigger()
             }
 
             PlasmaExtras.MenuItem {
@@ -573,13 +570,20 @@ PlasmoidItem {
                     PlasmaComponents.ToolTip.text: text
                     PlasmaComponents.ToolTip.visible: hovered
                 }
+
+                PlasmaComponents.BusyIndicator {
+                    running: busy
+                    visible: busy
+                    implicitWidth: 16
+                    implicitHeight: 16
+                }
             }
 
             Rectangle {
                 id: contentFrame
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                Layout.minimumHeight: 165
+                Layout.minimumHeight: 145
                 radius: 13
                 color: Qt.alpha(Kirigami.Theme.textColor, 0.035)
                 border.width: 1
@@ -927,27 +931,6 @@ PlasmoidItem {
                 icon.name: "go-next"
                 enabled: loaded && !empty && !busy
                 onClicked: loadNext()
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
-
-                PlasmaComponents.BusyIndicator {
-                    running: busy
-                    visible: busy
-                    implicitWidth: 18
-                    implicitHeight: 18
-                }
-
-                PlasmaComponents.Label {
-                    text: retrievability >= 0
-                        ? i18n("%1% recall", retrievability.toFixed(0))
-                        : ""
-                    opacity: 0.6
-                    font.pixelSize: 10
-                }
-
-                Item { Layout.fillWidth: true }
             }
 
             PlasmaComponents.ProgressBar {

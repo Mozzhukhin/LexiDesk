@@ -4,11 +4,13 @@ import org.kde.kirigami as Kirigami
 import org.kde.plasma.components as PlasmaComponents
 
 Kirigami.FormLayout {
+    id: form
+
     property alias cfg_rotationSeconds: rotation.value
-    property alias cfg_revealMode: reveal.currentValue
-    property alias cfg_colorTheme: colors.currentValue
     property alias cfg_dailyGoal: dailyGoal.value
-    property alias cfg_quizMode: quizMode.currentValue
+    property string cfg_revealMode
+    property string cfg_colorTheme
+    property string cfg_quizMode
 
     PlasmaComponents.SpinBox {
         id: rotation
@@ -35,6 +37,8 @@ Kirigami.FormLayout {
             { text: i18n("Choose the context"), value: "context" },
             { text: i18n("Type the translation"), value: "typing" }
         ]
+        currentIndex: Math.max(0, indexOfValue(form.cfg_quizMode))
+        onActivated: form.cfg_quizMode = currentValue
     }
 
     PlasmaComponents.ComboBox {
@@ -47,6 +51,8 @@ Kirigami.FormLayout {
             { text: i18n("Click to reveal"), value: "quiz" },
             { text: i18n("Type the translation"), value: "typing" }
         ]
+        currentIndex: Math.max(0, indexOfValue(form.cfg_revealMode))
+        onActivated: form.cfg_revealMode = currentValue
     }
 
     PlasmaComponents.SpinBox {
@@ -70,5 +76,7 @@ Kirigami.FormLayout {
             { text: i18n("Forest"), value: "forest" },
             { text: i18n("Purple"), value: "purple" }
         ]
+        currentIndex: Math.max(0, indexOfValue(form.cfg_colorTheme))
+        onActivated: form.cfg_colorTheme = currentValue
     }
 }

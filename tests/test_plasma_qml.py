@@ -77,6 +77,19 @@ def test_widget_has_compact_navigation_and_hover_actions() -> None:
     assert 'text: i18n("Hide for now")' in qml
     assert 'text: i18n("Delete card…")' in qml
     assert "maximumLineCount: 2" in qml
+    assert "% recall" not in qml
+    assert 'internalAction("configure").trigger()' in qml
+    assert "Layout.minimumHeight: 270" in qml
+
+
+def test_widget_settings_write_string_values() -> None:
+    config = (QML_PATH.parent / "configGeneral.qml").read_text(encoding="utf-8")
+
+    assert "property alias cfg_colorTheme" not in config
+    assert "property string cfg_colorTheme" in config
+    assert "onActivated: form.cfg_colorTheme = currentValue" in config
+    assert "onActivated: form.cfg_revealMode = currentValue" in config
+    assert "onActivated: form.cfg_quizMode = currentValue" in config
 
 
 def test_widget_keeps_english_above_russian_on_regular_cards() -> None:
