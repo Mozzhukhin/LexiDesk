@@ -42,6 +42,7 @@ PlasmoidItem {
     property string typedAnswer: ""
     property var choiceOptions: []
     property bool choiceMode: false
+    property bool quizUnavailable: false
     property bool choiceAnswered: false
     property string selectedChoice: ""
     property string quizRating: ""
@@ -164,12 +165,18 @@ PlasmoidItem {
         if (busy || empty)
             return
         if (!quiz) {
-            choiceMode = false
-            revealed = true
-            answerChecked = true
+            quizType = kind
+            quizPrompt = i18n("No suitable card for this quiz yet")
+            quizAnswer = ""
+            quizInstruction = i18n(
+                "This mode remains selected. Press Next or wait for another card.")
+            choiceOptions = []
+            choiceMode = true
+            quizUnavailable = true
+            revealed = false
+            answerChecked = false
             suggestedRating = ""
-            answerFeedback = i18n(
-                "This quiz needs more cards or suitable examples.")
+            answerFeedback = ""
             return
         }
         quizType = quiz.type || kind
@@ -178,6 +185,7 @@ PlasmoidItem {
         quizInstruction = quiz.instruction || ""
         choiceOptions = quiz.choices || []
         choiceMode = true
+        quizUnavailable = false
         choiceAnswered = false
         selectedChoice = ""
         quizRating = ""
@@ -198,6 +206,7 @@ PlasmoidItem {
         mixedDryStreak = 0
         if (kind === "off" || kind === "mixed") {
             choiceMode = false
+            quizUnavailable = false
             revealed = plasmoid.configuration.revealMode === "both"
             answerChecked = false
             answerFeedback = ""
@@ -282,6 +291,7 @@ PlasmoidItem {
         quizInstruction = quiz.instruction || ""
         choiceOptions = quiz.choices || card.choices || []
         choiceMode = false
+        quizUnavailable = false
         revealed = !choiceMode
             && plasmoid.configuration.revealMode === "both"
         choiceAnswered = false
@@ -932,7 +942,7 @@ PlasmoidItem {
 
             PlasmaComponents.Button {
                 Layout.fillWidth: true
-                visible: !choiceMode
+                visible: !choiceMode || quizUnavailable
                 implicitHeight: 36
                 text: i18n("Next") + "  →"
                 icon.name: "go-next"

@@ -41,6 +41,7 @@ def test_widget_uses_simple_reviews_and_four_choice_quizzes() -> None:
     assert 'root.selectQuizMode("typing")' in qml
     assert 'text: i18n("Mixed — adaptive + regular checks")' in qml
     assert "property bool adaptiveQuiz" in qml
+    assert "property bool quizUnavailable" in qml
     assert "property bool quizEligible" in qml
     assert "property int mixedDryStreak" in qml
     assert "mixedDryStreak++" in qml
@@ -68,6 +69,7 @@ def test_widget_uses_simple_reviews_and_four_choice_quizzes() -> None:
     assert 'text: i18n("Easy")' not in qml
     assert "Undo last review" not in qml
     assert "undoReview" not in qml
+    assert "visible: !choiceMode || quizUnavailable" in qml
 
 
 def test_widget_has_compact_navigation_and_hover_actions() -> None:

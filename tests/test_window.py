@@ -121,3 +121,18 @@ def test_rotation_skips_an_unanswered_quiz(tmp_path: Path) -> None:
     assert skipped.know_count == 0
     assert skipped.dont_know_count == 0
     repository.close()
+
+
+def test_fixed_quiz_mode_never_falls_back_to_a_normal_card(tmp_path: Path) -> None:
+    window, repository = _window(tmp_path)
+    window.tick_timer.stop()
+    window.current_word = repository.get_word(1)
+
+    window.set_practice_mode("cloze")
+
+    assert window._current_quiz is None
+    assert window.word_label.text() == "No suitable card for this quiz yet"
+    assert window.translation_label.isHidden()
+    assert "mode selected" in window.quiz_instruction.text()
+    assert window.settings.practice_mode == "cloze"
+    repository.close()

@@ -36,6 +36,7 @@ from .answers import AnswerGrade, evaluate_answer
 from .api import mixed_quiz_due, quiz_variants
 from .autostart import set_autostart
 from .batch import BatchAddDialog
+from .config import database_path
 from .database import WordRepository
 from .diagnostics_dialog import DiagnosticsDialog
 from .dialogs import AddWordDialog, SettingsDialog
@@ -370,6 +371,7 @@ class LexiDeskWindow(QMainWindow):
         if (
             word.id not in self._example_enrichment_scheduled
             and len(self._example_enrichment_scheduled) < 20
+            and self.repository.path == database_path()
             and len(self.repository.examples_for_word(word.id)) < 3
         ):
             self._example_enrichment_scheduled.add(word.id)
@@ -407,11 +409,16 @@ class LexiDeskWindow(QMainWindow):
         if selected_quiz is not None:
             self._show_quiz(selected_quiz)
         elif practice_mode not in {"off", "mixed"}:
+            self.word_label.setText("No suitable card for this quiz yet")
+            self.translation_label.hide()
+            self.alternatives_label.hide()
+            self.example_label.hide()
+            self.reveal_button.hide()
             self.quiz_instruction.setText(
-                "This practice mode needs more cards or suitable examples."
+                "LexiDesk will keep this mode selected. Press Next or wait "
+                "for the next card."
             )
             self.quiz_instruction.show()
-            self.reveal_translation()
         elif self.settings.reveal_mode == "quiz":
             self.translation_label.hide()
             self.alternatives_label.hide()

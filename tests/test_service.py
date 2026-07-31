@@ -155,6 +155,31 @@ def test_cloze_quiz_rotates_between_saved_examples(tmp_path: Path, monkeypatch) 
     repository.close()
 
 
+def test_russian_cloze_uses_safe_fallback_distractors(tmp_path: Path) -> None:
+    repository = WordRepository(tmp_path / "russian-cloze.db")
+    word_id = repository.add_word(
+        source_text="ограниченный",
+        source_lang="ru",
+        target_text="restricted",
+        part_of_speech="adjective",
+        example="Доступ в эту зону ограниченный после закрытия.",
+        example_translation="Access to this area is restricted after closing.",
+    )
+    repository.add_word(
+        source_text="полезный",
+        source_lang="ru",
+        target_text="useful",
+    )
+    variants = quiz_variants(repository.get_word(word_id), repository)
+
+    assert variants["cloze"]["prompt"] == "Доступ в эту зону ___ после закрытия."
+    assert len(variants["cloze"]["choices"]) == 4
+    assert variants["reverse"]["instruction"] == "Choose the Russian word"
+    assert len(variants["context"]["choices"]) == 4
+    assert all("___" in choice for choice in variants["context"]["choices"])
+    repository.close()
+
+
 def test_quiz_mistakes_are_available_to_analytics(tmp_path: Path) -> None:
     repository = WordRepository(tmp_path / "analytics.db")
     word_id = repository.add_word(

@@ -7,6 +7,8 @@
 - Keep every practice mode selectable while cards rotate.
 - Rotate several per-card examples in sentence-completion quizzes and enrich
   older cards lazily without loading the full vocabulary.
+- Never replace a selected fixed quiz mode with a normal card; retain the mode
+  and provide a clear skip state when a quiz cannot be constructed.
 - Replace the Argos Python runtime with direct CTranslate2 inference, preserving
   the same models and beam-search output while removing Torch, Stanza, spaCy,
   MiniSBD, and ONNX from Linux and Windows bundles.

@@ -57,6 +57,21 @@ COMMON_DISTRACTORS = {
     ),
 }
 
+CONTEXT_DISTRACTORS = {
+    "en": (
+        "We had little ___ before the meeting began.",
+        "This ___ helped the team solve the problem.",
+        "She finished the ___ ahead of schedule.",
+        "They finally found the right ___ to the question.",
+    ),
+    "ru": (
+        "До начала встречи оставалось мало ___.",
+        "Этот ___ помог команде решить проблему.",
+        "Она закончила ___ раньше срока.",
+        "Они наконец нашли правильный ___ на вопрос.",
+    ),
+}
+
 
 def word_payload(
     word: Word | None,
@@ -187,10 +202,11 @@ def quiz_variants(
         dictionary,
         candidates=candidates,
     )
-    reverse_choices = _distinct_choices(
-        word.source_text,
-        [candidate.source_text for candidate in candidates],
+    reverse_candidates = [candidate.source_text for candidate in candidates]
+    reverse_candidates.extend(
+        COMMON_DISTRACTORS["ru" if word.source_lang == "en" else "en"]
     )
+    reverse_choices = _distinct_choices(word.source_text, reverse_candidates)
     variants: dict[str, dict[str, Any]] = {
         "typing": {
             "type": "typing",
@@ -214,7 +230,11 @@ def quiz_variants(
             "prompt": word.target_text,
             "answer": word.source_text,
             "choices": reverse_choices,
-            "instruction": "Choose the English word",
+            "instruction": (
+                "Choose the English word"
+                if word.source_lang == "en"
+                else "Choose the Russian word"
+            ),
         }
     stored_examples = repository.examples_for_word(word.id)
     cloze = _cloze_sentence(
@@ -236,13 +256,18 @@ def quiz_variants(
         if candidate.part_of_speech.split(",", 1)[0].strip().casefold() == category
     ]
     correct_context = _masked_context(word)
+    context_candidates = [
+        *same_category,
+        *(candidate for candidate in candidates if candidate not in same_category),
+    ]
     context_choices = _distinct_choices(
         correct_context,
         [
             masked
-            for candidate in same_category
+            for candidate in context_candidates
             if (masked := _masked_context(candidate))
-        ],
+        ]
+        + list(CONTEXT_DISTRACTORS[word.source_lang]),
     )
     if correct_context and len(context_choices) == 4:
         variants["context"] = {
