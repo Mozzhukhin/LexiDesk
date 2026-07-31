@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import random
 import re
+from datetime import UTC, datetime
 from typing import Any
 
 from .answers import evaluate_answer
@@ -121,7 +122,16 @@ def card_payload(
     payload["quiz_probability"] = (
         quiz_probability(word, repository) if word is not None else 0
     )
+    payload["adaptive_quiz"] = adaptive_quiz_due(word) if word is not None else False
     return payload
+
+
+def adaptive_quiz_due(word: Word, now: datetime | None = None) -> bool:
+    """Return whether Mixed mode should actively test this presentation."""
+    reviews = word.know_count + word.dont_know_count
+    if reviews == 0:
+        return word.view_count >= 2
+    return word.due_at <= (now or datetime.now(UTC))
 
 
 def quiz_probability(word: Word, repository: WordRepository) -> float:
@@ -323,7 +333,10 @@ def execute_request(
     if command == "card":
         exclude = request.get("exclude")
         return card_payload(
-            repository.next_word(int(exclude) if exclude is not None else None),
+            repository.next_word(
+                int(exclude) if exclude is not None else None,
+                adaptive=bool(request.get("adaptive", False)),
+            ),
             repository,
         )
     if command == "get":
@@ -341,7 +354,13 @@ def execute_request(
             selected_answer=str(request.get("selected_answer", "")),
             correct_answer=str(request.get("correct_answer", "")),
         )
-        return card_payload(repository.next_word(word_id), repository)
+        return card_payload(
+            repository.next_word(
+                word_id,
+                adaptive=bool(request.get("adaptive", False)),
+            ),
+            repository,
+        )
     if command == "undo":
         restored = repository.undo_last_review()
         payload = card_payload(restored, repository)

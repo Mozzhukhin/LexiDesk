@@ -57,10 +57,11 @@ selected target meaning. WordNet examples from another sense and inconsistent
 Argos output are rejected. Quoted definition terms can be aligned safely; when
 that is not possible, the service stores a compact explicit fallback.
 
-Card rotation is deterministic until meaningful ties: unseen cards come first,
-then the oldest `last_shown_at` across the entire deck, followed by due state,
-miss rate, FSRS difficulty, and due time. This prevents overdue cards from
-starving future cards during passive browsing. Random ordering is only the final
+Card rotation is deterministic until meaningful ties. Passive browsing covers
+unseen and least-recently-shown cards across the complete deck. Adaptive Mixed
+mode introduces each new card once, then prioritizes its first recall check and
+later FSRS-due reviews by miss rate and difficulty. A failed recall enters an
+explicit ten-minute learning/relearning step. Random ordering is only the final
 tie-breaker.
 
 Quiz distractors come from one bounded, indexed repository query instead of

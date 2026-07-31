@@ -33,7 +33,7 @@ from PySide6.QtWidgets import (
 )
 
 from .answers import AnswerGrade, evaluate_answer
-from .api import quiz_variants
+from .api import adaptive_quiz_due, quiz_variants
 from .autostart import set_autostart
 from .batch import BatchAddDialog
 from .database import WordRepository
@@ -66,7 +66,6 @@ class LexiDeskWindow(QMainWindow):
         self._drag_origin = QPoint()
         self._current_quiz: dict[str, Any] | None = None
         self._choice_buttons: list[QPushButton] = []
-        self._mixed_card_counter = 0
         self._quiz_answered = False
         self.advance_timer = QTimer(self)
         self.advance_timer.setSingleShot(True)
@@ -119,7 +118,7 @@ class LexiDeskWindow(QMainWindow):
         practice_group.setExclusive(True)
         practice_modes = (
             ("Off", "off"),
-            ("Mixed — every fifth card", "mixed"),
+            ("Mixed — adaptive review", "mixed"),
             ("Choose translation", "translation"),
             ("Reverse translation", "reverse"),
             ("Complete the sentence", "cloze"),
@@ -317,7 +316,10 @@ class LexiDeskWindow(QMainWindow):
     def next_card(self) -> None:
         self.advance_timer.stop()
         previous_id = self.current_word.id if self.current_word else None
-        self.current_word = self.repository.next_word(previous_id)
+        self.current_word = self.repository.next_word(
+            previous_id,
+            adaptive=self.settings.practice_mode == "mixed",
+        )
         self.seconds_left = self.settings.rotation_seconds
         self._update_countdown()
         self.review_clock.restart()
@@ -411,10 +413,8 @@ class LexiDeskWindow(QMainWindow):
         mode = self.settings.practice_mode
         if mode != "mixed":
             return mode
-        self._mixed_card_counter += 1
-        if self._mixed_card_counter < 5:
+        if self.current_word is None or not adaptive_quiz_due(self.current_word):
             return "off"
-        self._mixed_card_counter = 0
         available = [
             candidate
             for candidate in ("translation", "reverse", "cloze", "context")
@@ -427,7 +427,6 @@ class LexiDeskWindow(QMainWindow):
             return
         self.settings.practice_mode = mode
         self.settings_store.save(self.settings)
-        self._mixed_card_counter = 0
         self.practice_actions[mode].setChecked(True)
         self._update_practice_button()
         self._render_card()
@@ -435,7 +434,7 @@ class LexiDeskWindow(QMainWindow):
     def _update_practice_button(self) -> None:
         labels = {
             "off": "Off",
-            "mixed": "Mixed — every fifth card",
+            "mixed": "Mixed — adaptive review",
             "translation": "Choose translation",
             "reverse": "Reverse translation",
             "cloze": "Complete the sentence",

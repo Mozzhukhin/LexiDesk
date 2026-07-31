@@ -51,7 +51,7 @@ PlasmoidItem {
     property string quizInstruction: ""
     property var quizVariants: ({})
     property string quizMode: plasmoid.configuration.quizMode || "off"
-    property int mixedCardCounter: 0
+    property bool adaptiveQuiz: false
     property int cardRevision: 0
     property string pendingKind: ""
     property string bridgePath: findExecutable(
@@ -112,7 +112,8 @@ PlasmoidItem {
 
     function loadNext() {
         var exclusion = cardId > 0 ? " --exclude " + cardId : ""
-        runBridge("card" + exclusion, "card")
+        var adaptive = quizMode === "mixed" ? " --adaptive" : ""
+        runBridge("card" + exclusion + adaptive, "card")
     }
 
     function review(result) {
@@ -121,6 +122,8 @@ PlasmoidItem {
                 + " --selected " + shellQuote(
                     selectedChoice || typedAnswer.trim())
                 + " --correct " + shellQuote(quizAnswer)
+            if (quizMode === "mixed")
+                metadata += " --adaptive"
             runBridge("review " + cardId + " " + result + metadata, "card")
         }
     }
@@ -188,7 +191,6 @@ PlasmoidItem {
 
     function selectQuizMode(kind) {
         plasmoid.configuration.quizMode = kind
-        mixedCardCounter = 0
         if (kind === "off" || kind === "mixed") {
             choiceMode = false
             revealed = plasmoid.configuration.revealMode === "both"
@@ -219,10 +221,8 @@ PlasmoidItem {
             startQuiz(quizMode, false)
             return
         }
-        mixedCardCounter++
-        if (mixedCardCounter < 5)
+        if (!adaptiveQuiz)
             return
-        mixedCardCounter = 0
         var mixedKinds = ["translation", "reverse", "cloze", "context"]
         var available = []
         for (var index = 0; index < mixedKinds.length; index++) {
@@ -267,6 +267,7 @@ PlasmoidItem {
         exampleText = card.example || ""
         exampleTranslationText = card.example_translation || ""
         quizVariants = card.quizzes || {}
+        adaptiveQuiz = Boolean(card.adaptive_quiz)
         var quiz = card.quiz || {}
         quizType = quiz.type || ""
         quizPrompt = quiz.prompt || sourceText
@@ -473,7 +474,7 @@ PlasmoidItem {
                 onClicked: root.selectQuizMode("off")
             }
             PlasmaExtras.MenuItem {
-                text: i18n("Mixed — every fifth card")
+                text: i18n("Mixed — adaptive review")
                 checkable: true
                 checked: root.quizMode === "mixed"
                 onClicked: root.selectQuizMode("mixed")

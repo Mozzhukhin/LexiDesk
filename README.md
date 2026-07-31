@@ -76,20 +76,19 @@ a network connection. A source installation downloads this data once during
 
 LexiDesk uses the official FSRS 6 implementation with 90% desired retention by
 default. Ordinary cards are passive: **Next** and automatic rotation only
-change the visible word. Quizzes never interrupt normal browsing: the user
-chooses a persistent mode from the dedicated Practice menu. **Mixed** keeps
-normal cards and inserts a random non-typing quiz every fifth card. Selecting a
-specific quiz type applies that type to every available word until the mode is
-changed or switched Off.
+change the visible word. The user chooses a persistent mode from the Practice
+section of the widget menu. **Mixed** introduces new cards normally, tests them
+on their next eligible appearance, and turns FSRS-due cards into a random
+non-typing quiz. Selecting a specific quiz type applies that type to every
+available word until the mode is changed or switched Off.
 A correct choice records a successful review; a wrong choice records a failed
 review. Those quiz results produce individualized intervals instead of a fixed
 ladder. The desired retention can be adjusted between 70% and 99%.
 
 Legacy review history is migrated automatically. LexiDesk shows every unseen
-card before repeating one. It then selects the least recently shown item across
-the whole deck; due state, mistakes, and FSRS difficulty break close ties
-without starving scheduled cards. **Next** does not alter learning history, and
-**Undo** restores the complete state before the most recent new-format review.
+card before repeating one. In Mixed mode it then prioritizes first-recall and
+FSRS-due cards by mistake rate and difficulty; passive mode keeps a balanced
+full-deck rotation. **Next** does not alter learning history.
 The same card cannot reappear during the next five displays. In a smaller deck,
 LexiDesk cycles through every other available card before allowing a repeat.
 
@@ -105,17 +104,17 @@ LexiDesk cycles through every other available card before allowing a repeat.
    and is limited to one compact sentence.
 3. **Next** requests another card without recording whether the word is known.
    The 90-second timer performs the same passive change automatically.
-4. The compact Practice icon opens a separate menu. Off keeps normal cards. Mixed
-   inserts translation, reverse, sentence-gap, or context practice every fifth
-   card. Selecting one exact quiz type uses only that type on subsequent words.
-   The active mode is check-marked and remembered by Plasma.
+4. The compact application menu contains the Practice section. Off keeps normal
+   cards. Mixed inserts translation, reverse, sentence-gap, or context practice
+   when a card is ready for adaptive review. Selecting one exact quiz type uses
+   only that type on subsequent words. The active mode is check-marked and
+   remembered by Plasma.
 5. A correct answer turns green. A wrong selected answer turns red while the
    correct answer turns green. The result remains visible for one second.
 6. The widget then records only that quiz result in FSRS and advances
-   automatically. Statistics, recall, difficulty, and the next due date are
-   based on these quiz results.
-7. The arrow in the footer undoes the latest recorded quiz result. Adding and
-   editing cards opens the Python application, while all vocabulary remains in
+   automatically. Statistics, difficulty, and the next due date are based on
+   these quiz results.
+7. Adding and editing cards opens the Python application, while all vocabulary remains in
    the same local SQLite database.
 
 ## Install from source on Arch Linux

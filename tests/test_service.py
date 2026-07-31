@@ -1,8 +1,9 @@
 import json
 import sqlite3
+from datetime import timedelta
 from pathlib import Path
 
-from lexidesk.api import quiz_choices, quiz_variants
+from lexidesk.api import adaptive_quiz_due, quiz_choices, quiz_variants
 from lexidesk.database import WordRepository
 from lexidesk.dictionary import OfflineDictionary
 from lexidesk.service import LexiDeskService
@@ -121,4 +122,45 @@ def test_quiz_mistakes_are_available_to_analytics(tmp_path: Path) -> None:
 
     assert repository.quiz_breakdown()[0]["accuracy"] == 0.0
     assert repository.common_confusions()[0]["selected"] == "очевидный"
+    repository.close()
+
+
+def test_adaptive_mode_introduces_then_quizzes_new_cards(tmp_path: Path) -> None:
+    repository = WordRepository(tmp_path / "adaptive.db")
+    for index in range(6):
+        repository.add_word(
+            source_text=f"word-{index}",
+            source_lang="en",
+            target_text=f"слово-{index}",
+        )
+
+    introductions = [repository.next_word(adaptive=True) for _ in range(6)]
+
+    assert all(word is not None for word in introductions)
+    assert all(word.view_count == 1 for word in introductions if word is not None)
+    assert all(
+        not adaptive_quiz_due(word) for word in introductions if word is not None
+    )
+
+    tested = repository.next_word(adaptive=True)
+    assert tested is not None
+    assert tested.view_count == 2
+    assert adaptive_quiz_due(tested)
+    repository.close()
+
+
+def test_fsrs_due_time_controls_adaptive_quiz(tmp_path: Path) -> None:
+    repository = WordRepository(tmp_path / "adaptive-due.db")
+    word_id = repository.add_word(
+        source_text="reliable",
+        source_lang="en",
+        target_text="надёжный",
+    )
+    repository.next_word(adaptive=True)
+    reviewed = repository.review(word_id, "again")
+
+    assert reviewed.last_reviewed_at is not None
+    assert reviewed.due_at - reviewed.last_reviewed_at == timedelta(minutes=10)
+    assert not adaptive_quiz_due(reviewed)
+    assert adaptive_quiz_due(reviewed, reviewed.due_at + timedelta(seconds=1))
     repository.close()

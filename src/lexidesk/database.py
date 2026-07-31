@@ -87,6 +87,7 @@ class WordRepository:
                 dont_know_count INTEGER NOT NULL DEFAULT 0,
                 last_reviewed_at TEXT,
                 last_shown_at TEXT,
+                view_count INTEGER NOT NULL DEFAULT 0,
                 fsrs_state INTEGER NOT NULL DEFAULT 1,
                 fsrs_step INTEGER,
                 stability REAL,
@@ -146,6 +147,7 @@ class WordRepository:
             "fsrs_step": "INTEGER",
             "stability": "REAL",
             "difficulty": "REAL",
+            "view_count": "INTEGER NOT NULL DEFAULT 0",
         }
         migrating_to_fsrs = "fsrs_state" not in columns
         for name, declaration in additions.items():
@@ -153,6 +155,11 @@ class WordRepository:
                 self.connection.execute(
                     f"ALTER TABLE words ADD COLUMN {name} {declaration}"
                 )
+                if name == "view_count":
+                    self.connection.execute(
+                        "UPDATE words SET view_count = 1 "
+                        "WHERE last_shown_at IS NOT NULL"
+                    )
         if migrating_to_fsrs:
             self.connection.execute(
                 """
@@ -187,7 +194,7 @@ class WordRepository:
         }
         if "rating" not in review_columns:
             self._migrate_review_log()
-        self.connection.execute("PRAGMA user_version=5")
+        self.connection.execute("PRAGMA user_version=6")
         self.connection.commit()
 
     def _migrate_review_log(self) -> None:
@@ -531,7 +538,12 @@ class WordRepository:
             ),
         }
 
-    def next_word(self, exclude_id: int | None = None) -> Word | None:
+    def next_word(
+        self,
+        exclude_id: int | None = None,
+        *,
+        adaptive: bool = False,
+    ) -> Word | None:
         """
         Never repeat a card within the next five displays. For decks smaller
         than six cards, the cooldown becomes ``deck size - 1`` so every other
@@ -539,9 +551,9 @@ class WordRepository:
         least recently shown cards come first. Due state and learning
         difficulty break close ties; RANDOM is only the final tie-breaker.
 
-        Passive desktop rotation must cover the entire deck. A strict due-first
-        order would let overdue cards monopolize the widget because browsing a
-        normal card intentionally does not record an FSRS review.
+        Adaptive practice shows every unseen card normally before prioritizing
+        cards that are ready for their first quiz or due under FSRS. Passive
+        browsing keeps a balanced full-deck rotation.
         """
         now = to_storage(utc_now())
         row = self.connection.execute(
@@ -568,6 +580,24 @@ class WordRepository:
                 )
             ORDER BY
                 CASE WHEN last_shown_at IS NULL THEN 0 ELSE 1 END,
+                CASE WHEN ? = 1 THEN
+                    CASE
+                        WHEN know_count + dont_know_count = 0
+                             AND view_count >= 1 THEN 0
+                        WHEN know_count + dont_know_count > 0
+                             AND due_at <= ? THEN 0
+                        ELSE 1
+                    END
+                    ELSE 0
+                END,
+                CASE WHEN ? = 1 AND due_at <= ? THEN 0 ELSE 1 END,
+                CASE
+                    WHEN ? = 1 AND know_count + dont_know_count > 0
+                    THEN CAST(dont_know_count AS REAL)
+                         / (know_count + dont_know_count)
+                    ELSE 0
+                END DESC,
+                CASE WHEN ? = 1 THEN COALESCE(difficulty, 5) ELSE 0 END DESC,
                 COALESCE(last_shown_at, created_at),
                 CASE WHEN due_at <= ? THEN 0 ELSE 1 END,
                 CASE
@@ -580,16 +610,30 @@ class WordRepository:
                 RANDOM()
             LIMIT 1
             """,
-            (exclude_id, exclude_id, now),
+            (
+                exclude_id,
+                exclude_id,
+                int(adaptive),
+                now,
+                int(adaptive),
+                now,
+                int(adaptive),
+                int(adaptive),
+                now,
+            ),
         ).fetchone()
         if row is None:
             return None
         self.connection.execute(
-            "UPDATE words SET last_shown_at = ? WHERE id = ?",
+            """
+            UPDATE words
+            SET last_shown_at = ?, view_count = view_count + 1
+            WHERE id = ?
+            """,
             (now, row["id"]),
         )
         self.connection.commit()
-        return self._to_word(row)
+        return self.get_word(int(row["id"]))
 
     def review(
         self,
@@ -912,6 +956,7 @@ class WordRepository:
             dont_know_count=row["dont_know_count"],
             last_reviewed_at=from_storage(row["last_reviewed_at"]),
             last_shown_at=from_storage(row["last_shown_at"]),
+            view_count=row["view_count"],
             fsrs_state=row["fsrs_state"],
             fsrs_step=row["fsrs_step"],
             stability=row["stability"],

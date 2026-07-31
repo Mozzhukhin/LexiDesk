@@ -13,6 +13,8 @@
   configuration, reduced the default height, and removed the recall label.
 - Reject meta-sentences that merely mention a word, generate short contextual
   examples from WordNet meanings, and handle Russian inflections reliably.
+- Replace fixed every-fifth-card quizzes with adaptive first-recall and FSRS-due
+  quizzes while preserving the five-card repetition cooldown.
 
 - Move batch translation to a responsive, cancellable background worker.
 - Reduce quiz payload generation from a full-deck scan to a bounded SQL query.

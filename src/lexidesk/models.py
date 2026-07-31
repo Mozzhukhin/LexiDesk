@@ -27,6 +27,7 @@ class Word:
     dont_know_count: int
     last_reviewed_at: datetime | None
     last_shown_at: datetime | None
+    view_count: int
     fsrs_state: int
     fsrs_step: int | None
     stability: float | None

@@ -30,7 +30,7 @@ Kirigami.FormLayout {
         valueRole: "value"
         model: [
             { text: i18n("Off"), value: "off" },
-            { text: i18n("Mixed — every fifth card"), value: "mixed" },
+            { text: i18n("Mixed — adaptive review"), value: "mixed" },
             { text: i18n("Choose translation"), value: "translation" },
             { text: i18n("Reverse translation"), value: "reverse" },
             { text: i18n("Complete the sentence"), value: "cloze" },

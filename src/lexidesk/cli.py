@@ -18,6 +18,7 @@ def parser() -> argparse.ArgumentParser:
 
     card = subparsers.add_parser("card", help="Select the next display card")
     card.add_argument("--exclude", type=int)
+    card.add_argument("--adaptive", action="store_true")
 
     get_card = subparsers.add_parser("get", help="Return a specific card")
     get_card.add_argument("word_id", type=int)
@@ -32,6 +33,7 @@ def parser() -> argparse.ArgumentParser:
     review.add_argument("--quiz-type", default="")
     review.add_argument("--selected", default="")
     review.add_argument("--correct", default="")
+    review.add_argument("--adaptive", action="store_true")
 
     check = subparsers.add_parser("check", help="Check a typed translation")
     check.add_argument("word_id", type=int)
@@ -48,8 +50,10 @@ def parser() -> argparse.ArgumentParser:
 
 def request_from_arguments(args: argparse.Namespace) -> dict[str, Any]:
     request: dict[str, Any] = {"command": args.command}
-    if args.command == "card" and args.exclude is not None:
-        request["exclude"] = args.exclude
+    if args.command == "card":
+        if args.exclude is not None:
+            request["exclude"] = args.exclude
+        request["adaptive"] = args.adaptive
     elif args.command == "get":
         request["word_id"] = args.word_id
     elif args.command == "review":
@@ -62,6 +66,7 @@ def request_from_arguments(args: argparse.Namespace) -> dict[str, Any]:
                 "quiz_type": args.quiz_type,
                 "selected_answer": args.selected,
                 "correct_answer": args.correct,
+                "adaptive": args.adaptive,
             }
         )
     elif args.command == "check":

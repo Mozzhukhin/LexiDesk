@@ -47,6 +47,18 @@ FSRS_RATINGS = {
     ReviewRating.EASY: Rating.Easy,
 }
 
+FSRS_LEARNING_STEPS = (timedelta(minutes=10), timedelta(hours=1))
+FSRS_RELEARNING_STEPS = (timedelta(minutes=10),)
+
+
+def _scheduler(desired_retention: float) -> Scheduler:
+    return Scheduler(
+        desired_retention=desired_retention,
+        learning_steps=FSRS_LEARNING_STEPS,
+        relearning_steps=FSRS_RELEARNING_STEPS,
+        enable_fuzzing=False,
+    )
+
 
 @dataclass(frozen=True, slots=True)
 class FSRSState:
@@ -71,10 +83,7 @@ def schedule_fsrs_review(
     now: datetime,
     desired_retention: float = 0.9,
 ) -> FSRSState:
-    scheduler = Scheduler(
-        desired_retention=desired_retention,
-        enable_fuzzing=False,
-    )
+    scheduler = _scheduler(desired_retention)
     card = Card(
         card_id=card_id,
         state=State(state),
@@ -109,7 +118,7 @@ def retrievability(
 ) -> float | None:
     if last_reviewed_at is None or stability is None:
         return None
-    scheduler = Scheduler(desired_retention=desired_retention, enable_fuzzing=False)
+    scheduler = _scheduler(desired_retention)
     card = Card(
         card_id=card_id,
         state=State(state),

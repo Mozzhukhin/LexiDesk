@@ -15,9 +15,10 @@ def test_cli_card_and_review(tmp_path: Path, monkeypatch) -> None:
     repository.close()
     monkeypatch.setattr(lexidesk.cli, "database_path", lambda: path)
 
-    card = lexidesk.cli.run(["card"])
+    card = lexidesk.cli.run(["card", "--adaptive"])
     assert card["id"] == word_id
     assert card["direction"] == "EN → RU"
+    assert card["adaptive_quiz"] is False
 
     next_card = lexidesk.cli.run(["review", str(word_id), "know"])
     assert next_card["id"] == word_id

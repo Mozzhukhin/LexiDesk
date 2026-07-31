@@ -401,7 +401,7 @@ class SettingsDialog(QDialog):
 
         self.practice_combo = QComboBox()
         self.practice_combo.addItem("Off — normal cards", "off")
-        self.practice_combo.addItem("Mixed — quiz every fifth card", "mixed")
+        self.practice_combo.addItem("Mixed — adaptive review", "mixed")
         self.practice_combo.addItem("Choose translation", "translation")
         self.practice_combo.addItem("Reverse translation", "reverse")
         self.practice_combo.addItem("Complete the sentence", "cloze")
