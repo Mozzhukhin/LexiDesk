@@ -5,9 +5,31 @@ from pathlib import Path
 
 from .database import WordRepository
 from .examples import MAX_EXAMPLE_LENGTH, example_is_informative
+from .models import Word
 from .translation import ExampleResult, OfflineTranslator
 
 logger = logging.getLogger(__name__)
+
+
+def useful_examples(repository: WordRepository, word: Word) -> list[tuple[str, str]]:
+    return [
+        (example, translation)
+        for example, translation in repository.examples_for_word(word.id)
+        if example_is_informative(
+            example,
+            word.source_text,
+            allow_inflection=word.source_lang == "ru",
+        )
+        and example_is_informative(
+            translation,
+            word.target_text,
+            allow_inflection=True,
+        )
+    ]
+
+
+def needs_example_enrichment(repository: WordRepository, word: Word) -> bool:
+    return len(useful_examples(repository, word)) < 3
 
 
 def enrich_example(database: Path, word_id: int) -> bool:
@@ -33,19 +55,8 @@ def enrich_example(database: Path, word_id: int) -> bool:
                 )
             )
         )
-        if refresh_example:
-            generated_examples = list(
-                translator.generate_examples(
-                    word.source_text,
-                    word.source_lang,
-                    word.part_of_speech,
-                    word.target_text,
-                )
-            )
-            generated = generated_examples[0]
-            example = generated.source
-            translation = generated.translation
-        else:
+        retained: list[ExampleResult] = []
+        if not refresh_example:
             if not example_is_informative(
                 translation,
                 word.target_text,
@@ -60,20 +71,30 @@ def enrich_example(database: Path, word_id: int) -> bool:
                 )
                 example = completed.source
                 translation = completed.translation
-            generated_examples = list(
-                translator.generate_examples(
-                    word.source_text,
-                    word.source_lang,
-                    word.part_of_speech,
-                    word.target_text,
-                )
+            if example_is_informative(
+                example,
+                word.source_text,
+                allow_inflection=word.source_lang == "ru",
+            ) and example_is_informative(
+                translation,
+                word.target_text,
+                allow_inflection=True,
+            ):
+                retained.append(ExampleResult(example, translation))
+        generated_examples = list(
+            translator.generate_examples(
+                word.source_text,
+                word.source_lang,
+                word.part_of_speech,
+                word.target_text,
             )
-            generated_examples.insert(0, ExampleResult(example, translation))
-        if not example:
+        )
+        retained.extend(generated_examples)
+        if not retained:
             return False
         repository.replace_examples(
             word.id,
-            [(item.source, item.translation) for item in generated_examples],
+            [(item.source, item.translation) for item in retained],
         )
         return True
     except Exception:

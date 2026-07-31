@@ -181,6 +181,19 @@ def example_is_informative(
         r"\b(?:выражение|фраза)\b.*\b(?:помог|передал)",
         r"\bважный смысл здесь\b",
         r"\bрезультат можно описать как\b",
+        r"\bрезультат оказался\b.*\bв этой ситуации\b",
+        r"\bвыражение\b.*\b(?:помогло уточнить|точно передало)\b",
+        r"\bпонятие\b.*\bстало (?:главным|центральным)\b",
+        r"\bмы обсудили\b.*\b(?:перед|прежде чем)\b",
+        r"\bстало центральн\w* в (?:их|этом) разговоре\b",
+        r"\bwe (?:discussed the|encountered)\b.*"
+        r"\b(?:before making|during the discussion)\b",
+        r"\bbecame central to (?:their|the) conversation\b",
+        r"\bexplained the\b.*\b(?:practical|clear) example\b",
+        r"\bthe final result was clearly\b",
+        r"\bthe situation became increasingly\b.*\bover time\b",
+        r"\bони использовали\b.*\b(?:объясняя|при объяснении)\b",
+        r"\bthey used\b.*\bwhile explaining\b",
     )
     return not any(re.search(pattern, normalized) for pattern in weak_patterns)
 

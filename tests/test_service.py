@@ -180,6 +180,21 @@ def test_russian_cloze_uses_safe_fallback_distractors(tmp_path: Path) -> None:
     repository.close()
 
 
+def test_russian_cloze_masks_an_inflected_form(tmp_path: Path) -> None:
+    repository = WordRepository(tmp_path / "inflected-cloze.db")
+    word_id = repository.add_word(
+        source_text="разъяснения",
+        source_lang="ru",
+        target_text="clarification",
+        example="Она попросила разъяснений перед подписанием формы.",
+        example_translation="She asked for clarification before signing the form.",
+    )
+    variants = quiz_variants(repository.get_word(word_id), repository)
+
+    assert variants["cloze"]["prompt"] == ("Она попросила ___ перед подписанием формы.")
+    repository.close()
+
+
 def test_quiz_mistakes_are_available_to_analytics(tmp_path: Path) -> None:
     repository = WordRepository(tmp_path / "analytics.db")
     word_id = repository.add_word(

@@ -185,8 +185,27 @@ class OfflineTranslator:
             part_of_speech,
             target_text,
         )
-        results = [primary]
-        seen = {primary.source.casefold()}
+        results: list[ExampleResult] = []
+        seen: set[str] = set()
+
+        def add_if_useful(candidate: ExampleResult) -> None:
+            key = candidate.source.casefold()
+            if key in seen:
+                return
+            if not example_is_informative(
+                candidate.source,
+                source_text,
+                allow_inflection=language == "ru",
+            ) or not example_is_informative(
+                candidate.translation,
+                target_text,
+                allow_inflection=True,
+            ):
+                return
+            results.append(candidate)
+            seen.add(key)
+
+        add_if_useful(primary)
         if language == "en":
             candidates = self.examples.lookup_many(
                 source_text,
@@ -204,10 +223,7 @@ class OfflineTranslator:
                     target_text,
                     part_of_speech,
                 )
-                key = completed.source.casefold()
-                if key not in seen:
-                    results.append(completed)
-                    seen.add(key)
+                add_if_useful(completed)
                 if len(results) >= limit:
                     break
         else:
@@ -231,10 +247,7 @@ class OfflineTranslator:
                     part_of_speech,
                 )
                 reversed_result = ExampleResult(completed.translation, completed.source)
-                key = reversed_result.source.casefold()
-                if key not in seen:
-                    results.append(reversed_result)
-                    seen.add(key)
+                add_if_useful(reversed_result)
                 if len(results) >= limit:
                     break
         return tuple(results[:limit])
@@ -538,6 +551,25 @@ def _varied_fallback_sentences(
             f"Он использовал «{term}», объясняя свою мысль.",
         ]
     insertion = term if term.isupper() else term.casefold()
+    meaning = insertion.casefold()
+    if meaning in {"clarification", "clarifications"}:
+        return [
+            "She asked for clarification before signing the form.",
+            "His detailed clarifications made the task easier to understand.",
+            "Further clarification is needed before we make a decision.",
+        ]
+    if meaning in {"regret", "regrets"}:
+        return [
+            "He wrote a note expressing his regret.",
+            "She felt deep regret after missing the opportunity.",
+            "His only regret was leaving the city so early.",
+        ]
+    if meaning in {"restricted", "limited"}:
+        return [
+            f"Access to this area is {insertion} after dark.",
+            f"The {insertion} section is open only to authorized staff.",
+            f"Travel remained {insertion} until the road was safe again.",
+        ]
     if category.startswith("noun"):
         return [
             f"We discussed the {insertion} before making a decision.",

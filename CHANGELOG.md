@@ -9,6 +9,8 @@
   older cards lazily without loading the full vocabulary.
 - Never replace a selected fixed quiz mode with a normal card; retain the mode
   and provide a clear skip state when a quiz cannot be constructed.
+- Reject generic meta sentences from quizzes and progressively retain only
+  meaning-bearing bilingual examples.
 - Replace the Argos Python runtime with direct CTranslate2 inference, preserving
   the same models and beam-search output while removing Torch, Stanza, spaCy,
   MiniSBD, and ONNX from Linux and Windows bundles.

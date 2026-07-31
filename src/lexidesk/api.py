@@ -8,6 +8,7 @@ from typing import Any
 from .answers import evaluate_answer
 from .database import WordRepository
 from .dictionary import OfflineDictionary, normalize_headword
+from .enrichment import useful_examples
 from .models import Word
 
 COMMON_DISTRACTORS = {
@@ -236,7 +237,7 @@ def quiz_variants(
                 else "Choose the Russian word"
             ),
         }
-    stored_examples = repository.examples_for_word(word.id)
+    stored_examples = useful_examples(repository, word)
     cloze = _cloze_sentence(
         word,
         [example for example, _translation in stored_examples],
@@ -255,7 +256,7 @@ def quiz_variants(
         for candidate in candidates
         if candidate.part_of_speech.split(",", 1)[0].strip().casefold() == category
     ]
-    correct_context = _masked_context(word)
+    correct_context = cloze
     context_candidates = [
         *same_category,
         *(candidate for candidate in candidates if candidate not in same_category),
@@ -366,7 +367,18 @@ def _cloze_sentence(word: Word, examples: list[str] | None = None) -> str:
         rf"(?<!\w){re.escape(word.source_text)}(?!\w)",
         flags=re.IGNORECASE,
     )
-    return pattern.sub("___", example, count=1)
+    masked, replacements = pattern.subn("___", example, count=1)
+    if replacements:
+        return masked
+    term = normalize_headword(word.source_text)
+    if " " in term or len(term) < 5:
+        return ""
+    stem_length = max(4, len(term) - (5 if word.source_lang == "ru" else 3))
+    stem = term[:stem_length]
+    for match in re.finditer(r"[^\W\d_]+", example, flags=re.UNICODE):
+        if normalize_headword(match.group()).startswith(stem):
+            return f"{example[: match.start()]}___{example[match.end() :]}"
+    return ""
 
 
 def _masked_context(word: Word) -> str:

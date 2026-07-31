@@ -262,7 +262,9 @@ automatically after indexing.
 LexiDesk stores several short examples separately for each card and randomly
 selects one for sentence-completion practice. Only the current card's examples
 are queried. Older cards are enriched gradually in the background as they
-appear, so a large vocabulary does not cause a bulk startup job.
+appear, so a large vocabulary does not cause a bulk startup job. Meta templates
+that merely mention a word are rejected; a sentence is saved only when both
+language sides contain the studied meaning in a useful context.
 
 For an unknown single word, LexiDesk compares nearby dictionary spellings with
 the offline model's translation and automatically substitutes a correction only

@@ -221,6 +221,18 @@ def test_meta_sentences_are_not_informative_examples() -> None:
         "The word “destruction” means severe damage.",
         "destruction",
     )
+    assert not example_is_informative(
+        "Выражение «разъяснения» точно передало смысл разговора.",
+        "разъяснения",
+    )
+    assert not example_is_informative(
+        "Они использовали разъяснения при объяснении ситуации.",
+        "разъяснения",
+    )
+    assert not example_is_informative(
+        "Результат оказался «Ограниченный» в этой ситуации.",
+        "ограниченный",
+    )
     assert example_is_informative(
         "Доступ в эту зону ограничен после наступления темноты.",
         "ограниченный",

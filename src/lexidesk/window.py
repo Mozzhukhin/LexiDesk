@@ -40,6 +40,7 @@ from .config import database_path
 from .database import WordRepository
 from .diagnostics_dialog import DiagnosticsDialog
 from .dialogs import AddWordDialog, SettingsDialog
+from .enrichment import needs_example_enrichment
 from .insights import AnalyticsDialog
 from .library import LibraryDialog
 from .models import Word
@@ -372,7 +373,7 @@ class LexiDeskWindow(QMainWindow):
             word.id not in self._example_enrichment_scheduled
             and len(self._example_enrichment_scheduled) < 20
             and self.repository.path == database_path()
-            and len(self.repository.examples_for_word(word.id)) < 3
+            and needs_example_enrichment(self.repository, word)
         ):
             self._example_enrichment_scheduled.add(word.id)
             schedule_example_enrichment(word.id)

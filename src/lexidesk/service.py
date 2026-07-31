@@ -13,7 +13,7 @@ from .backup import ensure_daily_backup
 from .config import APP_NAME, database_path, settings_path
 from .database import WordRepository
 from .diagnostics import configure_logging
-from .enrichment import enrich_example
+from .enrichment import enrich_example, needs_example_enrichment
 from .service_client import INTERFACE_NAME, OBJECT_PATH, SERVICE_NAME
 from .settings import SettingsStore
 
@@ -59,7 +59,9 @@ class LexiDeskService(QObject):
                     and word_id > 0
                     and word_id not in self.enrichment_scheduled
                     and len(self.enrichment_scheduled) < 20
-                    and len(self.repository.examples_for_word(word_id)) < 3
+                    and needs_example_enrichment(
+                        self.repository, self.repository.get_word(word_id)
+                    )
                 ):
                     self.enrichment_scheduled.add(word_id)
                     self.thread_pool.start(
