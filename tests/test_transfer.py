@@ -30,6 +30,7 @@ def test_json_round_trip(tmp_path: Path) -> None:
     assert (imported, skipped) == (1, 0)
     word = target.list_words()[0]
     assert word.source_text == "look forward to"
+    assert word.target_lang == "ru"
     assert word.tags == ["work", "phrases"]
     assert word.forms == ["looks forward to", "looked forward to"]
     assert word.frequency == "common"

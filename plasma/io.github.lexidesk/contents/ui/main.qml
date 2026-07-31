@@ -14,13 +14,15 @@ PlasmoidItem {
     property string sourceText: ""
     property string translationText: ""
     property string sourceLanguage: ""
-    readonly property string primaryText: sourceLanguage === "ru"
+    property string targetLanguage: ""
+    readonly property bool targetFirst: targetLanguage === "en"
+    readonly property string primaryText: targetFirst
         ? translationText : sourceText
-    readonly property string secondaryText: sourceLanguage === "ru"
+    readonly property string secondaryText: targetFirst
         ? sourceText : translationText
-    readonly property string primaryExampleText: sourceLanguage === "ru"
+    readonly property string primaryExampleText: targetFirst
         ? exampleTranslationText : exampleText
-    readonly property string secondaryExampleText: sourceLanguage === "ru"
+    readonly property string secondaryExampleText: targetFirst
         ? exampleText : exampleTranslationText
     property string directionText: "OFFLINE"
     property string metadataText: ""
@@ -266,6 +268,7 @@ PlasmoidItem {
         sourceText = card.source || ""
         translationText = card.translation || ""
         sourceLanguage = card.source_language || "en"
+        targetLanguage = card.target_language || (sourceLanguage === "en" ? "ru" : "en")
         directionText = card.direction || "OFFLINE"
         var metadata = []
         if (card.part_of_speech)

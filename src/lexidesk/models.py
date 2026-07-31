@@ -9,6 +9,7 @@ class Word:
     id: int
     source_text: str
     source_lang: str
+    target_lang: str
     target_text: str
     alternatives: list[str]
     part_of_speech: str
@@ -35,8 +36,7 @@ class Word:
 
     @property
     def direction(self) -> str:
-        target = "ru" if self.source_lang == "en" else "en"
-        return f"{self.source_lang.upper()} → {target.upper()}"
+        return f"{self.source_lang.upper()} → {self.target_lang.upper()}"
 
     @property
     def status(self) -> str:

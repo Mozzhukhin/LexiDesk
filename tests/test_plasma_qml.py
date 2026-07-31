@@ -103,7 +103,7 @@ def test_widget_settings_write_string_values() -> None:
 def test_widget_keeps_english_above_russian_on_regular_cards() -> None:
     qml = QML_PATH.read_text(encoding="utf-8")
 
-    assert 'sourceLanguage === "ru"' in qml
+    assert 'targetLanguage === "en"' in qml
     assert "? translationText : sourceText" in qml
     assert "? sourceText : translationText" in qml
     assert "(choiceMode ? quizPrompt : primaryText)" in qml

@@ -8,10 +8,11 @@ from typing import Any
 from .answers import evaluate_answer
 from .database import WordRepository
 from .dictionary import OfflineDictionary, normalize_headword
+from .languages import language_name
 from .models import Word
 
 COMMON_DISTRACTORS = {
-    "en": (
+    "ru": (
         "время",
         "человек",
         "работа",
@@ -33,7 +34,7 @@ COMMON_DISTRACTORS = {
         "ошибка",
         "пример",
     ),
-    "ru": (
+    "en": (
         "time",
         "person",
         "work",
@@ -83,6 +84,7 @@ def word_payload(
             "id": 0,
             "source": "",
             "translation": "",
+            "target_language": "",
             "direction": "",
             "part_of_speech": "",
             "alternatives": [],
@@ -103,6 +105,7 @@ def word_payload(
         "source": word.source_text,
         "translation": word.target_text,
         "source_language": word.source_lang,
+        "target_language": word.target_lang,
         "direction": word.direction,
         "part_of_speech": word.part_of_speech,
         "alternatives": word.alternatives,
@@ -203,9 +206,7 @@ def quiz_variants(
         candidates=candidates,
     )
     reverse_candidates = [candidate.source_text for candidate in candidates]
-    reverse_candidates.extend(
-        COMMON_DISTRACTORS["ru" if word.source_lang == "en" else "en"]
-    )
+    reverse_candidates.extend(COMMON_DISTRACTORS.get(word.source_lang, ()))
     reverse_choices = _distinct_choices(word.source_text, reverse_candidates)
     variants: dict[str, dict[str, Any]] = {
         "typing": {
@@ -230,21 +231,17 @@ def quiz_variants(
             "prompt": word.target_text,
             "answer": word.source_text,
             "choices": reverse_choices,
-            "instruction": (
-                "Choose the English word"
-                if word.source_lang == "en"
-                else "Choose the Russian word"
-            ),
+            "instruction": f"Choose the {language_name(word.source_lang)} word",
         }
     cloze = _cloze_sentence(word)
-    cloze_answer = word.source_text if word.source_lang == "en" else word.target_text
+    cloze_language, cloze_answer = _cloze_side(word)
     cloze_candidates = [
         candidate.source_text
-        if candidate.source_lang == "en"
+        if cloze_language == word.source_lang
         else candidate.target_text
         for candidate in candidates
     ]
-    cloze_candidates.extend(COMMON_DISTRACTORS["ru"])
+    cloze_candidates.extend(COMMON_DISTRACTORS.get(cloze_language, ()))
     cloze_choices = _distinct_choices(
         cloze_answer,
         cloze_candidates,
@@ -275,7 +272,7 @@ def quiz_variants(
             for candidate in context_candidates
             if (masked := _masked_context(candidate))
         ]
-        + list(CONTEXT_DISTRACTORS["en"]),
+        + list(CONTEXT_DISTRACTORS.get(cloze_language, ())),
     )
     if correct_context and len(context_choices) == 4:
         variants["context"] = {
@@ -308,6 +305,7 @@ def quiz_choices(
         if (
             candidate.id != word.id
             and candidate.source_lang == word.source_lang
+            and candidate.target_lang == word.target_lang
             and value
             and key not in seen
         ):
@@ -316,7 +314,7 @@ def quiz_choices(
         if len(distractors) == 3:
             break
 
-    if len(distractors) < 3:
+    if len(distractors) < 3 and {word.source_lang, word.target_lang} == {"en", "ru"}:
         offline_dictionary = dictionary or OfflineDictionary()
         additions = offline_dictionary.random_translations(
             word.source_lang,
@@ -326,7 +324,7 @@ def quiz_choices(
         )
         distractors.extend(additions)
 
-    common_candidates = list(COMMON_DISTRACTORS[word.source_lang])
+    common_candidates = list(COMMON_DISTRACTORS.get(word.target_lang, ()))
     random.shuffle(common_candidates)
     for value in common_candidates:
         key = normalize_headword(value)
@@ -366,12 +364,11 @@ def _distinct_choices(answer: str, candidates: list[str]) -> list[str]:
 
 
 def _cloze_sentence(word: Word) -> str:
-    if word.source_lang == "en":
+    cloze_language, term = _cloze_side(word)
+    if cloze_language == word.source_lang:
         example = word.example
-        term = word.source_text
     else:
         example = word.example_translation
-        term = word.target_text
     if not example or not term:
         return ""
     pattern = re.compile(
@@ -390,6 +387,13 @@ def _cloze_sentence(word: Word) -> str:
         if normalize_headword(match.group()).startswith(stem):
             return f"{example[: match.start()]}___{example[match.end() :]}"
     return ""
+
+
+def _cloze_side(word: Word) -> tuple[str, str]:
+    """Prefer English for its semantic example index, otherwise use source."""
+    if word.source_lang == "en" or word.target_lang != "en":
+        return word.source_lang, word.source_text
+    return word.target_lang, word.target_text
 
 
 def _masked_context(word: Word) -> str:

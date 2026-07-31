@@ -14,6 +14,8 @@ class StubTranslator:
         _source_language: str,
         _part_of_speech: str,
         target_text: str,
+        *,
+        target_language: str = "",
     ) -> ExampleResult:
         if source_text == "restricted":
             return ExampleResult(

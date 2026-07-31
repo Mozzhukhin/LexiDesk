@@ -2,7 +2,7 @@
 <component type="desktop-application">
   <id>io.github.lexidesk</id>
   <name>LexiDesk</name>
-  <summary>Offline English–Russian vocabulary trainer for Linux desktops</summary>
+  <summary>Multilingual offline vocabulary trainer for Linux desktops</summary>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
   <description>

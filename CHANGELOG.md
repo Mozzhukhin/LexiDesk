@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add a multilingual card schema with automatic migration from EN/RU cards.
+- Discover installed translation models as a directed graph, prefer direct
+  models, and support one-hop offline pivot routes between arbitrary languages.
+- Add an in-app manager for explicitly downloading compatible language models
+  from the official Argos package catalog.
+- Add explicit source and target selectors to single-card and batch workflows;
+  retain automatic EN/RU detection for backward compatibility.
 - Add an optional developer-support page with a copyable USDT TRC20 address.
 - Let timed rotation skip unanswered quizzes without recording a review.
 - Keep every practice mode selectable while cards rotate.

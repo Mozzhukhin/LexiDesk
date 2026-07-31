@@ -1,12 +1,12 @@
 # LexiDesk
 
-LexiDesk is an offline English–Russian vocabulary companion for Windows,
+LexiDesk is a multilingual offline vocabulary companion for Windows,
 KDE Plasma 6, and other Linux desktops. Its application core is written in
 Python with PySide6, and its optional native Plasma widget uses QML.
 
-The app starts with an empty vocabulary. Add an English or Russian word/phrase,
-let the local model suggest a translation, review it, and save it. Cards rotate
-every 90 seconds by default.
+The app starts with an empty vocabulary. Choose any installed source and target
+language, let the local model suggest a translation, review it, and save it.
+Cards rotate every 90 seconds by default.
 
 ![LexiDesk desktop card](docs/images/desktop-window.png)
 
@@ -37,7 +37,9 @@ a network connection. A source installation downloads this data once during
 
 ## Features
 
-- Fully offline EN ↔ RU translation after initial language-data installation
+- Fully offline translation after installing the selected language packages
+- Direct and two-step translation routes between any installed languages
+- An in-app manager for downloading official Argos language models on demand
 - A 99,000-headword FreeDict index cross-checked in both translation directions
 - Compact CTranslate2 neural fallback for phrases and missing dictionary entries
 - Short examples validated against both the studied word and selected meaning
@@ -72,6 +74,23 @@ a network connection. A source installation downloads this data once during
 - Persistent local D-Bus service with automatic direct-database fallback
 - Local SQLite storage with no account, telemetry, or network calls at runtime
 - Desktop-menu actions for adding cards and opening the library
+
+## Offline languages
+
+EN↔RU is the default bundled pair. Open **Settings → Manage offline languages**
+to refresh the official package catalog and install more directions. Packages
+are downloaded only after an explicit click; translation makes no network
+request after installation.
+
+LexiDesk treats installed models as a directed graph. A direct model is always
+preferred. If it is unavailable, one local pivot is allowed—for example,
+UK→EN plus EN→DE enables UK→DE. Pivot translation is convenient but may lose
+some nuance, so important meanings remain editable before a card is saved.
+Install both directions when you want to study either side of a pair.
+
+Automatic language detection remains limited to legacy EN/RU use. Languages
+sharing a writing system cannot be identified reliably from a single word, so
+the add and batch dialogs provide explicit source and target selectors.
 
 ## Learning model
 

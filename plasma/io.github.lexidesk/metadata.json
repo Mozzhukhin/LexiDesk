@@ -6,7 +6,7 @@
             }
         ],
         "Category": "Utilities",
-        "Description": "Learn English and Russian words offline from your desktop",
+        "Description": "Learn vocabulary in installed languages offline from your desktop",
         "Icon": "accessories-dictionary",
         "Id": "io.github.lexidesk",
         "License": "MIT",

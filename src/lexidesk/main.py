@@ -15,6 +15,7 @@ from .database import WordRepository
 from .diagnostics import configure_logging
 from .dialogs import AddWordDialog, SettingsDialog
 from .insights import AnalyticsDialog
+from .language_dialog import LanguagePackagesDialog
 from .library import LibraryDialog
 from .service_client import request_service, schedule_example_enrichment
 from .settings import SettingsStore
@@ -61,6 +62,11 @@ def _arguments() -> argparse.Namespace:
         "--support",
         action="store_true",
         help="Open the developer support page",
+    )
+    mode.add_argument(
+        "--languages",
+        action="store_true",
+        help="Manage downloadable offline language packages",
     )
     mode.add_argument(
         "--self-test",
@@ -194,6 +200,13 @@ def main() -> int:
         support_dialog = SupportDialog()
         support_dialog.setStyleSheet(stylesheet(settings.theme, settings.font_scale))
         support_dialog.exec()
+        repository.close()
+        return 0
+
+    if arguments.languages:
+        language_dialog = LanguagePackagesDialog()
+        language_dialog.setStyleSheet(stylesheet(settings.theme, settings.font_scale))
+        language_dialog.exec()
         repository.close()
         return 0
 

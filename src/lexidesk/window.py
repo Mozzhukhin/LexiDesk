@@ -378,11 +378,10 @@ class LexiDeskWindow(QMainWindow):
             self._example_enrichment_scheduled.add(word.id)
             schedule_example_enrichment(word.id)
 
-        target_language = "RU" if word.source_lang == "en" else "EN"
-        self.direction_label.setText(f"{word.source_lang.upper()} → {target_language}")
+        self.direction_label.setText(word.direction)
         # The English side always stays on top, regardless of which language was
         # entered when the card was created.
-        english_first = word.source_lang == "ru"
+        english_first = word.target_lang == "en"
         self.word_label.setText(word.target_text if english_first else word.source_text)
         self.translation_label.setText(
             word.source_text if english_first else word.target_text

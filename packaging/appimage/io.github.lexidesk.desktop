@@ -2,7 +2,7 @@
 Type=Application
 Name=LexiDesk
 GenericName=Vocabulary Trainer
-Comment=Learn English and Russian vocabulary offline
+Comment=Learn vocabulary in your installed languages offline
 Exec=LexiDesk
 Icon=io.github.lexidesk
 Terminal=false

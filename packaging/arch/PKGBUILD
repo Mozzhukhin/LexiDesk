@@ -2,7 +2,7 @@
 pkgname=lexidesk
 pkgver=1.1.0
 pkgrel=1
-pkgdesc="Offline English-Russian vocabulary trainer and Plasma widget"
+pkgdesc="Multilingual offline vocabulary trainer and Plasma widget"
 arch=('any')
 url="https://github.com/Mozzhukhin/LexiDesk"
 license=('MIT')

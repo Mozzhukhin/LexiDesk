@@ -145,12 +145,56 @@ class OfflineModelRegistry:
         self._models: dict[tuple[str, str], TranslationModel] | None = None
 
     def candidates(self, text: str, source: str, target: str) -> tuple[str, ...]:
-        model = self.models().get((source, target))
-        if model is None:
+        route = self.route(source, target)
+        if route is None:
             raise LookupError(
-                f"The {source.upper()} → {target.upper()} model is missing."
+                f"No installed offline route from {source.upper()} to {target.upper()}."
             )
-        return model.hypotheses(text)
+        value = text
+        hypotheses: tuple[str, ...] = ()
+        for start, end in zip(route, route[1:], strict=False):
+            hypotheses = self.models()[(start, end)].hypotheses(value)
+            if not hypotheses:
+                return ()
+            value = hypotheses[0]
+        return hypotheses
+
+    def route(self, source: str, target: str) -> tuple[str, ...] | None:
+        """Find the shortest installed route, preferring a direct model."""
+        source = source.casefold()
+        target = target.casefold()
+        if source == target:
+            return (source,)
+        edges = self.models()
+        queue: list[tuple[str, ...]] = [(source,)]
+        visited = {source}
+        while queue:
+            route = queue.pop(0)
+            if len(route) > 3:
+                continue
+            neighbours = sorted(end for start, end in edges if start == route[-1])
+            for neighbour in neighbours:
+                candidate = (*route, neighbour)
+                if neighbour == target:
+                    return candidate
+                if neighbour not in visited:
+                    visited.add(neighbour)
+                    queue.append(candidate)
+        return None
+
+    def installed_pairs(self) -> tuple[tuple[str, str], ...]:
+        return tuple(sorted(self.models()))
+
+    def installed_languages(self) -> tuple[str, ...]:
+        return tuple(sorted({code for pair in self.models() for code in pair}))
+
+    def reachable_targets(self, source: str) -> tuple[str, ...]:
+        languages = self.installed_languages()
+        return tuple(
+            target
+            for target in languages
+            if target != source and self.route(source, target) is not None
+        )
 
     def models(self) -> dict[tuple[str, str], TranslationModel]:
         if self._models is not None:

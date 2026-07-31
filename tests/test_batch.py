@@ -21,7 +21,7 @@ class StubDictionary:
 class StubTranslator:
     dictionary = StubDictionary()
 
-    def translate(self, text: str) -> TranslationResult:
+    def translate(self, text: str, *_languages: str) -> TranslationResult:
         if text == "broken":
             raise TranslationError("not found")
         return TranslationResult(

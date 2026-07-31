@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .languages import language_label
 from .models import Word
 from .settings import Settings
 from .themes import THEMES
@@ -39,14 +40,28 @@ class TranslationWorker(QThread):
     completed = Signal(object)
     failed = Signal(str)
 
-    def __init__(self, translator: OfflineTranslator, text: str) -> None:
+    def __init__(
+        self,
+        translator: OfflineTranslator,
+        text: str,
+        source_language: str = "",
+        target_language: str = "",
+    ) -> None:
         super().__init__()
         self.translator = translator
         self.text = text
+        self.source_language = source_language
+        self.target_language = target_language
 
     def run(self) -> None:
         try:
-            self.completed.emit(self.translator.translate(self.text))
+            self.completed.emit(
+                self.translator.translate(
+                    self.text,
+                    self.source_language,
+                    self.target_language,
+                )
+            )
         except TranslationError as error:
             self.failed.emit(str(error))
         except Exception:
@@ -74,7 +89,7 @@ class AddWordDialog(QDialog):
         self.setMinimumWidth(500)
 
         self.source_edit = QLineEdit()
-        self.source_edit.setPlaceholderText("English or Russian")
+        self.source_edit.setPlaceholderText("Word or phrase")
         self.source_edit.returnPressed.connect(self.translate)
 
         self.translate_button = QPushButton("Translate offline")
@@ -85,6 +100,28 @@ class AddWordDialog(QDialog):
         source_row.addWidget(self.translate_button)
         source_widget = QWidget()
         source_widget.setLayout(source_row)
+
+        installed_languages = (
+            self.translator.installed_languages()
+            if hasattr(self.translator, "installed_languages")
+            else ("en", "ru")
+        )
+        if not installed_languages:
+            installed_languages = ("en", "ru")
+        self.source_language = QComboBox()
+        self.source_language.addItem("Auto-detect EN / RU", "")
+        self.target_language = QComboBox()
+        self.target_language.addItem("Automatic EN ↔ RU", "")
+        for code in installed_languages:
+            label = language_label(code)
+            self.source_language.addItem(label, code)
+            self.target_language.addItem(label, code)
+        language_row = QHBoxLayout()
+        language_row.addWidget(self.source_language, 1)
+        language_row.addWidget(QLabel("→"))
+        language_row.addWidget(self.target_language, 1)
+        language_widget = QWidget()
+        language_widget.setLayout(language_row)
 
         self.direction_label = QLabel("Language is detected automatically")
         self.direction_label.setObjectName("muted")
@@ -139,6 +176,7 @@ class AddWordDialog(QDialog):
 
         form = QFormLayout()
         form.addRow("Word / phrase", source_widget)
+        form.addRow("Languages", language_widget)
         form.addRow("", direction_widget)
         form.addRow("Did you mean", spelling_widget)
         form.addRow("Primary translation", self.target_edit)
@@ -177,8 +215,13 @@ class AddWordDialog(QDialog):
             self.setWindowTitle("Edit word or phrase")
             self.source_edit.setText(word.source_text)
             self.direction_label.setText(
-                f"{word.source_lang.upper()} → "
-                f"{'RU' if word.source_lang == 'en' else 'EN'}"
+                f"{word.source_lang.upper()} → {word.target_lang.upper()}"
+            )
+            self.source_language.setCurrentIndex(
+                max(0, self.source_language.findData(word.source_lang))
+            )
+            self.target_language.setCurrentIndex(
+                max(0, self.target_language.findData(word.target_lang))
             )
             self.target_edit.setText(word.target_text)
             self.meaning_combo.addItems([word.target_text, *word.alternatives])
@@ -204,7 +247,12 @@ class AddWordDialog(QDialog):
         self.translate_button.setText("Checking offline data…")
         self.buttons.setEnabled(False)
         self.setCursor(Qt.CursorShape.WaitCursor)
-        worker = TranslationWorker(self.translator, text)
+        worker = TranslationWorker(
+            self.translator,
+            text,
+            str(self.source_language.currentData() or ""),
+            str(self.target_language.currentData() or ""),
+        )
         self._translation_worker = worker
         worker.completed.connect(lambda result: self._apply_translation(result, text))
         worker.failed.connect(self._translation_failed)
@@ -227,6 +275,12 @@ class AddWordDialog(QDialog):
         self.spelling_suggestions.addItems(result.spelling_suggestions)
         self.spelling_widget.setVisible(bool(result.spelling_suggestions))
         self.target_edit.setText(result.translation)
+        source_index = self.source_language.findData(result.source_language)
+        target_index = self.target_language.findData(result.target_language)
+        if source_index >= 0:
+            self.source_language.setCurrentIndex(source_index)
+        if target_index >= 0:
+            self.target_language.setCurrentIndex(target_index)
         self.alternatives_edit.setText(", ".join(result.alternatives))
         self.meaning_combo.blockSignals(True)
         self.meaning_combo.clear()
@@ -340,7 +394,8 @@ class AddWordDialog(QDialog):
             )
             return
         try:
-            source_language = detect_language(source)
+            selected_source = str(self.source_language.currentData() or "")
+            source_language = selected_source or detect_language(source)
         except TranslationError as error:
             QMessageBox.warning(self, "Invalid source", str(error))
             return
@@ -351,6 +406,15 @@ class AddWordDialog(QDialog):
         ]
         example = self.example_edit.text().strip()
         example_translation = self.example_translation_edit.text().strip()
+        selected_target = str(self.target_language.currentData() or "")
+        target_language = selected_target or ("ru" if source_language == "en" else "en")
+        if source_language == target_language:
+            QMessageBox.warning(
+                self,
+                "Invalid language pair",
+                "Source and target languages must be different.",
+            )
+            return
         if not example and source_language == "en":
             with suppress(TranslationError):
                 example = self.translator.example_sentence(
@@ -361,6 +425,7 @@ class AddWordDialog(QDialog):
         self.word_data = {
             "source_text": source,
             "source_lang": source_language,
+            "target_lang": target_language,
             "target_text": target,
             "alternatives": list(dict.fromkeys(alternatives)),
             "part_of_speech": self.part_of_speech.currentText(),
@@ -442,6 +507,9 @@ class SettingsDialog(QDialog):
         self.autostart_check = QCheckBox("Launch automatically after login")
         self.autostart_check.setChecked(settings.autostart)
 
+        self.language_packages_button = QPushButton("Manage offline languages…")
+        self.language_packages_button.clicked.connect(self._open_language_packages)
+
         form = QFormLayout()
         form.addRow("Theme", self.theme_combo)
         form.addRow("Card mode", self.reveal_combo)
@@ -452,6 +520,7 @@ class SettingsDialog(QDialog):
         form.addRow("Daily goal", self.daily_goal_spin)
         form.addRow("FSRS retention", self.retention_spin)
         form.addRow("Offline autocorrection", self.autocorrect_check)
+        form.addRow("Languages", self.language_packages_button)
         form.addRow("", self.autostart_check)
 
         note = QLabel(
@@ -472,6 +541,11 @@ class SettingsDialog(QDialog):
         layout.addLayout(form)
         layout.addWidget(note)
         layout.addWidget(buttons)
+
+    def _open_language_packages(self) -> None:
+        from .language_dialog import LanguagePackagesDialog
+
+        LanguagePackagesDialog(self).exec()
 
     def apply_to(self, settings: Settings) -> None:
         settings.theme = self.theme_combo.currentText()

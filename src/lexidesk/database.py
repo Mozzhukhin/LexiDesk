@@ -5,6 +5,7 @@ import sqlite3
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
+from .languages import normalize_language_code
 from .models import Word
 from .scheduling import ReviewRating, retrievability, schedule_fsrs_review
 
@@ -68,7 +69,8 @@ class WordRepository:
             CREATE TABLE IF NOT EXISTS words (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 source_text TEXT NOT NULL,
-                source_lang TEXT NOT NULL CHECK(source_lang IN ('en', 'ru')),
+                source_lang TEXT NOT NULL,
+                target_lang TEXT NOT NULL,
                 target_text TEXT NOT NULL,
                 alternatives_json TEXT NOT NULL DEFAULT '[]',
                 part_of_speech TEXT NOT NULL DEFAULT '',
@@ -92,7 +94,7 @@ class WordRepository:
                 fsrs_step INTEGER,
                 stability REAL,
                 difficulty REAL,
-                UNIQUE(source_text COLLATE NOCASE, source_lang)
+                UNIQUE(source_text COLLATE NOCASE, source_lang, target_lang)
             );
 
             CREATE TABLE IF NOT EXISTS review_log (
@@ -156,6 +158,7 @@ class WordRepository:
             for row in self.connection.execute("PRAGMA table_info(words)").fetchall()
         }
         additions = {
+            "target_lang": "TEXT NOT NULL DEFAULT ''",
             "tags_json": "TEXT NOT NULL DEFAULT '[]'",
             "transcription": "TEXT NOT NULL DEFAULT ''",
             "forms_json": "TEXT NOT NULL DEFAULT '[]'",
@@ -178,6 +181,21 @@ class WordRepository:
                         "UPDATE words SET view_count = 1 "
                         "WHERE last_shown_at IS NOT NULL"
                     )
+        self.connection.execute(
+            """
+            UPDATE words
+            SET target_lang = CASE source_lang WHEN 'en' THEN 'ru' ELSE 'en' END
+            WHERE target_lang = ''
+            """
+        )
+        self._migrate_language_schema()
+        self.connection.execute("DROP INDEX IF EXISTS idx_words_quiz_candidates")
+        self.connection.execute(
+            """
+            CREATE INDEX idx_words_quiz_candidates
+            ON words(source_lang, target_lang, part_of_speech COLLATE NOCASE)
+            """
+        )
         if migrating_to_fsrs:
             self.connection.execute(
                 """
@@ -212,8 +230,74 @@ class WordRepository:
         }
         if "rating" not in review_columns:
             self._migrate_review_log()
-        self.connection.execute("PRAGMA user_version=7")
+        self.connection.execute("PRAGMA user_version=8")
         self.connection.commit()
+
+    def _migrate_language_schema(self) -> None:
+        table_sql_row = self.connection.execute(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'words'"
+        ).fetchone()
+        table_sql = str(table_sql_row["sql"] if table_sql_row else "")
+        if "CHECK(source_lang IN" not in table_sql and (
+            "source_lang, target_lang" in table_sql
+        ):
+            return
+        self.connection.commit()
+        self.connection.execute("PRAGMA foreign_keys=OFF")
+        try:
+            self.connection.executescript(
+                """
+                BEGIN IMMEDIATE;
+                CREATE TABLE words_multilingual (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    source_text TEXT NOT NULL,
+                    source_lang TEXT NOT NULL,
+                    target_lang TEXT NOT NULL,
+                    target_text TEXT NOT NULL,
+                    alternatives_json TEXT NOT NULL DEFAULT '[]',
+                    part_of_speech TEXT NOT NULL DEFAULT '',
+                    example TEXT NOT NULL DEFAULT '',
+                    example_translation TEXT NOT NULL DEFAULT '',
+                    tags_json TEXT NOT NULL DEFAULT '[]',
+                    transcription TEXT NOT NULL DEFAULT '',
+                    forms_json TEXT NOT NULL DEFAULT '[]',
+                    frequency TEXT NOT NULL DEFAULT '',
+                    source_info TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL,
+                    due_at TEXT NOT NULL,
+                    level INTEGER NOT NULL DEFAULT 0,
+                    learning_step INTEGER NOT NULL DEFAULT -1,
+                    know_count INTEGER NOT NULL DEFAULT 0,
+                    dont_know_count INTEGER NOT NULL DEFAULT 0,
+                    last_reviewed_at TEXT,
+                    last_shown_at TEXT,
+                    view_count INTEGER NOT NULL DEFAULT 0,
+                    fsrs_state INTEGER NOT NULL DEFAULT 1,
+                    fsrs_step INTEGER,
+                    stability REAL,
+                    difficulty REAL,
+                    UNIQUE(source_text COLLATE NOCASE, source_lang, target_lang)
+                );
+                INSERT INTO words_multilingual SELECT
+                    id, source_text, source_lang, target_lang, target_text,
+                    alternatives_json, part_of_speech, example,
+                    example_translation, tags_json, transcription, forms_json,
+                    frequency, source_info, created_at, due_at, level,
+                    learning_step, know_count, dont_know_count, last_reviewed_at,
+                    last_shown_at, view_count, fsrs_state, fsrs_step, stability,
+                    difficulty
+                FROM words;
+                DROP TABLE words;
+                ALTER TABLE words_multilingual RENAME TO words;
+                CREATE INDEX idx_words_due ON words(due_at);
+                CREATE INDEX idx_words_quiz_candidates
+                    ON words(source_lang, target_lang,
+                             part_of_speech COLLATE NOCASE);
+                COMMIT;
+                """
+            )
+        finally:
+            self.connection.execute("PRAGMA foreign_keys=ON")
 
     def _migrate_review_log(self) -> None:
         self.connection.execute("DROP INDEX IF EXISTS idx_review_word")
@@ -273,6 +357,7 @@ class WordRepository:
         source_text: str,
         source_lang: str,
         target_text: str,
+        target_lang: str | None = None,
         alternatives: list[str] | None = None,
         part_of_speech: str = "",
         example: str = "",
@@ -288,18 +373,25 @@ class WordRepository:
             target_text,
             alternatives,
         )
+        source_lang = normalize_language_code(source_lang)
+        target_lang = normalize_language_code(
+            target_lang or ("ru" if source_lang == "en" else "en")
+        )
+        if source_lang == target_lang:
+            raise ValueError("Source and target languages must be different.")
         cursor = self.connection.execute(
             """
             INSERT INTO words (
-                source_text, source_lang, target_text, alternatives_json,
+                source_text, source_lang, target_lang, target_text, alternatives_json,
                 part_of_speech, example, example_translation, tags_json,
                 transcription, forms_json, frequency, source_info,
                 created_at, due_at, fsrs_state, fsrs_step
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0)
             """,
             (
                 source_text.strip(),
                 source_lang,
+                target_lang,
                 cleaned_target,
                 json.dumps(cleaned_alternatives, ensure_ascii=False),
                 part_of_speech.strip(),
@@ -340,6 +432,7 @@ class WordRepository:
         source_text: str,
         source_lang: str,
         target_text: str,
+        target_lang: str | None = None,
         alternatives: list[str] | None = None,
         part_of_speech: str = "",
         example: str = "",
@@ -354,10 +447,16 @@ class WordRepository:
             target_text,
             alternatives,
         )
+        source_lang = normalize_language_code(source_lang)
+        target_lang = normalize_language_code(
+            target_lang or ("ru" if source_lang == "en" else "en")
+        )
+        if source_lang == target_lang:
+            raise ValueError("Source and target languages must be different.")
         cursor = self.connection.execute(
             """
             UPDATE words SET
-                source_text = ?, source_lang = ?, target_text = ?,
+                source_text = ?, source_lang = ?, target_lang = ?, target_text = ?,
                 alternatives_json = ?, part_of_speech = ?, example = ?,
                 example_translation = ?, tags_json = ?, transcription = ?,
                 forms_json = ?, frequency = ?, source_info = ?
@@ -366,6 +465,7 @@ class WordRepository:
             (
                 source_text.strip(),
                 source_lang,
+                target_lang,
                 cleaned_target,
                 json.dumps(cleaned_alternatives, ensure_ascii=False),
                 part_of_speech.strip(),
@@ -500,7 +600,7 @@ class WordRepository:
         rows = self.connection.execute(
             """
             SELECT * FROM words
-            WHERE id != ? AND source_lang = ?
+            WHERE id != ? AND source_lang = ? AND target_lang = ?
             ORDER BY
                 CASE
                     WHEN lower(trim(
@@ -526,6 +626,7 @@ class WordRepository:
             (
                 word.id,
                 word.source_lang,
+                word.target_lang,
                 category,
                 word.difficulty or 5,
                 max(4, min(limit, 256)),
@@ -1031,6 +1132,7 @@ class WordRepository:
             id=row["id"],
             source_text=row["source_text"],
             source_lang=row["source_lang"],
+            target_lang=row["target_lang"],
             target_text=row["target_text"],
             alternatives=_json_string_list(row["alternatives_json"]),
             part_of_speech=row["part_of_speech"],

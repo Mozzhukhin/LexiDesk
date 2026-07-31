@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QHBoxLayout,
     QHeaderView,
     QLabel,
     QMessageBox,
@@ -23,6 +24,7 @@ from PySide6.QtWidgets import (
 )
 
 from .database import WordRepository
+from .languages import language_label
 from .service_client import schedule_example_enrichment
 from .translation import OfflineTranslator, TranslationError, detect_language
 
@@ -93,6 +95,8 @@ def prepare_batch_records(
     records: list[tuple[str, str]],
     translator: OfflineTranslator,
     *,
+    source_language: str = "",
+    target_language: str = "",
     cancelled: Callable[[], bool] = lambda: False,
     progress: Callable[[int], None] = lambda _value: None,
 ) -> list[PreparedRecord]:
@@ -103,20 +107,20 @@ def prepare_batch_records(
             break
         try:
             if supplied_target:
-                source_language = detect_language(source)
+                detected_source = source_language or detect_language(source)
                 corrected = source
                 target = supplied_target
                 part_of_speech = ""
             else:
-                result = translator.translate(source)
-                source_language = result.source_language
+                result = translator.translate(source, source_language, target_language)
+                detected_source = result.source_language
                 corrected = result.corrected_source or source
                 target = result.translation
                 part_of_speech = result.part_of_speech
             try:
                 example = translator.example_sentence(
                     corrected,
-                    source_language,
+                    detected_source,
                     part_of_speech,
                 )
             except TranslationError:
@@ -125,7 +129,7 @@ def prepare_batch_records(
                 (
                     corrected,
                     target,
-                    source_language,
+                    detected_source,
                     part_of_speech,
                     example,
                     "",
@@ -147,16 +151,22 @@ class BatchPreviewWorker(QThread):
         self,
         translator: OfflineTranslator,
         records: list[tuple[str, str]],
+        source_language: str = "",
+        target_language: str = "",
     ) -> None:
         super().__init__()
         self.translator = translator
         self.records = records
+        self.source_language = source_language
+        self.target_language = target_language
 
     def run(self) -> None:
         try:
             prepared = prepare_batch_records(
                 self.records,
                 self.translator,
+                source_language=self.source_language,
+                target_language=self.target_language,
                 cancelled=self.isInterruptionRequested,
                 progress=self.progress_changed.emit,
             )
@@ -194,6 +204,23 @@ class BatchAddDialog(QDialog):
         self.mode.addItem("One card per line", "lines")
         self.mode.addItem("Smart words from article", "extract")
 
+        installed_languages = (
+            self.translator.installed_languages()
+            if hasattr(self.translator, "installed_languages")
+            else ("en", "ru")
+        )
+        self.source_language = QComboBox()
+        self.source_language.addItem("Auto-detect EN / RU", "")
+        self.target_language = QComboBox()
+        self.target_language.addItem("Automatic EN ↔ RU", "")
+        for code in installed_languages:
+            self.source_language.addItem(language_label(code), code)
+            self.target_language.addItem(language_label(code), code)
+        language_row = QHBoxLayout()
+        language_row.addWidget(self.source_language, 1)
+        language_row.addWidget(QLabel("→"))
+        language_row.addWidget(self.target_language, 1)
+
         self.input = QPlainTextEdit()
         self.input.setPlaceholderText(
             "opportunity = возможность\nlook forward to\n\nor paste an article…"
@@ -225,6 +252,7 @@ class BatchAddDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.addWidget(hint)
         layout.addWidget(self.mode)
+        layout.addLayout(language_row)
         layout.addWidget(self.input, 1)
         layout.addWidget(self.preview_button)
         layout.addWidget(self.table, 1)
@@ -289,7 +317,12 @@ class BatchAddDialog(QDialog):
         progress_dialog.setMinimumDuration(0)
         progress_dialog.setAutoClose(False)
         progress_dialog.setAutoReset(False)
-        worker = BatchPreviewWorker(self.translator, records)
+        worker = BatchPreviewWorker(
+            self.translator,
+            records,
+            str(self.source_language.currentData() or ""),
+            str(self.target_language.currentData() or ""),
+        )
         worker.progress_changed.connect(progress_dialog.setValue)
         worker.completed.connect(self._preview_ready)
         worker.failed.connect(self._preview_failed)
@@ -375,9 +408,13 @@ class BatchAddDialog(QDialog):
                     if isinstance(metadata, (list, tuple)) and len(metadata) == 4
                     else (detect_language(source), "", "", "")
                 )
+                target_language = str(self.target_language.currentData() or "") or (
+                    "ru" if source_language == "en" else "en"
+                )
                 word_id = self.repository.add_word(
                     source_text=source,
                     source_lang=source_language,
+                    target_lang=target_language,
                     target_text=target,
                     part_of_speech=part_of_speech,
                     example=example,

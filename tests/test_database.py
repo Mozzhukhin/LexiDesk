@@ -362,7 +362,7 @@ def test_pre_fsrs_database_is_migrated_without_losing_history(
     assert word.source_text == "reliable"
     assert word.fsrs_state == 2
     assert word.stability == 3.0
-    assert repository.connection.execute("PRAGMA user_version").fetchone()[0] == 7
+    assert repository.connection.execute("PRAGMA user_version").fetchone()[0] == 8
     assert word.view_count == 0
     review = repository.connection.execute("SELECT * FROM review_log").fetchone()
     assert review["rating"] == 3

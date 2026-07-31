@@ -11,6 +11,7 @@ from .dictionary import (
     normalize_headword,
 )
 from .examples import SemanticExampleIndex, example_is_informative
+from .languages import normalize_language_code
 from .model_translation import OfflineModelRegistry
 
 CYRILLIC_RE = re.compile(r"[\u0400-\u04ff]")
@@ -56,8 +57,9 @@ class OfflineTranslator:
         *,
         autocorrect: bool = True,
         examples: SemanticExampleIndex | None = None,
+        model_registry: OfflineModelRegistry | None = None,
     ) -> None:
-        self._model_registry: OfflineModelRegistry | None = None
+        self._model_registry = model_registry
         self._model_cache: dict[tuple[str, str, str], tuple[str, ...]] = {}
         self.dictionary = dictionary or OfflineDictionary()
         self.autocorrect = autocorrect
@@ -72,11 +74,37 @@ class OfflineTranslator:
             self._model_registry = OfflineModelRegistry()
         return self._model_registry
 
-    def translate(self, text: str) -> TranslationResult:
+    def installed_languages(self) -> tuple[str, ...]:
+        return self._models().installed_languages()
+
+    def available_route(
+        self, source_language: str, target_language: str
+    ) -> tuple[str, ...] | None:
+        return self._models().route(source_language, target_language)
+
+    def translate(
+        self,
+        text: str,
+        source_language: str = "",
+        target_language: str = "",
+    ) -> TranslationResult:
         cleaned = " ".join(text.strip().split())
-        source = detect_language(cleaned)
-        target = "ru" if source == "en" else "en"
-        dictionary_entry = self.dictionary.lookup(cleaned, source)
+        source = (
+            normalize_language_code(source_language)
+            if source_language
+            else detect_language(cleaned)
+        )
+        if target_language:
+            target = normalize_language_code(target_language)
+        else:
+            target = "ru" if source == "en" else "en"
+        if source == target:
+            raise TranslationError("Source and target languages must be different.")
+        dictionary_entry = (
+            self.dictionary.lookup(cleaned, source)
+            if {source, target} == {"en", "ru"}
+            else None
+        )
         if dictionary_entry and dictionary_entry.translations:
             reciprocal = self.dictionary.reciprocal_translations(cleaned, source)
             ranked = _rank_dictionary_translations(
@@ -144,21 +172,32 @@ class OfflineTranslator:
         source_language: str = "",
         part_of_speech: str = "",
         target_text: str = "",
+        *,
+        target_language: str = "",
     ) -> ExampleResult:
         language = source_language or detect_language(source_text)
-        if language == "ru":
-            english_term = (
-                target_text.strip() or self.translate(source_text).translation
-            )
+        target_language = target_language or ("ru" if language == "en" else "en")
+        if language != "en":
+            english_term = target_text.strip() if target_language == "en" else ""
+            if not english_term:
+                english_term = self.translate(source_text, language, "en").translation
             english_example = self.examples.lookup(english_term, part_of_speech)
             if english_example:
-                russian_example = self.translate(english_example).translation
+                source_example = self.translate(
+                    english_example, "en", language
+                ).translation
+                if target_language == "en":
+                    translated_example = english_example
+                else:
+                    translated_example = self.translate(
+                        english_example, "en", target_language
+                    ).translation
                 if example_is_informative(
-                    russian_example,
+                    source_example,
                     source_text,
                     allow_inflection=True,
                 ):
-                    return ExampleResult(russian_example, english_example)
+                    return ExampleResult(source_example, translated_example)
         sentence = self.example_sentence(source_text, language, part_of_speech)
         return self.complete_example(
             sentence,
@@ -166,6 +205,7 @@ class OfflineTranslator:
             language,
             target_text,
             part_of_speech,
+            target_language,
         )
 
     def complete_example(
@@ -175,9 +215,13 @@ class OfflineTranslator:
         source_language: str,
         target_text: str,
         part_of_speech: str = "",
+        target_language: str = "",
     ) -> ExampleResult:
         """Translate an example and keep both sides tied to the card meaning."""
-        translation = self.translate(sentence).translation
+        target_language = target_language or ("ru" if source_language == "en" else "en")
+        translation = self.translate(
+            sentence, source_language, target_language
+        ).translation
         if target_text:
             quoted_source = re.search(
                 rf"[«“\"]\s*{re.escape(source_text)}\s*[»”\"]",
@@ -226,7 +270,7 @@ class OfflineTranslator:
         except (LookupError, RuntimeError) as error:
             raise TranslationError(
                 f"The {source.upper()} → {target.upper()} model is missing. "
-                "Run scripts/install_models.py while connected to the internet."
+                "Install the required offline language package."
             ) from error
         candidates: list[str] = []
         seen: set[str] = set()

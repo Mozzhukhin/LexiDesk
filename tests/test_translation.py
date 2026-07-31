@@ -104,7 +104,7 @@ def test_translated_definition_uses_the_selected_meaning() -> None:
 
 def test_unrelated_quoted_words_are_not_replaced_in_example() -> None:
     class QuotedExampleTranslator(OfflineTranslator):
-        def translate(self, _text: str) -> TranslationResult:
+        def translate(self, _text: str, *_languages: str) -> TranslationResult:
             return TranslationResult(
                 "en",
                 "ru",
@@ -219,7 +219,7 @@ def test_russian_example_uses_english_word_meaning(tmp_path) -> None:
     connection.close()
 
     class StubTranslator(OfflineTranslator):
-        def translate(self, text: str) -> TranslationResult:
+        def translate(self, text: str, *_languages: str) -> TranslationResult:
             translations = {
                 "предложение": TranslationResult("ru", "en", "suggestion"),
                 "The picnic was her suggestion.": TranslationResult(
@@ -239,7 +239,7 @@ def test_russian_example_uses_english_word_meaning(tmp_path) -> None:
 
 def test_mismatched_model_example_uses_contextual_fallback() -> None:
     class MismatchingTranslator(OfflineTranslator):
-        def translate(self, _text: str) -> TranslationResult:
+        def translate(self, _text: str, *_languages: str) -> TranslationResult:
             return TranslationResult("en", "ru", "Перевод без нужного значения.")
 
     result = MismatchingTranslator().complete_example(

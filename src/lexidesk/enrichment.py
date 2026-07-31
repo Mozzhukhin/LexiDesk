@@ -80,6 +80,7 @@ def enrich_example(database: Path, word_id: int) -> bool:
             word.source_lang,
             word.part_of_speech,
             word.target_text,
+            target_language=word.target_lang,
         )
         if not example_is_informative(
             generated.source,

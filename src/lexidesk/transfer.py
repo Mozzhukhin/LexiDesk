@@ -11,6 +11,7 @@ from .translation import detect_language
 FIELDS = (
     "source_text",
     "source_lang",
+    "target_lang",
     "target_text",
     "alternatives",
     "part_of_speech",
@@ -30,6 +31,7 @@ def export_words(repository: WordRepository, path: Path) -> int:
         {
             "source_text": word.source_text,
             "source_lang": word.source_lang,
+            "target_lang": word.target_lang,
             "target_text": word.target_text,
             "alternatives": word.alternatives,
             "part_of_speech": word.part_of_speech,
@@ -90,12 +92,16 @@ def import_words(repository: WordRepository, path: Path) -> tuple[int, int]:
             skipped += 1
             continue
         language = str(record.get("source_lang", "")).lower()
-        if language not in {"en", "ru"}:
+        if not language:
             language = detect_language(source)
+        target_language = str(record.get("target_lang", "")).lower() or (
+            "ru" if language == "en" else "en"
+        )
         try:
             repository.add_word(
                 source_text=source,
                 source_lang=language,
+                target_lang=target_language,
                 target_text=target,
                 alternatives=_as_list(record.get("alternatives")),
                 part_of_speech=str(record.get("part_of_speech", "")),
