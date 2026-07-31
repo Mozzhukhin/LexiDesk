@@ -216,7 +216,11 @@ def quiz_variants(
             "choices": reverse_choices,
             "instruction": "Choose the English word",
         }
-    cloze = _cloze_sentence(word)
+    stored_examples = repository.examples_for_word(word.id)
+    cloze = _cloze_sentence(
+        word,
+        [example for example, _translation in stored_examples],
+    )
     if cloze and len(reverse_choices) == 4:
         variants["cloze"] = {
             "type": "cloze",
@@ -328,14 +332,16 @@ def _distinct_choices(answer: str, candidates: list[str]) -> list[str]:
     return values
 
 
-def _cloze_sentence(word: Word) -> str:
-    if not word.example:
+def _cloze_sentence(word: Word, examples: list[str] | None = None) -> str:
+    candidates = examples or ([word.example] if word.example else [])
+    if not candidates:
         return ""
+    example = random.choice(candidates)
     pattern = re.compile(
         rf"(?<!\w){re.escape(word.source_text)}(?!\w)",
         flags=re.IGNORECASE,
     )
-    return pattern.sub("___", word.example, count=1)
+    return pattern.sub("___", example, count=1)
 
 
 def _masked_context(word: Word) -> str:

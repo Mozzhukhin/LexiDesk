@@ -50,8 +50,18 @@ class SemanticExampleIndex:
         return self.path.exists()
 
     def lookup(self, word: str, part_of_speech: str = "") -> str:
+        examples = self.lookup_many(word, part_of_speech, limit=1)
+        return examples[0] if examples else ""
+
+    def lookup_many(
+        self,
+        word: str,
+        part_of_speech: str = "",
+        *,
+        limit: int = 5,
+    ) -> list[str]:
         if not self.available:
-            return ""
+            return []
         normalized = normalize_headword(word).replace(" ", "_")
         category = part_of_speech.strip().casefold()
         pos = next(
@@ -74,24 +84,37 @@ class SemanticExampleIndex:
                 (normalized, pos, pos, pos),
             ).fetchall()
         except (sqlite3.Error, OSError):
-            return ""
+            return []
         finally:
             if connection is not None:
                 connection.close()
         if not rows:
-            return ""
+            return []
         best_frequency = max(int(row["frequency"]) for row in rows)
+        selected: list[str] = []
+        seen: set[str] = set()
         for row in rows:
             example = _sentence_case(str(row["example"]))
             frequency = int(row["frequency"])
             if example_is_informative(example, word) and frequency >= max(
                 2, best_frequency // 3
             ):
-                return example
+                key = example.casefold()
+                if key not in seen:
+                    selected.append(example)
+                    seen.add(key)
+                if len(selected) >= limit:
+                    return selected
         definition = str(rows[0]["definition"]).strip()
         if definition:
-            return _definition_example(word, definition, category)
-        return ""
+            for example in _definition_examples(word, definition, category):
+                key = example.casefold()
+                if key not in seen and example_is_informative(example, word):
+                    selected.append(example)
+                    seen.add(key)
+                if len(selected) >= limit:
+                    break
+        return selected
 
 
 def example_is_suitable(
@@ -175,17 +198,34 @@ def _definition_example(
     definition: str,
     part_of_speech: str = "",
 ) -> str:
+    examples = _definition_examples(word, definition, part_of_speech)
+    return examples[0] if examples else ""
+
+
+def _definition_examples(
+    word: str,
+    definition: str,
+    part_of_speech: str = "",
+) -> list[str]:
     term = " ".join(word.strip().split()).casefold()
     meaning = " ".join(definition.strip().rstrip(".").split())
     semantics = meaning.casefold()
     category = part_of_speech.casefold()
     if any(token in semantics for token in ("restriction", "limited", "limit the")):
-        sentence = f"Access to this area is {term} after dark."
+        sentences = [
+            f"Access to this area is {term} after dark.",
+            f"The {term} section is open only to authorized staff.",
+            f"Travel remained {term} until the road was safe again.",
+        ]
     elif any(
         token in semantics
         for token in ("interpretation", "uncertain", "more than one possible meaning")
     ):
-        sentence = f"The instructions were {term}, so we asked for clarification."
+        sentences = [
+            f"The instructions were {term}, so we asked for clarification.",
+            f"Her {term} reply could be understood in two different ways.",
+            f"The ending was deliberately {term} and invited discussion.",
+        ]
     elif any(
         token in semantics
         for token in (
@@ -196,29 +236,63 @@ def _definition_example(
             "termination",
         )
     ):
-        sentence = f"The storm caused widespread {term} along the coast."
+        sentences = [
+            f"The storm caused widespread {term} along the coast.",
+            f"The fire left a trail of {term} through the old building.",
+            f"Years of neglect led to the {term} of the historic bridge.",
+        ]
     elif any(
         token in semantics
         for token in ("grammatical number", "form of a word", "two or more")
     ):
-        sentence = f"Cats is the {term} of cat."
+        sentences = [
+            f"Cats is the {term} of cat.",
+            f"We use the {term} when talking about more than one item.",
+            f"Children is an irregular {term} form in English.",
+        ]
     elif any(token in semantics for token in ("idea that is suggested", "proposal")):
-        sentence = f"Her {term} helped the team reach a decision."
+        sentences = [
+            f"Her {term} helped the team reach a decision.",
+            f"Everyone considered his {term} before the meeting ended.",
+            f"The manager accepted our {term} for improving the service.",
+        ]
     elif any(token in semantics for token in ("occurrences", "given time period")):
-        sentence = f"The {term} of the signal increased during the test."
+        sentences = [
+            f"The {term} of the signal increased during the test.",
+            f"Doctors measured the {term} of these events over a week.",
+            f"The report tracks how the {term} changes over time.",
+        ]
     elif category.startswith("noun"):
-        sentence = f"We discussed the {term} before making a final decision."
+        sentences = [
+            f"We discussed the {term} before making a final decision.",
+            f"The {term} became central to their conversation.",
+            f"She explained the {term} with a practical example.",
+        ]
     elif category.startswith("verb"):
-        sentence = f"They agreed to {term} when the time was right."
+        sentences = [
+            f"They agreed to {term} when the time was right.",
+            f"We may need to {term} before the deadline.",
+            f"She showed us how to {term} safely.",
+        ]
     elif category.startswith("adj"):
-        sentence = f"The final result was clearly {term}."
+        sentences = [
+            f"The final result was clearly {term}.",
+            f"His explanation seemed {term} to everyone in the room.",
+            f"The situation became increasingly {term} over time.",
+        ]
     elif category.startswith("adv"):
-        sentence = f"She responded {term} during the meeting."
+        sentences = [
+            f"She responded {term} during the meeting.",
+            f"The team worked {term} to solve the problem.",
+            f"He explained the decision {term} and calmly.",
+        ]
     else:
-        sentence = f"We encountered {term} during the discussion."
-    if len(sentence) <= MAX_EXAMPLE_LENGTH:
-        return sentence
-    return f"The situation involved {term}."
+        sentences = [
+            f"We encountered {term} during the discussion.",
+            f"The conversation provided a clear example of {term}.",
+            f"They used {term} while explaining the situation.",
+        ]
+    return [sentence for sentence in sentences if len(sentence) <= MAX_EXAMPLE_LENGTH]
 
 
 def _sentence_case(text: str) -> str:

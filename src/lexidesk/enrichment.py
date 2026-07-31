@@ -5,7 +5,7 @@ from pathlib import Path
 
 from .database import WordRepository
 from .examples import MAX_EXAMPLE_LENGTH, example_is_informative
-from .translation import OfflineTranslator
+from .translation import ExampleResult, OfflineTranslator
 
 logger = logging.getLogger(__name__)
 
@@ -34,31 +34,47 @@ def enrich_example(database: Path, word_id: int) -> bool:
             )
         )
         if refresh_example:
-            generated = translator.generate_example(
-                word.source_text,
-                word.source_lang,
-                word.part_of_speech,
-                word.target_text,
+            generated_examples = list(
+                translator.generate_examples(
+                    word.source_text,
+                    word.source_lang,
+                    word.part_of_speech,
+                    word.target_text,
+                )
             )
+            generated = generated_examples[0]
             example = generated.source
             translation = generated.translation
-        elif not example_is_informative(
-            translation,
-            word.target_text,
-            allow_inflection=True,
-        ):
-            completed = translator.complete_example(
-                example,
-                word.source_text,
-                word.source_lang,
+        else:
+            if not example_is_informative(
+                translation,
                 word.target_text,
-                word.part_of_speech,
+                allow_inflection=True,
+            ):
+                completed = translator.complete_example(
+                    example,
+                    word.source_text,
+                    word.source_lang,
+                    word.target_text,
+                    word.part_of_speech,
+                )
+                example = completed.source
+                translation = completed.translation
+            generated_examples = list(
+                translator.generate_examples(
+                    word.source_text,
+                    word.source_lang,
+                    word.part_of_speech,
+                    word.target_text,
+                )
             )
-            example = completed.source
-            translation = completed.translation
+            generated_examples.insert(0, ExampleResult(example, translation))
         if not example:
             return False
-        repository.update_example(word.id, example, translation)
+        repository.replace_examples(
+            word.id,
+            [(item.source, item.translation) for item in generated_examples],
+        )
         return True
     except Exception:
         logger.exception("Could not enrich card %s", word_id)

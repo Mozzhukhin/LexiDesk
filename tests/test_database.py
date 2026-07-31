@@ -35,6 +35,21 @@ def test_add_select_and_review(tmp_path: Path) -> None:
     assert (
         repository.get_word(word_id).example_translation == "Возможность изменила всё."
     )
+    repository.replace_examples(
+        word_id,
+        [
+            ("The opportunity changed everything.", "Возможность изменила всё."),
+            (
+                "This opportunity could shape her career.",
+                "Этот шанс изменит её карьеру.",
+            ),
+            (
+                "He accepted the opportunity immediately.",
+                "Он сразу принял эту возможность.",
+            ),
+        ],
+    )
+    assert len(repository.examples_for_word(word_id)) == 3
     assert repository.statistics()["total"] == 1
     backup = ensure_daily_backup(repository)
     assert backup.exists()
@@ -345,7 +360,7 @@ def test_pre_fsrs_database_is_migrated_without_losing_history(
     assert word.source_text == "reliable"
     assert word.fsrs_state == 2
     assert word.stability == 3.0
-    assert repository.connection.execute("PRAGMA user_version").fetchone()[0] == 6
+    assert repository.connection.execute("PRAGMA user_version").fetchone()[0] == 7
     assert word.view_count == 0
     review = repository.connection.execute("SELECT * FROM review_log").fetchone()
     assert review["rating"] == 3

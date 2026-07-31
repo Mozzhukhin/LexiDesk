@@ -41,6 +41,7 @@ a network connection. A source installation downloads this data once during
 - A 99,000-headword FreeDict index cross-checked in both translation directions
 - Compact CTranslate2 neural fallback for phrases and missing dictionary entries
 - Short examples validated against both the studied word and selected meaning
+- Up to five compact examples per card, rotated in sentence-completion quizzes
 - Conservative offline autocorrection for misspelled English and Russian words
 - Clean card meanings without sentence-ending periods or duplicate variants
 - Words and short phrases in either language
@@ -257,6 +258,11 @@ WordNet sense or neural translation is rejected and replaced with a short safe
 contextual example instead of being saved as misleading learning material. The
 compact WordNet SQLite index is retained; its larger source corpus is removed
 automatically after indexing.
+
+LexiDesk stores several short examples separately for each card and randomly
+selects one for sentence-completion practice. Only the current card's examples
+are queried. Older cards are enriched gradually in the background as they
+appear, so a large vocabulary does not cause a bulk startup job.
 
 For an unknown single word, LexiDesk compares nearby dictionary spellings with
 the offline model's translation and automatically substitutes a correction only

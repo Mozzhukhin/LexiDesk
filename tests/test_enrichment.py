@@ -20,6 +20,19 @@ class StubTranslator:
             "Результат казался надёжным для всех.",
         )
 
+    def generate_examples(self, *_args) -> tuple[ExampleResult, ...]:
+        return (
+            self.generate_example(),
+            ExampleResult(
+                "The final result was clearly reliable.",
+                "Итоговый результат был явно надёжным.",
+            ),
+            ExampleResult(
+                "Her reliable method worked every time.",
+                "Её надёжный метод работал каждый раз.",
+            ),
+        )
+
 
 def test_enrichment_generates_missing_example(tmp_path: Path, monkeypatch) -> None:
     path = tmp_path / "enrich.db"
@@ -37,6 +50,7 @@ def test_enrichment_generates_missing_example(tmp_path: Path, monkeypatch) -> No
 
     repository = WordRepository(path)
     assert repository.get_word(word_id).example.startswith("A reliable source")
+    assert len(repository.examples_for_word(word_id)) == 3
     repository.close()
 
 

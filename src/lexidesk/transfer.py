@@ -19,6 +19,7 @@ FIELDS = (
     "frequency",
     "example",
     "example_translation",
+    "examples",
     "tags",
     "source_info",
 )
@@ -38,6 +39,10 @@ def export_words(repository: WordRepository, path: Path) -> int:
             "frequency": word.frequency,
             "example": word.example,
             "example_translation": word.example_translation,
+            "examples": [
+                {"example": example, "translation": translation}
+                for example, translation in repository.examples_for_word(word.id)
+            ],
             "tags": word.tags,
             "source_info": word.source_info,
         }
@@ -47,16 +52,19 @@ def export_words(repository: WordRepository, path: Path) -> int:
         with path.open("w", encoding="utf-8", newline="") as handle:
             writer = csv.DictWriter(handle, fieldnames=FIELDS)
             writer.writeheader()
-            for record in records:
+            for record, word in zip(records, words, strict=True):
                 flat = dict(record)
-                flat["alternatives"] = " | ".join(record["alternatives"])
-                flat["forms"] = " | ".join(record["forms"])
-                flat["tags"] = " | ".join(record["tags"])
+                flat["alternatives"] = " | ".join(word.alternatives)
+                flat["forms"] = " | ".join(word.forms)
+                flat["tags"] = " | ".join(word.tags)
+                flat["examples"] = json.dumps(
+                    record["examples"], ensure_ascii=False, separators=(",", ":")
+                )
                 writer.writerow(flat)
     else:
         path.write_text(
             json.dumps(
-                {"format": "lexidesk", "version": 1, "words": records},
+                {"format": "lexidesk", "version": 2, "words": records},
                 ensure_ascii=False,
                 indent=2,
             ),
@@ -93,7 +101,7 @@ def import_words(repository: WordRepository, path: Path) -> tuple[int, int]:
         if language not in {"en", "ru"}:
             language = detect_language(source)
         try:
-            repository.add_word(
+            word_id = repository.add_word(
                 source_text=source,
                 source_lang=language,
                 target_text=target,
@@ -107,6 +115,9 @@ def import_words(repository: WordRepository, path: Path) -> tuple[int, int]:
                 tags=_as_list(record.get("tags")),
                 source_info=str(record.get("source_info", "")),
             )
+            examples = _as_examples(record.get("examples"))
+            if examples:
+                repository.replace_examples(word_id, examples)
             imported += 1
         except sqlite3.IntegrityError:
             skipped += 1
@@ -125,3 +136,22 @@ def _as_list(value: object) -> list[str]:
     if isinstance(value, str):
         return _split_list(value)
     return []
+
+
+def _as_examples(value: object) -> list[tuple[str, str]]:
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except json.JSONDecodeError:
+            return []
+    if not isinstance(value, list):
+        return []
+    examples: list[tuple[str, str]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        example = str(item.get("example", "")).strip()
+        translation = str(item.get("translation", "")).strip()
+        if example and translation:
+            examples.append((example, translation))
+    return examples[:5]

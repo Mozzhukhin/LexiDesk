@@ -168,6 +168,77 @@ class OfflineTranslator:
             part_of_speech,
         )
 
+    def generate_examples(
+        self,
+        source_text: str,
+        source_language: str = "",
+        part_of_speech: str = "",
+        target_text: str = "",
+        *,
+        limit: int = 3,
+    ) -> tuple[ExampleResult, ...]:
+        """Create several short examples in the background for varied quizzes."""
+        language = source_language or detect_language(source_text)
+        primary = self.generate_example(
+            source_text,
+            language,
+            part_of_speech,
+            target_text,
+        )
+        results = [primary]
+        seen = {primary.source.casefold()}
+        if language == "en":
+            candidates = self.examples.lookup_many(
+                source_text,
+                part_of_speech,
+                limit=max(limit * 2, 8),
+            )
+            candidates.extend(
+                _varied_fallback_sentences(source_text, language, part_of_speech)
+            )
+            for sentence in candidates:
+                completed = self.complete_example(
+                    sentence,
+                    source_text,
+                    language,
+                    target_text,
+                    part_of_speech,
+                )
+                key = completed.source.casefold()
+                if key not in seen:
+                    results.append(completed)
+                    seen.add(key)
+                if len(results) >= limit:
+                    break
+        else:
+            english_term = (
+                target_text.strip() or self.translate(source_text).translation
+            )
+            candidates = self.examples.lookup_many(
+                english_term,
+                part_of_speech,
+                limit=max(limit * 2, 8),
+            )
+            candidates.extend(
+                _varied_fallback_sentences(english_term, "en", part_of_speech)
+            )
+            for sentence in candidates:
+                completed = self.complete_example(
+                    sentence,
+                    english_term,
+                    "en",
+                    source_text,
+                    part_of_speech,
+                )
+                reversed_result = ExampleResult(completed.translation, completed.source)
+                key = reversed_result.source.casefold()
+                if key not in seen:
+                    results.append(reversed_result)
+                    seen.add(key)
+                if len(results) >= limit:
+                    break
+        return tuple(results[:limit])
+
     def complete_example(
         self,
         sentence: str,
@@ -445,6 +516,57 @@ def build_example_sentence(
     if category.startswith("phrase"):
         return f"I heard the phrase “{term}” during the conversation."
     return f"The term “{term}” appeared in the conversation."
+
+
+def _varied_fallback_sentences(
+    source_text: str,
+    source_language: str,
+    part_of_speech: str,
+) -> list[str]:
+    term = " ".join(source_text.strip().split())
+    category = part_of_speech.casefold()
+    if source_language == "ru":
+        if category.startswith(("noun", "сущ")):
+            return [
+                f"Мы обсудили «{term}» перед принятием решения.",
+                f"Понятие «{term}» стало главным в разговоре.",
+                f"Она объяснила «{term}» на понятном примере.",
+            ]
+        return [
+            f"В разговоре естественно прозвучало «{term}».",
+            f"Ситуация помогла понять выражение «{term}».",
+            f"Он использовал «{term}», объясняя свою мысль.",
+        ]
+    insertion = term if term.isupper() else term.casefold()
+    if category.startswith("noun"):
+        return [
+            f"We discussed the {insertion} before making a decision.",
+            f"The {insertion} became central to their conversation.",
+            f"She explained the {insertion} with a practical example.",
+        ]
+    if category.startswith("verb"):
+        return [
+            f"They agreed to {insertion} when the time was right.",
+            f"We may need to {insertion} before the deadline.",
+            f"She showed us how to {insertion} safely.",
+        ]
+    if category.startswith("adj"):
+        return [
+            f"The final result was clearly {insertion}.",
+            f"His explanation seemed {insertion} to everyone.",
+            f"The situation became increasingly {insertion} over time.",
+        ]
+    if category.startswith("adv"):
+        return [
+            f"She responded {insertion} during the meeting.",
+            f"The team worked {insertion} to solve the problem.",
+            f"He explained the decision very {insertion}.",
+        ]
+    return [
+        f"We encountered {insertion} during the discussion.",
+        f"The conversation offered a clear example of {insertion}.",
+        f"They used {insertion} while explaining the situation.",
+    ]
 
 
 def _contextual_fallback(

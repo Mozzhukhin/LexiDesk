@@ -131,6 +131,24 @@ class WordRepository:
                 correct_answer TEXT NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_quiz_word ON quiz_log(word_id);
+
+            CREATE TABLE IF NOT EXISTS word_examples (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                word_id INTEGER NOT NULL REFERENCES words(id) ON DELETE CASCADE,
+                example TEXT NOT NULL,
+                example_translation TEXT NOT NULL,
+                position INTEGER NOT NULL DEFAULT 0,
+                UNIQUE(word_id, example COLLATE NOCASE)
+            );
+            CREATE INDEX IF NOT EXISTS idx_word_examples_word
+                ON word_examples(word_id, position, id);
+
+            INSERT OR IGNORE INTO word_examples (
+                word_id, example, example_translation, position
+            )
+            SELECT id, example, example_translation, 0
+            FROM words
+            WHERE example != '';
             """
         )
         columns = {
@@ -194,7 +212,7 @@ class WordRepository:
         }
         if "rating" not in review_columns:
             self._migrate_review_log()
-        self.connection.execute("PRAGMA user_version=6")
+        self.connection.execute("PRAGMA user_version=7")
         self.connection.commit()
 
     def _migrate_review_log(self) -> None:
@@ -296,10 +314,20 @@ class WordRepository:
                 to_storage(now),
             ),
         )
-        self.connection.commit()
         if cursor.lastrowid is None:
             raise RuntimeError("SQLite did not return an ID for the new card.")
-        return cursor.lastrowid
+        word_id = cursor.lastrowid
+        if example.strip():
+            self.connection.execute(
+                """
+                INSERT INTO word_examples (
+                    word_id, example, example_translation, position
+                ) VALUES (?, ?, ?, 0)
+                """,
+                (word_id, example.strip(), example_translation.strip()),
+            )
+        self.connection.commit()
+        return word_id
 
     def count(self) -> int:
         row = self.connection.execute("SELECT COUNT(*) AS total FROM words").fetchone()
@@ -353,6 +381,18 @@ class WordRepository:
         )
         if cursor.rowcount == 0:
             raise KeyError(f"Unknown word id: {word_id}")
+        self.connection.execute(
+            "DELETE FROM word_examples WHERE word_id = ?", (word_id,)
+        )
+        if example.strip():
+            self.connection.execute(
+                """
+                INSERT INTO word_examples (
+                    word_id, example, example_translation, position
+                ) VALUES (?, ?, ?, 0)
+                """,
+                (word_id, example.strip(), example_translation.strip()),
+            )
         self.connection.commit()
 
     def delete_word(self, word_id: int) -> None:
@@ -365,17 +405,63 @@ class WordRepository:
         example: str,
         example_translation: str,
     ) -> None:
+        self.replace_examples(word_id, [(example, example_translation)])
+
+    def replace_examples(
+        self,
+        word_id: int,
+        examples: list[tuple[str, str]],
+    ) -> None:
+        cleaned: list[tuple[str, str]] = []
+        seen: set[str] = set()
+        for example, translation in examples:
+            source = " ".join(example.strip().split())
+            target = " ".join(translation.strip().split())
+            key = source.casefold()
+            if source and target and key not in seen:
+                cleaned.append((source, target))
+                seen.add(key)
+            if len(cleaned) == 5:
+                break
+        primary = cleaned[0] if cleaned else ("", "")
         cursor = self.connection.execute(
             """
             UPDATE words
             SET example = ?, example_translation = ?
             WHERE id = ?
             """,
-            (example.strip(), example_translation.strip(), word_id),
+            (*primary, word_id),
         )
         if cursor.rowcount == 0:
             raise KeyError(f"Unknown word id: {word_id}")
+        self.connection.execute(
+            "DELETE FROM word_examples WHERE word_id = ?", (word_id,)
+        )
+        self.connection.executemany(
+            """
+            INSERT INTO word_examples (
+                word_id, example, example_translation, position
+            ) VALUES (?, ?, ?, ?)
+            """,
+            [
+                (word_id, example, translation, position)
+                for position, (example, translation) in enumerate(cleaned)
+            ],
+        )
         self.connection.commit()
+
+    def examples_for_word(self, word_id: int) -> list[tuple[str, str]]:
+        rows = self.connection.execute(
+            """
+            SELECT example, example_translation
+            FROM word_examples
+            WHERE word_id = ?
+            ORDER BY position, id
+            LIMIT 5
+            """,
+            (word_id,),
+        ).fetchall()
+        return [(str(row["example"]), str(row["example_translation"])) for row in rows]
 
     def get_word(self, word_id: int) -> Word:
         row = self.connection.execute(

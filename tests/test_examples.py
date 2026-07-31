@@ -53,6 +53,39 @@ def test_semantic_examples_prefer_the_most_frequent_sense(tmp_path: Path) -> Non
     assert result == "The picnic was her suggestion."
 
 
+def test_semantic_index_returns_several_distinct_examples(tmp_path: Path) -> None:
+    path = tmp_path / "several-examples.db"
+    connection = sqlite3.connect(path)
+    connection.execute(
+        """
+        CREATE TABLE examples (
+            lemma TEXT, pos TEXT, example TEXT, definition TEXT,
+            frequency INTEGER, sense_rank INTEGER
+        )
+        """
+    )
+    connection.executemany(
+        "INSERT INTO examples VALUES (?, ?, ?, ?, ?, ?)",
+        [
+            ("reliable", "a", "a reliable source checks facts", "dependable", 9, 0),
+            ("reliable", "a", "the reliable train arrived on time", "dependable", 8, 1),
+            ("reliable", "a", "her reliable method worked again", "dependable", 7, 2),
+        ],
+    )
+    connection.commit()
+    connection.close()
+
+    examples = SemanticExampleIndex(path).lookup_many("reliable", "adjective")
+
+    assert len(examples) >= 3
+    assert len(set(examples)) == len(examples)
+    assert examples[:3] == [
+        "A reliable source checks facts.",
+        "The reliable train arrived on time.",
+        "Her reliable method worked again.",
+    ]
+
+
 def test_wordnet_sources_are_removed_after_indexing(tmp_path: Path) -> None:
     nltk_source = tmp_path / "nltk_data" / "corpora" / "wordnet"
     legacy_source = tmp_path / "wordnet" / "wordnet"

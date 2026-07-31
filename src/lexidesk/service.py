@@ -34,6 +34,7 @@ class LexiDeskService(QObject):
         self.repository = repository
         self.thread_pool = QThreadPool.globalInstance()
         self.thread_pool.setMaxThreadCount(1)
+        self.enrichment_scheduled: set[int] = set()
 
     @Slot(str, result=str)
     def Request(self, raw_request: str) -> str:  # noqa: N802
@@ -45,12 +46,25 @@ class LexiDeskService(QObject):
             if decoded.get("command") == "enrich":
                 word_id = int(decoded["word_id"])
                 self.repository.get_word(word_id)
+                self.enrichment_scheduled.add(word_id)
                 self.thread_pool.start(
                     ExampleEnrichmentTask(self.repository.path, word_id)
                 )
                 payload = {"scheduled": True, "word_id": word_id}
             else:
                 payload = execute_request(self.repository, decoded)
+                word_id = int(payload.get("id", 0))
+                if (
+                    decoded.get("command") in {"card", "get"}
+                    and word_id > 0
+                    and word_id not in self.enrichment_scheduled
+                    and len(self.enrichment_scheduled) < 20
+                    and len(self.repository.examples_for_word(word_id)) < 3
+                ):
+                    self.enrichment_scheduled.add(word_id)
+                    self.thread_pool.start(
+                        ExampleEnrichmentTask(self.repository.path, word_id)
+                    )
         except Exception as error:
             payload = {"error": str(error), "type": type(error).__name__}
         return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))

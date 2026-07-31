@@ -111,6 +111,50 @@ def test_quiz_payload_supports_reverse_cloze_and_context(tmp_path: Path) -> None
     repository.close()
 
 
+def test_cloze_quiz_rotates_between_saved_examples(tmp_path: Path, monkeypatch) -> None:
+    repository = WordRepository(tmp_path / "varied-cloze.db")
+    records = [
+        ("reliable", "надёжный"),
+        ("careful", "осторожный"),
+        ("useful", "полезный"),
+        ("simple", "простой"),
+    ]
+    ids = [
+        repository.add_word(
+            source_text=source,
+            source_lang="en",
+            target_text=target,
+            part_of_speech="adjective",
+            example=f"The result was {source} for everyone.",
+        )
+        for source, target in records
+    ]
+    repository.replace_examples(
+        ids[0],
+        [
+            (
+                "A reliable source checks each fact.",
+                "Надёжный источник проверяет факты.",
+            ),
+            ("The reliable train arrived on time.", "Надёжный поезд прибыл вовремя."),
+            ("Her reliable method worked again.", "Её надёжный метод снова сработал."),
+        ],
+    )
+    saved_examples = [example for example, _ in repository.examples_for_word(ids[0])]
+    choices = iter(saved_examples)
+    monkeypatch.setattr(
+        "lexidesk.api.random.choice",
+        lambda items: next(choices) if items == saved_examples else items[0],
+    )
+    word = repository.get_word(ids[0])
+
+    prompts = [quiz_variants(word, repository)["cloze"]["prompt"] for _ in range(3)]
+
+    assert len(set(prompts)) == 3
+    assert all("___" in prompt for prompt in prompts)
+    repository.close()
+
+
 def test_quiz_mistakes_are_available_to_analytics(tmp_path: Path) -> None:
     repository = WordRepository(tmp_path / "analytics.db")
     word_id = repository.add_word(

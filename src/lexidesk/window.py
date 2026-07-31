@@ -69,6 +69,7 @@ class LexiDeskWindow(QMainWindow):
         self._mixed_dry_streak = 0
         self._choice_buttons: list[QPushButton] = []
         self._quiz_answered = False
+        self._example_enrichment_scheduled: set[int] = set()
         self.advance_timer = QTimer(self)
         self.advance_timer.setSingleShot(True)
         self.advance_timer.setInterval(1000)
@@ -366,6 +367,13 @@ class LexiDeskWindow(QMainWindow):
             return
 
         self.practice_label.setEnabled(True)
+        if (
+            word.id not in self._example_enrichment_scheduled
+            and len(self._example_enrichment_scheduled) < 20
+            and len(self.repository.examples_for_word(word.id)) < 3
+        ):
+            self._example_enrichment_scheduled.add(word.id)
+            schedule_example_enrichment(word.id)
 
         target_language = "RU" if word.source_lang == "en" else "EN"
         self.direction_label.setText(f"{word.source_lang.upper()} → {target_language}")
@@ -591,6 +599,7 @@ class LexiDeskWindow(QMainWindow):
         try:
             word_id = self.repository.add_word(**dialog.word_data)
             schedule_example_enrichment(word_id)
+            self._example_enrichment_scheduled.add(word_id)
         except sqlite3.IntegrityError:
             QMessageBox.information(
                 self,
@@ -670,6 +679,7 @@ class LexiDeskWindow(QMainWindow):
         try:
             self.repository.update_word(self.current_word.id, **dialog.word_data)
             schedule_example_enrichment(self.current_word.id)
+            self._example_enrichment_scheduled.add(self.current_word.id)
         except sqlite3.IntegrityError:
             QMessageBox.information(
                 self,
