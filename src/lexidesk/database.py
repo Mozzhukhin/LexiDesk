@@ -593,11 +593,16 @@ class WordRepository:
                 CASE WHEN ? = 1 AND due_at <= ? THEN 0 ELSE 1 END,
                 CASE
                     WHEN ? = 1 AND know_count + dont_know_count > 0
+                         AND due_at <= ?
                     THEN CAST(dont_know_count AS REAL)
                          / (know_count + dont_know_count)
                     ELSE 0
                 END DESC,
-                CASE WHEN ? = 1 THEN COALESCE(difficulty, 5) ELSE 0 END DESC,
+                CASE
+                    WHEN ? = 1 AND due_at <= ?
+                    THEN COALESCE(difficulty, 5)
+                    ELSE 0
+                END DESC,
                 COALESCE(last_shown_at, created_at),
                 CASE WHEN due_at <= ? THEN 0 ELSE 1 END,
                 CASE
@@ -618,7 +623,9 @@ class WordRepository:
                 int(adaptive),
                 now,
                 int(adaptive),
+                now,
                 int(adaptive),
+                now,
                 now,
             ),
         ).fetchone()

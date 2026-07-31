@@ -33,7 +33,7 @@ from PySide6.QtWidgets import (
 )
 
 from .answers import AnswerGrade, evaluate_answer
-from .api import adaptive_quiz_due, quiz_variants
+from .api import mixed_quiz_due, quiz_variants
 from .autostart import set_autostart
 from .batch import BatchAddDialog
 from .database import WordRepository
@@ -65,6 +65,7 @@ class LexiDeskWindow(QMainWindow):
         self.review_clock = QElapsedTimer()
         self._drag_origin = QPoint()
         self._current_quiz: dict[str, Any] | None = None
+        self._mixed_dry_streak = 0
         self._choice_buttons: list[QPushButton] = []
         self._quiz_answered = False
         self.advance_timer = QTimer(self)
@@ -118,7 +119,7 @@ class LexiDeskWindow(QMainWindow):
         practice_group.setExclusive(True)
         practice_modes = (
             ("Off", "off"),
-            ("Mixed — adaptive review", "mixed"),
+            ("Mixed — adaptive + regular checks", "mixed"),
             ("Choose translation", "translation"),
             ("Reverse translation", "reverse"),
             ("Complete the sentence", "cloze"),
@@ -413,19 +414,26 @@ class LexiDeskWindow(QMainWindow):
         mode = self.settings.practice_mode
         if mode != "mixed":
             return mode
-        if self.current_word is None or not adaptive_quiz_due(self.current_word):
+        if self.current_word is None:
+            return "off"
+        self._mixed_dry_streak += 1
+        if not mixed_quiz_due(self.current_word, self._mixed_dry_streak):
             return "off"
         available = [
             candidate
             for candidate in ("translation", "reverse", "cloze", "context")
             if candidate in variants
         ]
-        return random.choice(available) if available else "off"
+        if not available:
+            return "off"
+        self._mixed_dry_streak = 0
+        return random.choice(available)
 
     def set_practice_mode(self, mode: str) -> None:
         if mode not in self.practice_actions:
             return
         self.settings.practice_mode = mode
+        self._mixed_dry_streak = 0
         self.settings_store.save(self.settings)
         self.practice_actions[mode].setChecked(True)
         self._update_practice_button()
@@ -434,7 +442,7 @@ class LexiDeskWindow(QMainWindow):
     def _update_practice_button(self) -> None:
         labels = {
             "off": "Off",
-            "mixed": "Mixed — adaptive review",
+            "mixed": "Mixed — adaptive + regular checks",
             "translation": "Choose translation",
             "reverse": "Reverse translation",
             "cloze": "Complete the sentence",

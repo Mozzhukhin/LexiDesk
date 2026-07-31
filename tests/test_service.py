@@ -3,7 +3,13 @@ import sqlite3
 from datetime import timedelta
 from pathlib import Path
 
-from lexidesk.api import adaptive_quiz_due, quiz_choices, quiz_variants
+from lexidesk.api import (
+    adaptive_quiz_due,
+    card_payload,
+    mixed_quiz_due,
+    quiz_choices,
+    quiz_variants,
+)
 from lexidesk.database import WordRepository
 from lexidesk.dictionary import OfflineDictionary
 from lexidesk.service import LexiDeskService
@@ -163,4 +169,23 @@ def test_fsrs_due_time_controls_adaptive_quiz(tmp_path: Path) -> None:
     assert reviewed.due_at - reviewed.last_reviewed_at == timedelta(minutes=10)
     assert not adaptive_quiz_due(reviewed)
     assert adaptive_quiz_due(reviewed, reviewed.due_at + timedelta(seconds=1))
+    repository.close()
+
+
+def test_mixed_mode_guarantees_maintenance_quiz_on_fifth_card(
+    tmp_path: Path,
+) -> None:
+    repository = WordRepository(tmp_path / "mixed-maintenance.db")
+    word_id = repository.add_word(
+        source_text="reliable",
+        source_lang="en",
+        target_text="надёжный",
+    )
+    repository.next_word(adaptive=True)
+    word = repository.review(word_id, "good")
+
+    assert not adaptive_quiz_due(word)
+    assert not mixed_quiz_due(word, 4)
+    assert mixed_quiz_due(word, 5)
+    assert card_payload(word, repository)["quiz_eligible"] is True
     repository.close()

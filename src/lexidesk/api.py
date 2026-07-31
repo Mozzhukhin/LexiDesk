@@ -123,6 +123,7 @@ def card_payload(
         quiz_probability(word, repository) if word is not None else 0
     )
     payload["adaptive_quiz"] = adaptive_quiz_due(word) if word is not None else False
+    payload["quiz_eligible"] = quiz_eligible(word) if word is not None else False
     return payload
 
 
@@ -132,6 +133,22 @@ def adaptive_quiz_due(word: Word, now: datetime | None = None) -> bool:
     if reviews == 0:
         return word.view_count >= 2
     return word.due_at <= (now or datetime.now(UTC))
+
+
+def quiz_eligible(word: Word) -> bool:
+    """Return whether a card has been seen enough for a maintenance quiz."""
+    return word.view_count >= 2 or word.know_count + word.dont_know_count > 0
+
+
+def mixed_quiz_due(
+    word: Word,
+    ordinary_cards_since_quiz: int,
+    now: datetime | None = None,
+) -> bool:
+    """Combine FSRS timing with a guaranteed fifth-card maintenance check."""
+    return adaptive_quiz_due(word, now) or (
+        quiz_eligible(word) and ordinary_cards_since_quiz >= 5
+    )
 
 
 def quiz_probability(word: Word, repository: WordRepository) -> float:

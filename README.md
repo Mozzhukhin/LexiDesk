@@ -79,7 +79,8 @@ default. Ordinary cards are passive: **Next** and automatic rotation only
 change the visible word. The user chooses a persistent mode from the Practice
 section of the widget menu. **Mixed** introduces new cards normally, tests them
 on their next eligible appearance, and turns FSRS-due cards into a random
-non-typing quiz. Selecting a specific quiz type applies that type to every
+non-typing quiz. If nothing is due, it still guarantees a maintenance quiz
+after at most four ordinary eligible cards. Selecting a specific quiz type applies that type to every
 available word until the mode is changed or switched Off.
 A correct choice records a successful review; a wrong choice records a failed
 review. Those quiz results produce individualized intervals instead of a fixed
@@ -106,7 +107,8 @@ LexiDesk cycles through every other available card before allowing a repeat.
    The 90-second timer performs the same passive change automatically.
 4. The compact application menu contains the Practice section. Off keeps normal
    cards. Mixed inserts translation, reverse, sentence-gap, or context practice
-   when a card is ready for adaptive review. Selecting one exact quiz type uses
+   when a card is ready for adaptive review, or on every fifth eligible card
+   when nothing is due. Selecting one exact quiz type uses
    only that type on subsequent words. The active mode is check-marked and
    remembered by Plasma.
 5. A correct answer turns green. A wrong selected answer turns red while the

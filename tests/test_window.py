@@ -82,3 +82,23 @@ def test_standalone_uses_mouse_only_next_and_compact_progress(tmp_path: Path) ->
     assert "until the next card" in window.countdown_progress.toolTip()
 
     repository.close()
+
+
+def test_standalone_mixed_mode_guarantees_a_quiz(tmp_path: Path) -> None:
+    window, repository = _window(tmp_path)
+    window.settings.practice_mode = "mixed"
+    word_id = repository.add_word(
+        source_text="steady",
+        source_lang="en",
+        target_text="стабильный",
+    )
+    window.current_word = repository.review(word_id, "good")
+    variants = {"translation": {"type": "translation", "answer": "стабильный"}}
+
+    for _ in range(4):
+        assert window._practice_for_card(variants) == "off"
+    assert window._practice_for_card(variants) == "translation"
+    assert window._mixed_dry_streak == 0
+
+    window.tick_timer.stop()
+    repository.close()

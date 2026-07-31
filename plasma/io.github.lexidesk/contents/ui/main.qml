@@ -52,6 +52,8 @@ PlasmoidItem {
     property var quizVariants: ({})
     property string quizMode: plasmoid.configuration.quizMode || "off"
     property bool adaptiveQuiz: false
+    property bool quizEligible: false
+    property int mixedDryStreak: 0
     property int cardRevision: 0
     property string pendingKind: ""
     property string bridgePath: findExecutable(
@@ -185,12 +187,15 @@ PlasmoidItem {
         typedAnswer = ""
         revealed = false
         choiceAdvanceTimer.stop()
+        if (quizMode === "mixed")
+            mixedDryStreak = 0
         if (animate !== false)
             cardRevision++
     }
 
     function selectQuizMode(kind) {
         plasmoid.configuration.quizMode = kind
+        mixedDryStreak = 0
         if (kind === "off" || kind === "mixed") {
             choiceMode = false
             revealed = plasmoid.configuration.revealMode === "both"
@@ -221,7 +226,8 @@ PlasmoidItem {
             startQuiz(quizMode, false)
             return
         }
-        if (!adaptiveQuiz)
+        mixedDryStreak++
+        if (!adaptiveQuiz && !(quizEligible && mixedDryStreak >= 5))
             return
         var mixedKinds = ["translation", "reverse", "cloze", "context"]
         var available = []
@@ -268,6 +274,7 @@ PlasmoidItem {
         exampleTranslationText = card.example_translation || ""
         quizVariants = card.quizzes || {}
         adaptiveQuiz = Boolean(card.adaptive_quiz)
+        quizEligible = Boolean(card.quiz_eligible)
         var quiz = card.quiz || {}
         quizType = quiz.type || ""
         quizPrompt = quiz.prompt || sourceText
@@ -474,7 +481,7 @@ PlasmoidItem {
                 onClicked: root.selectQuizMode("off")
             }
             PlasmaExtras.MenuItem {
-                text: i18n("Mixed — adaptive review")
+                text: i18n("Mixed — adaptive + regular checks")
                 checkable: true
                 checked: root.quizMode === "mixed"
                 onClicked: root.selectQuizMode("mixed")
