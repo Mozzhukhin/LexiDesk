@@ -11,6 +11,8 @@
 - Stabilized long-card layouts and improved quiz answer emphasis.
 - Fixed Plasma settings persistence, made the menu open the widget's own
   configuration, reduced the default height, and removed the recall label.
+- Reject meta-sentences that merely mention a word, generate short contextual
+  examples from WordNet meanings, and handle Russian inflections reliably.
 
 - Move batch translation to a responsive, cancellable background worker.
 - Reduce quiz payload generation from a full-deck scan to a bounded SQL query.

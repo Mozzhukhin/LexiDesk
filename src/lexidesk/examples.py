@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import shutil
 import sqlite3
+import unicodedata
 from contextlib import suppress
 from pathlib import Path
 
@@ -83,13 +84,13 @@ class SemanticExampleIndex:
         for row in rows:
             example = _sentence_case(str(row["example"]))
             frequency = int(row["frequency"])
-            if example_is_suitable(example, word) and frequency >= max(
+            if example_is_informative(example, word) and frequency >= max(
                 2, best_frequency // 3
             ):
                 return example
         definition = str(rows[0]["definition"]).strip()
         if definition:
-            return _definition_example(word, definition)
+            return _definition_example(word, definition, category)
         return ""
 
 
@@ -114,53 +115,110 @@ def example_is_suitable(
         return True
     if not allow_inflection or " " in term:
         return False
-    normalized_term = normalize_headword(term)
+    normalized_term = unicodedata.normalize("NFC", normalize_headword(term))
     if len(normalized_term) < 5:
         return False
-    stem_length = max(4, len(normalized_term) - 3)
+    stem_length = max(
+        4,
+        len(normalized_term) - (5 if re.search(r"[а-яё]", normalized_term) else 3),
+    )
     stem = normalized_term[:stem_length]
     return any(
-        normalize_headword(token.strip(".,!?;:«»“”\"'()")).startswith(stem)
+        unicodedata.normalize(
+            "NFC",
+            normalize_headword(token.strip(".,!?;:«»“”\"'()")),
+        ).startswith(stem)
         for token in sentence.split()
     )
+
+
+def example_is_informative(
+    example: str,
+    word: str,
+    *,
+    allow_inflection: bool = False,
+) -> bool:
+    """Reject examples that mention a word without showing its meaning."""
+    if not example_is_suitable(
+        example,
+        word,
+        allow_inflection=allow_inflection,
+    ):
+        return False
+    normalized = " ".join(example.casefold().split())
+    weak_patterns = (
+        r"\bthe (?:word|term|phrase)\b.*\b(?:means|appears|appeared|is used)\b",
+        r"\bthe text contains\b",
+        r"\bi heard the phrase\b",
+        r"\bthe intended meaning here\b",
+        r"\bno frame of reference\b",
+        r"\b(?:слово|термин)\b.*\bозначает\b",
+        r"\bв тексте (?:встретил(?:ось|ась)?|содержится)\b",
+        r"\bпонятие\b.*\b(?:важн|повлиял)",
+        r"\b(?:выражение|фраза)\b.*\b(?:помог|передал)",
+        r"\bважный смысл здесь\b",
+        r"\bрезультат можно описать как\b",
+    )
+    return not any(re.search(pattern, normalized) for pattern in weak_patterns)
 
 
 def select_human_example(examples: list[str], word: str) -> str:
     for candidate in examples:
         sentence = _sentence_case(candidate)
-        if example_is_suitable(sentence, word):
+        if example_is_informative(sentence, word):
             return sentence
     return ""
 
 
-def _definition_example(word: str, definition: str) -> str:
+def _definition_example(
+    word: str,
+    definition: str,
+    part_of_speech: str = "",
+) -> str:
     term = " ".join(word.strip().split()).casefold()
     meaning = " ".join(definition.strip().rstrip(".").split())
-    meaning = re.split(r"\s*(?:;|--)\s*", meaning, maxsplit=1)[0]
-    meaning = meaning.replace(" referring to ", " for ")
-    meaning = meaning.replace(" two or more ", " multiple ")
-    prefix = f"The word “{term}” means "
-    budget = MAX_EXAMPLE_LENGTH - len(prefix) - 1
-    if len(meaning) > budget:
-        for marker in (
-            " by ",
-            " that ",
-            " which ",
-            " with ",
-            " involving ",
-            " for ",
-        ):
-            shortened = meaning.split(marker, 1)[0]
-            if len(shortened.split()) >= 3 and len(shortened) <= budget:
-                meaning = shortened
-                break
-        else:
-            shortened = meaning[: max(1, budget - 1)].rsplit(" ", 1)[0]
-            meaning = f"{shortened}…"
-    sentence = f"{prefix}{meaning}"
-    return (
-        sentence if sentence[-1] in ".!?" or sentence.endswith("…") else sentence + "."
-    )
+    semantics = meaning.casefold()
+    category = part_of_speech.casefold()
+    if any(token in semantics for token in ("restriction", "limited", "limit the")):
+        sentence = f"Access to this area is {term} after dark."
+    elif any(
+        token in semantics
+        for token in ("interpretation", "uncertain", "more than one possible meaning")
+    ):
+        sentence = f"The instructions were {term}, so we asked for clarification."
+    elif any(
+        token in semantics
+        for token in (
+            "destroy",
+            "severe damage",
+            "damage so severe",
+            "no longer exists",
+            "termination",
+        )
+    ):
+        sentence = f"The storm caused widespread {term} along the coast."
+    elif any(
+        token in semantics
+        for token in ("grammatical number", "form of a word", "two or more")
+    ):
+        sentence = f"Cats is the {term} of cat."
+    elif any(token in semantics for token in ("idea that is suggested", "proposal")):
+        sentence = f"Her {term} helped the team reach a decision."
+    elif any(token in semantics for token in ("occurrences", "given time period")):
+        sentence = f"The {term} of the signal increased during the test."
+    elif category.startswith("noun"):
+        sentence = f"We discussed the {term} before making a final decision."
+    elif category.startswith("verb"):
+        sentence = f"They agreed to {term} when the time was right."
+    elif category.startswith("adj"):
+        sentence = f"The final result was clearly {term}."
+    elif category.startswith("adv"):
+        sentence = f"She responded {term} during the meeting."
+    else:
+        sentence = f"We encountered {term} during the discussion."
+    if len(sentence) <= MAX_EXAMPLE_LENGTH:
+        return sentence
+    return f"The situation involved {term}."
 
 
 def _sentence_case(text: str) -> str:

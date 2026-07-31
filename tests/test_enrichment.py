@@ -66,3 +66,24 @@ def test_enrichment_handles_missing_card(tmp_path: Path) -> None:
     WordRepository(path).close()
 
     assert enrich_example(path, 999) is False
+
+
+def test_enrichment_replaces_meta_example(tmp_path: Path, monkeypatch) -> None:
+    path = tmp_path / "meta.db"
+    repository = WordRepository(path)
+    word_id = repository.add_word(
+        source_text="restricted",
+        source_lang="en",
+        target_text="ограниченный",
+        part_of_speech="adjective",
+        example="The text contains the adjective “restricted”.",
+        example_translation="В тексте встретилось прилагательное «ограниченный».",
+    )
+    repository.close()
+    monkeypatch.setattr("lexidesk.enrichment.OfflineTranslator", StubTranslator)
+
+    assert enrich_example(path, word_id) is True
+
+    repository = WordRepository(path)
+    assert repository.get_word(word_id).example.startswith("A reliable source")
+    repository.close()

@@ -12,7 +12,7 @@ from .dictionary import (
     _damerau_levenshtein,
     normalize_headword,
 )
-from .examples import SemanticExampleIndex, example_is_suitable
+from .examples import SemanticExampleIndex, example_is_informative
 
 CYRILLIC_RE = re.compile(r"[\u0400-\u04ff]")
 LATIN_RE = re.compile(r"[A-Za-z]")
@@ -171,7 +171,7 @@ class OfflineTranslator:
             english_example = self.examples.lookup(english_term, part_of_speech)
             if english_example:
                 russian_example = self.translate(english_example).translation
-                if example_is_suitable(
+                if example_is_informative(
                     russian_example,
                     source_text,
                     allow_inflection=True,
@@ -197,8 +197,14 @@ class OfflineTranslator:
         """Translate an example and keep both sides tied to the card meaning."""
         translation = self.translate(sentence).translation
         if target_text:
-            translation = _align_quoted_term(translation, target_text)
-            if not example_is_suitable(
+            quoted_source = re.search(
+                rf"[«“\"]\s*{re.escape(source_text)}\s*[»”\"]",
+                sentence,
+                flags=re.IGNORECASE,
+            )
+            if quoted_source is not None:
+                translation = _align_quoted_term(translation, target_text)
+            if not example_is_informative(
                 translation,
                 target_text,
                 allow_inflection=True,

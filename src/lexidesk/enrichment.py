@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 
 from .database import WordRepository
-from .examples import MAX_EXAMPLE_LENGTH, example_is_suitable
+from .examples import MAX_EXAMPLE_LENGTH, example_is_informative
 from .translation import OfflineTranslator
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ def enrich_example(database: Path, word_id: int) -> bool:
         refresh_example = (
             not example
             or len(example) > MAX_EXAMPLE_LENGTH
-            or not example_is_suitable(
+            or not example_is_informative(
                 example,
                 word.source_text,
                 allow_inflection=word.source_lang == "ru",
@@ -42,7 +42,7 @@ def enrich_example(database: Path, word_id: int) -> bool:
             )
             example = generated.source
             translation = generated.translation
-        elif not example_is_suitable(
+        elif not example_is_informative(
             translation,
             word.target_text,
             allow_inflection=True,

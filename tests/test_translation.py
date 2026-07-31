@@ -102,6 +102,27 @@ def test_translated_definition_uses_the_selected_meaning() -> None:
     assert aligned == ("Слово «двусмысленный» означает открытый для разных толкований.")
 
 
+def test_unrelated_quoted_words_are_not_replaced_in_example() -> None:
+    class QuotedExampleTranslator(OfflineTranslator):
+        def translate(self, _text: str) -> TranslationResult:
+            return TranslationResult(
+                "en",
+                "ru",
+                "«Кошки» — это множественная форма слова «кошка».",
+            )
+
+    result = QuotedExampleTranslator().complete_example(
+        "The noun “cats” is plural because it refers to more than one cat.",
+        "plural",
+        "en",
+        "множественный",
+        "adjective",
+    )
+
+    assert result.translation.startswith("«Кошки»")
+    assert "множественная" in result.translation
+
+
 def test_reciprocal_dictionary_evidence_repairs_weak_primary_translation(
     tmp_path,
 ) -> None:
