@@ -2,19 +2,20 @@ from __future__ import annotations
 
 import logging
 
-from PySide6.QtCore import QThread, Signal
+from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtWidgets import (
-    QCheckBox,
-    QComboBox,
+    QAbstractItemView,
     QDialog,
     QDialogButtonBox,
-    QFormLayout,
     QHBoxLayout,
     QLabel,
     QMessageBox,
     QProgressBar,
     QPushButton,
+    QTreeWidget,
+    QTreeWidgetItem,
     QVBoxLayout,
+    QWidget,
 )
 
 from .language_packages import (
@@ -24,7 +25,7 @@ from .language_packages import (
     package_for_pair,
     refresh_catalog,
 )
-from .languages import language_label
+from .languages import LANGUAGES, language_name
 from .model_translation import OfflineModelRegistry
 
 logger = logging.getLogger(__name__)
@@ -53,93 +54,98 @@ class PackageWorker(QThread):
                 ) -> None:
                     self.progressed.emit(min(100, round(offset + value * span / 100)))
 
-                install_package(
-                    package,
-                    report,
-                )
+                install_package(package, report)
             self.completed.emit(self.packages)
         except Exception as error:
             logger.exception("Language package operation failed")
             self.failed.emit(str(error))
 
 
-class LanguagePackagesDialog(QDialog):
-    def __init__(self, parent=None) -> None:
+class LanguagePackagesPage(QWidget):
+    languages_changed = Signal()
+
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Offline language packages")
-        self.setMinimumWidth(520)
         self._worker: PackageWorker | None = None
         self._packages = cached_catalog()
+        self._installed: set[str] = set()
 
-        self.installed_label = QLabel()
-        self.installed_label.setWordWrap(True)
-        self.source_combo = QComboBox()
-        self.target_combo = QComboBox()
-        self.source_combo.currentIndexChanged.connect(self._update_targets)
-        self.both_directions = QCheckBox("Install both directions")
-        self.both_directions.setChecked(True)
+        intro = QLabel(
+            "Download a language once, then translate offline. LexiDesk installs "
+            "both directions through English so the language can also be used "
+            "with every other installed language."
+        )
+        intro.setWordWrap(True)
+
+        self.languages = QTreeWidget()
+        self.languages.setColumnCount(2)
+        self.languages.setHeaderLabels(["Language", "Status"])
+        self.languages.setRootIsDecorated(False)
+        self.languages.setAlternatingRowColors(True)
+        self.languages.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.languages.header().setStretchLastSection(False)
+        self.languages.header().setSectionResizeMode(
+            0, self.languages.header().ResizeMode.Stretch
+        )
+        self.languages.header().setSectionResizeMode(
+            1, self.languages.header().ResizeMode.ResizeToContents
+        )
+        self.languages.currentItemChanged.connect(self._selection_changed)
+
         self.progress = QProgressBar()
         self.progress.hide()
         self.status = QLabel(
-            "Models are downloaded only on request. Translation is offline afterwards."
+            "Installed languages are shown first; each group is alphabetical."
         )
         self.status.setWordWrap(True)
-
-        self.refresh_button = QPushButton("Refresh online catalog")
+        self.refresh_button = QPushButton("Refresh language list")
         self.refresh_button.clicked.connect(self.refresh)
-        self.install_button = QPushButton("Download and install")
+        self.install_button = QPushButton("Download selected language")
         self.install_button.clicked.connect(self.install_selected)
 
-        pair_row = QHBoxLayout()
-        pair_row.addWidget(self.source_combo, 1)
-        pair_row.addWidget(QLabel("→"))
-        pair_row.addWidget(self.target_combo, 1)
-        form = QFormLayout()
-        form.addRow("Installed", self.installed_label)
-        form.addRow("Language pair", pair_row)
-        form.addRow("", self.both_directions)
-        buttons_row = QHBoxLayout()
-        buttons_row.addWidget(self.refresh_button)
-        buttons_row.addStretch(1)
-        buttons_row.addWidget(self.install_button)
-        close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        close_buttons.rejected.connect(self.reject)
-
+        actions = QHBoxLayout()
+        actions.addWidget(self.refresh_button)
+        actions.addStretch(1)
+        actions.addWidget(self.install_button)
         layout = QVBoxLayout(self)
-        layout.addLayout(form)
+        layout.addWidget(intro)
+        layout.addWidget(self.languages, 1)
         layout.addWidget(self.status)
         layout.addWidget(self.progress)
-        layout.addLayout(buttons_row)
-        layout.addWidget(close_buttons)
+        layout.addLayout(actions)
         self._populate()
-        self._update_installed()
+
+    @property
+    def busy(self) -> bool:
+        return self._worker is not None
 
     def refresh(self) -> None:
-        self._start(PackageWorker(), "Downloading the official package catalog…")
+        self._start(PackageWorker(), "Downloading the official language list…")
 
     def install_selected(self) -> None:
-        source = str(self.source_combo.currentData() or "")
-        target = str(self.target_combo.currentData() or "")
-        forward = package_for_pair(self._packages, source, target)
-        if forward is None:
+        item = self.languages.currentItem()
+        code = str(item.data(0, Qt.ItemDataRole.UserRole) if item else "")
+        if not code or code in self._installed:
+            return
+        selected = tuple(
+            package
+            for package in (
+                package_for_pair(self._packages, code, "en"),
+                package_for_pair(self._packages, "en", code),
+            )
+            if package is not None
+        )
+        if len(selected) != 2:
             QMessageBox.warning(
-                self, "Package unavailable", "This pair is unavailable."
+                self,
+                "Language unavailable",
+                "The official catalog does not provide both directions "
+                "for this language.",
             )
             return
-        selected = [forward]
-        if self.both_directions.isChecked():
-            reverse = package_for_pair(self._packages, target, source)
-            if reverse is None:
-                QMessageBox.warning(
-                    self,
-                    "Reverse package unavailable",
-                    "Only the selected direction is available in the catalog.",
-                )
-            else:
-                selected.append(reverse)
         self._start(
-            PackageWorker(tuple(selected)),
-            "Downloading and verifying the offline model…",
+            PackageWorker(selected),
+            f"Downloading {language_name(code)} for offline use…",
         )
 
     def _start(self, worker: PackageWorker, message: str) -> None:
@@ -158,21 +164,18 @@ class LanguagePackagesDialog(QDialog):
         worker.start()
 
     def _completed(self, result: object) -> None:
-        if isinstance(result, tuple) and (
-            not result or isinstance(result[0], LanguagePackage)
-        ):
-            if self._worker is not None and self._worker.packages is None:
-                self._packages = result
-                self._populate()
-                self.status.setText(
-                    f"Catalog updated: {len(result)} directions available."
-                )
-            else:
-                self.status.setText(
-                    "Language package installed. Restart LexiDesk to use it."
-                )
-                self.progress.setValue(100)
-                self._update_installed()
+        if not isinstance(result, tuple):
+            return
+        if self._worker is not None and self._worker.packages is None:
+            self._packages = result
+            self.status.setText(
+                f"Language list updated: {len(self._language_codes())} languages."
+            )
+        else:
+            self.status.setText("Language installed and ready to use offline.")
+            self.progress.setValue(100)
+            self.languages_changed.emit()
+        self._populate()
 
     def _failed(self, message: str) -> None:
         self.status.setText(f"Could not complete the operation: {message}")
@@ -183,46 +186,108 @@ class LanguagePackagesDialog(QDialog):
         if worker is not None:
             worker.deleteLater()
         self.refresh_button.setEnabled(True)
-        self.install_button.setEnabled(bool(self._packages))
+        self._selection_changed(self.languages.currentItem())
+
+    def _language_codes(self) -> set[str]:
+        catalog_codes = {
+            code
+            for package in self._packages
+            for code in (package.source, package.target)
+        }
+        return catalog_codes or set(LANGUAGES)
 
     def _populate(self) -> None:
-        current = self.source_combo.currentData()
-        sources = sorted({package.source for package in self._packages})
-        self.source_combo.blockSignals(True)
-        self.source_combo.clear()
-        for code in sources:
-            self.source_combo.addItem(language_label(code), code)
-        index = self.source_combo.findData(current)
-        self.source_combo.setCurrentIndex(max(0, index))
-        self.source_combo.blockSignals(False)
-        self._update_targets()
-        self.install_button.setEnabled(bool(self._packages))
-
-    def _update_targets(self) -> None:
-        source = str(self.source_combo.currentData() or "")
-        current = self.target_combo.currentData()
-        targets = sorted(
-            {package.target for package in self._packages if package.source == source}
+        current = self.languages.currentItem()
+        current_code = str(current.data(0, Qt.ItemDataRole.UserRole) if current else "")
+        registry = OfflineModelRegistry()
+        pairs = registry.installed_pairs()
+        codes = self._language_codes()
+        has_english = any("en" in pair for pair in pairs)
+        self._installed = {
+            code
+            for code in codes
+            if (code == "en" and has_english)
+            or (
+                code != "en"
+                and registry.route(code, "en") is not None
+                and registry.route("en", code) is not None
+            )
+        }
+        catalog_names = {
+            package.source: package.source_name for package in self._packages
+        } | {package.target: package.target_name for package in self._packages}
+        ordered = sorted(
+            codes,
+            key=lambda code: (
+                code not in self._installed,
+                (
+                    LANGUAGES[code].name
+                    if code in LANGUAGES
+                    else catalog_names.get(code, code.upper())
+                ).casefold(),
+            ),
         )
-        self.target_combo.clear()
-        for code in targets:
-            self.target_combo.addItem(language_label(code), code)
-        index = self.target_combo.findData(current)
-        self.target_combo.setCurrentIndex(max(0, index))
+        self.languages.clear()
+        selected_item: QTreeWidgetItem | None = None
+        for code in ordered:
+            name = (
+                LANGUAGES[code].name
+                if code in LANGUAGES
+                else catalog_names.get(code, code.upper())
+            )
+            installed = code in self._installed
+            status = "✓ Installed" if installed else "Not installed"
+            if code == "en" and installed:
+                status = "✓ Installed · core"
+            item = QTreeWidgetItem([f"{name}  ·  {code.upper()}", status])
+            item.setData(0, Qt.ItemDataRole.UserRole, code)
+            if installed:
+                font = item.font(0)
+                font.setBold(True)
+                item.setFont(0, font)
+            self.languages.addTopLevelItem(item)
+            if code == current_code:
+                selected_item = item
+        item_to_select = selected_item or self.languages.topLevelItem(0)
+        if item_to_select is not None:
+            self.languages.setCurrentItem(item_to_select)
+        self._selection_changed(self.languages.currentItem())
 
-    def _update_installed(self) -> None:
-        pairs = OfflineModelRegistry().installed_pairs()
-        self.installed_label.setText(
-            ", ".join(f"{source.upper()}→{target.upper()}" for source, target in pairs)
-            or "No translation models found"
+    def _selection_changed(self, item: QTreeWidgetItem | None, *_args) -> None:
+        code = str(item.data(0, Qt.ItemDataRole.UserRole) if item else "")
+        installed = code in self._installed
+        available = (
+            bool(
+                package_for_pair(self._packages, code, "en")
+                and package_for_pair(self._packages, "en", code)
+            )
+            if code and code != "en"
+            else False
         )
+        self.install_button.setText(
+            "Installed" if installed else "Download selected language"
+        )
+        self.install_button.setEnabled(not self.busy and not installed and available)
+
+
+class LanguagePackagesDialog(QDialog):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Offline languages")
+        self.resize(600, 620)
+        self.page = LanguagePackagesPage(self)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(self.reject)
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.page)
+        layout.addWidget(buttons)
 
     def reject(self) -> None:
-        if self._worker is not None:
+        if self.page.busy:
             QMessageBox.information(
                 self,
                 "Download in progress",
-                "Wait for the current package operation to finish.",
+                "Wait for the current language download to finish.",
             )
             return
         super().reject()

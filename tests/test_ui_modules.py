@@ -76,6 +76,10 @@ def test_settings_dialog_applies_every_value(qapp: QApplication) -> None:
 def test_add_dialog_applies_translation_and_builds_card(qapp: QApplication) -> None:
     translator = StubTranslator()
     dialog = AddWordDialog(translator, initial_text="relyable")  # type: ignore[arg-type]
+    assert [dialog.tabs.tabText(index) for index in range(dialog.tabs.count())] == [
+        "Add word",
+        "Languages",
+    ]
     result = translator.translate("relyable")
 
     dialog._apply_translation(result, "relyable")

@@ -77,6 +77,10 @@ class OfflineTranslator:
     def installed_languages(self) -> tuple[str, ...]:
         return self._models().installed_languages()
 
+    def reload_models(self) -> None:
+        self._model_registry = None
+        self._model_cache.clear()
+
     def available_route(
         self, source_language: str, target_language: str
     ) -> tuple[str, ...] | None:

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Move language management into a dedicated Languages tab behind the + button;
+  group the full catalog by installed status and alphabetize both groups.
 - Add a multilingual card schema with automatic migration from EN/RU cards.
 - Discover installed translation models as a directed graph, prefer direct
   models, and support one-hop offline pivot routes between arbitrary languages.

@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSpinBox,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -101,21 +102,9 @@ class AddWordDialog(QDialog):
         source_widget = QWidget()
         source_widget.setLayout(source_row)
 
-        installed_languages = (
-            self.translator.installed_languages()
-            if hasattr(self.translator, "installed_languages")
-            else ("en", "ru")
-        )
-        if not installed_languages:
-            installed_languages = ("en", "ru")
         self.source_language = QComboBox()
-        self.source_language.addItem("Auto-detect EN / RU", "")
         self.target_language = QComboBox()
-        self.target_language.addItem("Automatic EN ↔ RU", "")
-        for code in installed_languages:
-            label = language_label(code)
-            self.source_language.addItem(label, code)
-            self.target_language.addItem(label, code)
+        self._refresh_language_selectors()
         language_row = QHBoxLayout()
         language_row.addWidget(self.source_language, 1)
         language_row.addWidget(QLabel("→"))
@@ -206,10 +195,26 @@ class AddWordDialog(QDialog):
         buttons.rejected.connect(self.reject)
         self.buttons = buttons
 
+        card_page = QWidget()
+        card_layout = QVBoxLayout(card_page)
+        card_layout.addLayout(form)
+        card_layout.addWidget(hint)
+        card_layout.addWidget(buttons)
         layout = QVBoxLayout(self)
-        layout.addLayout(form)
-        layout.addWidget(hint)
-        layout.addWidget(buttons)
+        if word is None:
+            from .language_dialog import LanguagePackagesPage
+
+            self.tabs = QTabWidget()
+            self.tabs.addTab(card_page, "Add word")
+            self.language_packages_page = LanguagePackagesPage(self.tabs)
+            self.language_packages_page.languages_changed.connect(
+                self._languages_changed
+            )
+            self.tabs.addTab(self.language_packages_page, "Languages")
+            layout.addWidget(self.tabs)
+            self.resize(610, 680)
+        else:
+            layout.addWidget(card_page)
 
         if word is not None:
             self.setWindowTitle("Edit word or phrase")
@@ -217,11 +222,19 @@ class AddWordDialog(QDialog):
             self.direction_label.setText(
                 f"{word.source_lang.upper()} → {word.target_lang.upper()}"
             )
+            if self.source_language.findData(word.source_lang) < 0:
+                self.source_language.addItem(
+                    language_label(word.source_lang), word.source_lang
+                )
+            if self.target_language.findData(word.target_lang) < 0:
+                self.target_language.addItem(
+                    language_label(word.target_lang), word.target_lang
+                )
             self.source_language.setCurrentIndex(
-                max(0, self.source_language.findData(word.source_lang))
+                self.source_language.findData(word.source_lang)
             )
             self.target_language.setCurrentIndex(
-                max(0, self.target_language.findData(word.target_lang))
+                self.target_language.findData(word.target_lang)
             )
             self.target_edit.setText(word.target_text)
             self.meaning_combo.addItems([word.target_text, *word.alternatives])
@@ -237,6 +250,34 @@ class AddWordDialog(QDialog):
         elif initial_text:
             self.source_edit.setText(initial_text.strip())
             self.source_edit.selectAll()
+
+    def _refresh_language_selectors(self) -> None:
+        source = self.source_language.currentData()
+        target = self.target_language.currentData()
+        installed_languages = (
+            self.translator.installed_languages()
+            if hasattr(self.translator, "installed_languages")
+            else ("en", "ru")
+        ) or ("en", "ru")
+        self.source_language.clear()
+        self.target_language.clear()
+        self.source_language.addItem("Auto-detect EN / RU", "")
+        self.target_language.addItem("Automatic EN ↔ RU", "")
+        for code in installed_languages:
+            label = language_label(code)
+            self.source_language.addItem(label, code)
+            self.target_language.addItem(label, code)
+        self.source_language.setCurrentIndex(
+            max(0, self.source_language.findData(source))
+        )
+        self.target_language.setCurrentIndex(
+            max(0, self.target_language.findData(target))
+        )
+
+    def _languages_changed(self) -> None:
+        if hasattr(self.translator, "reload_models"):
+            self.translator.reload_models()
+        self._refresh_language_selectors()
 
     def translate(self) -> None:
         text = self.source_edit.text().strip()
@@ -507,9 +548,6 @@ class SettingsDialog(QDialog):
         self.autostart_check = QCheckBox("Launch automatically after login")
         self.autostart_check.setChecked(settings.autostart)
 
-        self.language_packages_button = QPushButton("Manage offline languages…")
-        self.language_packages_button.clicked.connect(self._open_language_packages)
-
         form = QFormLayout()
         form.addRow("Theme", self.theme_combo)
         form.addRow("Card mode", self.reveal_combo)
@@ -520,7 +558,6 @@ class SettingsDialog(QDialog):
         form.addRow("Daily goal", self.daily_goal_spin)
         form.addRow("FSRS retention", self.retention_spin)
         form.addRow("Offline autocorrection", self.autocorrect_check)
-        form.addRow("Languages", self.language_packages_button)
         form.addRow("", self.autostart_check)
 
         note = QLabel(
@@ -541,11 +578,6 @@ class SettingsDialog(QDialog):
         layout.addLayout(form)
         layout.addWidget(note)
         layout.addWidget(buttons)
-
-    def _open_language_packages(self) -> None:
-        from .language_dialog import LanguagePackagesDialog
-
-        LanguagePackagesDialog(self).exec()
 
     def apply_to(self, settings: Settings) -> None:
         settings.theme = self.theme_combo.currentText()

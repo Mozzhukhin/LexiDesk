@@ -77,8 +77,9 @@ a network connection. A source installation downloads this data once during
 
 ## Offline languages
 
-EN↔RU is the default bundled pair. Open **Settings → Manage offline languages**
-to refresh the official package catalog and install more directions. Packages
+EN↔RU is the default bundled pair. Press **+**, open the **Languages** tab, and
+select a language to install it. Installed languages are shown first, followed
+by the remaining catalog alphabetically. Packages
 are downloaded only after an explicit click; translation makes no network
 request after installation.
 

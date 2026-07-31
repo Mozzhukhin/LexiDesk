@@ -173,17 +173,42 @@ def test_package_install_extracts_only_runtime_files(
     assert install_package(package()) == installed
 
 
-def test_language_dialog_lists_catalog_pairs(qapp: QApplication, monkeypatch) -> None:
-    packages = (package(), package("fr", "de"))
-    monkeypatch.setattr("lexidesk.language_dialog.cached_catalog", lambda: packages)
-    monkeypatch.setattr(
-        "lexidesk.language_dialog.OfflineModelRegistry.installed_pairs",
-        lambda _self: (("en", "ru"),),
+def test_language_dialog_groups_installed_languages_first(
+    qapp: QApplication, monkeypatch
+) -> None:
+    packages = (
+        package("en", "ru"),
+        package("ru", "en"),
+        package("en", "de"),
+        package("de", "en"),
+        package("en", "fr"),
+        package("fr", "en"),
     )
+    monkeypatch.setattr("lexidesk.language_dialog.cached_catalog", lambda: packages)
+
+    class Registry:
+        def installed_pairs(self) -> tuple[tuple[str, str], ...]:
+            return (("en", "ru"), ("ru", "en"))
+
+        def route(self, source: str, target: str) -> tuple[str, ...] | None:
+            if source == target:
+                return (source,)
+            if {source, target} == {"en", "ru"}:
+                return (source, target)
+            return None
+
+    monkeypatch.setattr("lexidesk.language_dialog.OfflineModelRegistry", Registry)
     dialog = LanguagePackagesDialog()
 
-    assert dialog.source_combo.currentData() == "de"
-    assert dialog.target_combo.currentData() == "fr"
-    assert dialog.install_button.isEnabled()
-    assert dialog.installed_label.text() == "EN→RU"
+    rows = [
+        dialog.page.languages.topLevelItem(index)
+        for index in range(dialog.page.languages.topLevelItemCount())
+    ]
+    codes = [item.data(0, 256) for item in rows]
+    assert codes == ["en", "ru", "fr", "de"]
+    assert rows[0].text(1).startswith("✓ Installed")
+    assert rows[1].text(1).startswith("✓ Installed")
+    assert rows[2].text(1) == "Not installed"
+    dialog.page.languages.setCurrentItem(rows[2])
+    assert dialog.page.install_button.isEnabled()
     dialog.close()
