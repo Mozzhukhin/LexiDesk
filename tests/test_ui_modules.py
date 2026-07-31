@@ -132,11 +132,22 @@ def test_library_search_export_backup_and_delete(
     monkeypatch,
 ) -> None:
     repository = _reviewed_repository(tmp_path / "library.db")
+    repository.add_word(
+        source_text="спасибо",
+        source_lang="ru",
+        target_text="дякую",
+        target_lang="uk",
+    )
     dialog = LibraryDialog(
         repository,
         StubTranslator(),  # type: ignore[arg-type]
+        active_pair=("ru", "uk"),
     )
     assert dialog.table.rowCount() == 1
+    assert dialog.deck_filter.currentData() == ("ru", "uk")
+    assert "1 cards" in dialog.stats_label.text()
+    dialog.deck_filter.setCurrentIndex(0)
+    assert dialog.table.rowCount() == 2
     dialog.search.setText("missing")
     assert dialog.table.rowCount() == 0
     dialog.search.clear()
@@ -162,7 +173,7 @@ def test_library_search_export_backup_and_delete(
 
     dialog.table.selectRow(0)
     dialog.delete_selected()
-    assert repository.count() == 0
+    assert repository.count() == 1
 
     open_paths = iter((str(exported), str(backup)))
     monkeypatch.setattr(
@@ -171,11 +182,11 @@ def test_library_search_export_backup_and_delete(
         lambda *_args: (next(open_paths), "LexiDesk database (*.db)"),
     )
     dialog.import_file()
-    assert repository.count() == 1
+    assert repository.count() == 2
 
     dialog.table.selectRow(0)
     dialog.delete_selected()
-    assert repository.count() == 0
-    dialog.restore_database()
     assert repository.count() == 1
+    dialog.restore_database()
+    assert repository.count() == 2
     repository.close()

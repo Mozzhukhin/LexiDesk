@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Separate the vocabulary library into source-to-target deck views, default to
+  the widget's active pair, and keep learning-status filtering independent.
 - Make the current language direction a compact header control that opens the
   deck chooser directly in both the Plasma and standalone interfaces.
 - Keep card rotation, adaptive scheduling, and quizzes inside the explicitly

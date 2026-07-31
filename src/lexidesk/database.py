@@ -601,7 +601,18 @@ class WordRepository:
             raise KeyError(f"Unknown word id: {word_id}")
         return self._to_word(row)
 
-    def list_words(self, search: str = "", status: str = "All") -> list[Word]:
+    def list_words(
+        self,
+        search: str = "",
+        status: str = "All",
+        source_lang: str = "",
+        target_lang: str = "",
+    ) -> list[Word]:
+        if bool(source_lang) != bool(target_lang):
+            raise ValueError("Both languages are required to filter a library.")
+        if source_lang:
+            source_lang = normalize_language_code(source_lang)
+            target_lang = normalize_language_code(target_lang)
         query = """
             SELECT * FROM words
             WHERE (
@@ -612,12 +623,24 @@ class WordRepository:
                 OR forms_json LIKE ? ESCAPE '\\'
                 OR transcription LIKE ? ESCAPE '\\'
             )
+              AND (? = '' OR (source_lang = ? AND target_lang = ?))
         """
         escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         pattern = f"%{escaped}%"
         rows = self.connection.execute(
             query + " ORDER BY source_text COLLATE NOCASE",
-            (search, pattern, pattern, pattern, pattern, pattern, pattern),
+            (
+                search,
+                pattern,
+                pattern,
+                pattern,
+                pattern,
+                pattern,
+                pattern,
+                source_lang,
+                source_lang,
+                target_lang,
+            ),
         ).fetchall()
         words = [self._to_word(row) for row in rows]
         if status != "All":

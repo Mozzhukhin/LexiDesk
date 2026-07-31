@@ -38,6 +38,7 @@ class LibraryDialog(QDialog):
         parent: QWidget | None = None,
         initial_add_text: str = "",
         daily_goal: int = 20,
+        active_pair: tuple[str, str] = ("", ""),
     ) -> None:
         super().__init__(parent)
         self.repository = repository
@@ -56,12 +57,21 @@ class LibraryDialog(QDialog):
         self.search.setClearButtonEnabled(True)
         self.search.textChanged.connect(self.refresh)
 
+        self.deck_filter = QComboBox()
+        self.deck_filter.setToolTip("Show cards from one language direction")
+        self._refresh_deck_filter(active_pair)
+        self.deck_filter.currentIndexChanged.connect(self.refresh)
+
         self.status_filter = QComboBox()
-        self.status_filter.addItems(["All", "New", "Learning", "Known"])
-        self.status_filter.currentTextChanged.connect(self.refresh)
+        self.status_filter.setToolTip("Filter cards by learning status")
+        self.status_filter.addItem("All statuses", "All")
+        for status in ("New", "Learning", "Known"):
+            self.status_filter.addItem(status, status)
+        self.status_filter.currentIndexChanged.connect(self.refresh)
 
         filters = QHBoxLayout()
         filters.addWidget(self.search, 1)
+        filters.addWidget(self.deck_filter)
         filters.addWidget(self.status_filter)
 
         self.table = QTableWidget(0, 7)
@@ -138,8 +148,12 @@ class LibraryDialog(QDialog):
             self.add_word(initial_add_text)
 
     def refresh(self, *_args: object) -> None:
+        source_lang, target_lang = self._selected_pair()
         words = self.repository.list_words(
-            self.search.text().strip(), self.status_filter.currentText()
+            self.search.text().strip(),
+            str(self.status_filter.currentData()),
+            source_lang,
+            target_lang,
         )
         self.table.setRowCount(len(words))
         for row_index, word in enumerate(words):
@@ -159,12 +173,44 @@ class LibraryDialog(QDialog):
                     item.setData(Qt.ItemDataRole.UserRole, word.id)
                 self.table.setItem(row_index, column, item)
 
-        stats = self.repository.statistics()
+        stats = self.repository.statistics(source_lang, target_lang)
         self.stats_label.setText(
             f"{stats['total']} cards  •  {stats['due']} due  •  "
             f"{stats['known']} known  •  {stats['reviews_today']} reviews today  •  "
             f"{stats['accuracy']}% accuracy  •  {stats['streak']}-day streak"
         )
+
+    def _selected_pair(self) -> tuple[str, str]:
+        value = self.deck_filter.currentData()
+        if isinstance(value, tuple) and len(value) == 2:
+            return str(value[0]), str(value[1])
+        return "", ""
+
+    def _refresh_deck_filter(
+        self, selected_pair: tuple[str, str] | None = None
+    ) -> None:
+        if selected_pair is None:
+            selected_pair = (
+                self._selected_pair() if self.deck_filter.count() else ("", "")
+            )
+        self.deck_filter.blockSignals(True)
+        self.deck_filter.clear()
+        self.deck_filter.addItem("All decks", ("", ""))
+        for source, target in self.repository.language_pairs():
+            self.deck_filter.addItem(
+                f"{source.upper()} → {target.upper()}",
+                (source, target),
+            )
+        selected_index = next(
+            (
+                index
+                for index in range(self.deck_filter.count())
+                if self.deck_filter.itemData(index) == selected_pair
+            ),
+            0,
+        )
+        self.deck_filter.setCurrentIndex(selected_index)
+        self.deck_filter.blockSignals(False)
 
     def selected_id(self) -> int | None:
         row = self.table.currentRow()
@@ -183,6 +229,12 @@ class LibraryDialog(QDialog):
         try:
             word_id = self.repository.add_word(**dialog.word_data)
             schedule_example_enrichment(word_id)
+            self._refresh_deck_filter(
+                (
+                    str(dialog.word_data["source_lang"]),
+                    str(dialog.word_data["target_lang"]),
+                )
+            )
         except sqlite3.IntegrityError:
             QMessageBox.information(self, "Already saved", "This card already exists.")
         self.refresh()
@@ -199,6 +251,12 @@ class LibraryDialog(QDialog):
         try:
             self.repository.update_word(word_id, **dialog.word_data)
             schedule_example_enrichment(word_id)
+            self._refresh_deck_filter(
+                (
+                    str(dialog.word_data["source_lang"]),
+                    str(dialog.word_data["target_lang"]),
+                )
+            )
         except sqlite3.IntegrityError:
             QMessageBox.information(
                 self, "Already saved", "Another card already uses this source."
@@ -217,6 +275,7 @@ class LibraryDialog(QDialog):
         )
         if answer == QMessageBox.StandardButton.Yes:
             self.repository.delete_word(word_id)
+            self._refresh_deck_filter()
             self.refresh()
 
     def export_file(self) -> None:
@@ -252,6 +311,7 @@ class LibraryDialog(QDialog):
         except (OSError, sqlite3.Error, ValueError, KeyError) as error:
             QMessageBox.warning(self, "Import failed", str(error))
             return
+        self._refresh_deck_filter()
         self.refresh()
         QMessageBox.information(
             self,
@@ -311,6 +371,7 @@ class LibraryDialog(QDialog):
         except (OSError, sqlite3.Error, ValueError) as error:
             QMessageBox.warning(self, "Restore failed", str(error))
             return
+        self._refresh_deck_filter()
         self.refresh()
         QMessageBox.information(
             self,
@@ -322,6 +383,7 @@ class LibraryDialog(QDialog):
         dialog = BatchAddDialog(self.repository, self.translator, self)
         dialog.setStyleSheet(self.styleSheet())
         dialog.exec()
+        self._refresh_deck_filter()
         self.refresh()
 
     def open_analytics(self) -> None:

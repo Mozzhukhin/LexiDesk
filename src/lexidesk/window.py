@@ -676,6 +676,10 @@ class LexiDeskWindow(QMainWindow):
             self.translator,
             self,
             daily_goal=self.settings.daily_goal,
+            active_pair=(
+                self.settings.active_source_language,
+                self.settings.active_target_language,
+            ),
         )
         dialog.setStyleSheet(self.styleSheet())
         dialog.exec()

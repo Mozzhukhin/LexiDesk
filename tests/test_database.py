@@ -132,6 +132,9 @@ def test_language_decks_rotate_without_crossing_pairs(tmp_path: Path) -> None:
     assert repository.count("ru", "uk") == 2
     assert repository.language_pairs() == [("en", "ru"), ("ru", "uk")]
     assert repository.latest_language_pair() == ("en", "ru")
+    assert {
+        word.id for word in repository.list_words(source_lang="ru", target_lang="uk")
+    } == set(ru_uk_ids)
     repository.close()
 
 

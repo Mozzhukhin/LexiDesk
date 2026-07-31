@@ -134,6 +134,10 @@ def main() -> int:
             repository,
             translator,
             daily_goal=settings.daily_goal,
+            active_pair=(
+                settings.active_source_language,
+                settings.active_target_language,
+            ),
         )
         library_dialog.setStyleSheet(stylesheet(settings.theme, settings.font_scale))
         library_dialog.exec()
