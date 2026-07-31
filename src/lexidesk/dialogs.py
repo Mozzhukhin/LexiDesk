@@ -37,6 +37,60 @@ from .translation import (
 logger = logging.getLogger(__name__)
 
 
+class DeckSelectionDialog(QDialog):
+    def __init__(
+        self,
+        pairs: list[tuple[str, str]],
+        current_pair: tuple[str, str] = ("", ""),
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Choose language deck")
+        self.setMinimumWidth(390)
+        self.selected_pair: tuple[str, str] | None = None
+
+        title = QLabel("Language deck")
+        title.setObjectName("heading")
+        explanation = QLabel(
+            "Only cards from the selected direction will appear in the widget. "
+            "Other language pairs remain stored separately in your library."
+        )
+        explanation.setWordWrap(True)
+        explanation.setObjectName("muted")
+        self.pair_combo = QComboBox()
+        for source, target in pairs:
+            self.pair_combo.addItem(
+                f"{language_label(source)}  →  {language_label(target)}",
+                (source, target),
+            )
+        current_index = self.pair_combo.findData(current_pair)
+        self.pair_combo.setCurrentIndex(max(0, current_index))
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self._accept_pair)
+        buttons.rejected.connect(self.reject)
+        buttons.setEnabled(bool(pairs))
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(title)
+        layout.addWidget(explanation)
+        layout.addWidget(self.pair_combo)
+        if not pairs:
+            empty = QLabel("Add at least one card before choosing a deck.")
+            empty.setObjectName("muted")
+            layout.addWidget(empty)
+        layout.addWidget(buttons)
+
+    def _accept_pair(self) -> None:
+        value = self.pair_combo.currentData()
+        if not isinstance(value, tuple) or len(value) != 2:
+            return
+        self.selected_pair = (str(value[0]), str(value[1]))
+        self.accept()
+
+
 class TranslationWorker(QThread):
     completed = Signal(object)
     failed = Signal(str)

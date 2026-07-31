@@ -106,6 +106,35 @@ def test_card_meanings_drop_sentence_periods_and_duplicates(tmp_path: Path) -> N
     repository.close()
 
 
+def test_language_decks_rotate_without_crossing_pairs(tmp_path: Path) -> None:
+    repository = WordRepository(tmp_path / "decks.db")
+    ru_uk_ids = [
+        repository.add_word(
+            source_text=source,
+            source_lang="ru",
+            target_text=target,
+            target_lang="uk",
+        )
+        for source, target in (("спасибо", "дякую"), ("время", "час"))
+    ]
+    repository.add_word(
+        source_text="time",
+        source_lang="en",
+        target_text="время",
+        target_lang="ru",
+    )
+
+    shown = [repository.next_word(source_lang="ru", target_lang="uk") for _ in range(6)]
+
+    assert all(word is not None for word in shown)
+    assert {word.id for word in shown if word is not None} == set(ru_uk_ids)
+    assert all(word.direction == "RU → UK" for word in shown if word is not None)
+    assert repository.count("ru", "uk") == 2
+    assert repository.language_pairs() == [("en", "ru"), ("ru", "uk")]
+    assert repository.latest_language_pair() == ("en", "ru")
+    repository.close()
+
+
 def test_card_meanings_preserve_abbreviation_periods(tmp_path: Path) -> None:
     repository = WordRepository(tmp_path / "abbreviations.db")
     word_id = repository.add_word(

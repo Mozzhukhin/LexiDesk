@@ -335,7 +335,8 @@ PlasmoidItem {
             }
             if (pendingKind === "add" || pendingKind === "edit"
                     || pendingKind === "delete" || pendingKind === "library"
-                    || pendingKind === "settings" || pendingKind === "support") {
+                    || pendingKind === "settings" || pendingKind === "support"
+                    || pendingKind === "deck") {
                 loadNext()
                 return
             }
@@ -459,6 +460,11 @@ PlasmoidItem {
                 text: i18n("Vocabulary library")
                 icon: "view-list-details"
                 onClicked: root.launchGui("--library", "library")
+            }
+            PlasmaExtras.MenuItem {
+                text: i18n("Choose language deck")
+                icon: "view-filter"
+                onClicked: root.launchGui("--decks", "deck")
             }
             PlasmaExtras.MenuItem {
                 text: i18n("Learning analytics")

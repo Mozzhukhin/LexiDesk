@@ -13,7 +13,7 @@ from .batch import BatchAddDialog
 from .config import APP_ID, APP_NAME, database_path, settings_path
 from .database import WordRepository
 from .diagnostics import configure_logging
-from .dialogs import AddWordDialog, SettingsDialog
+from .dialogs import AddWordDialog, DeckSelectionDialog, SettingsDialog
 from .insights import AnalyticsDialog
 from .language_dialog import LanguagePackagesDialog
 from .library import LibraryDialog
@@ -69,6 +69,11 @@ def _arguments() -> argparse.Namespace:
         help="Manage downloadable offline language packages",
     )
     mode.add_argument(
+        "--decks",
+        action="store_true",
+        help="Choose the active language deck",
+    )
+    mode.add_argument(
         "--self-test",
         action="store_true",
         help="Verify the bundled offline translation runtime and exit",
@@ -111,6 +116,13 @@ def main() -> int:
         ):
             try:
                 word_id = repository.add_word(**add_dialog.word_data)
+                settings.active_source_language = str(
+                    add_dialog.word_data["source_lang"]
+                )
+                settings.active_target_language = str(
+                    add_dialog.word_data["target_lang"]
+                )
+                settings_store.save(settings)
                 schedule_example_enrichment(word_id)
             except Exception as error:
                 QMessageBox.warning(None, "Could not save card", str(error))
@@ -207,6 +219,27 @@ def main() -> int:
         language_dialog = LanguagePackagesDialog()
         language_dialog.setStyleSheet(stylesheet(settings.theme, settings.font_scale))
         language_dialog.exec()
+        repository.close()
+        return 0
+
+    if arguments.decks:
+        deck_dialog = DeckSelectionDialog(
+            repository.language_pairs(),
+            (
+                settings.active_source_language,
+                settings.active_target_language,
+            ),
+        )
+        deck_dialog.setStyleSheet(stylesheet(settings.theme, settings.font_scale))
+        if (
+            deck_dialog.exec() == deck_dialog.DialogCode.Accepted
+            and deck_dialog.selected_pair is not None
+        ):
+            (
+                settings.active_source_language,
+                settings.active_target_language,
+            ) = deck_dialog.selected_pair
+            settings_store.save(settings)
         repository.close()
         return 0
 

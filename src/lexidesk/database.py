@@ -421,9 +421,39 @@ class WordRepository:
         self.connection.commit()
         return word_id
 
-    def count(self) -> int:
-        row = self.connection.execute("SELECT COUNT(*) AS total FROM words").fetchone()
+    def count(self, source_lang: str = "", target_lang: str = "") -> int:
+        row = self.connection.execute(
+            """
+            SELECT COUNT(*) AS total FROM words
+            WHERE (? = '' OR (source_lang = ? AND target_lang = ?))
+            """,
+            (source_lang, source_lang, target_lang),
+        ).fetchone()
         return int(row["total"])
+
+    def language_pairs(self) -> list[tuple[str, str]]:
+        rows = self.connection.execute(
+            """
+            SELECT source_lang, target_lang
+            FROM words
+            GROUP BY source_lang, target_lang
+            ORDER BY source_lang, target_lang
+            """
+        ).fetchall()
+        return [(str(row["source_lang"]), str(row["target_lang"])) for row in rows]
+
+    def latest_language_pair(self) -> tuple[str, str] | None:
+        row = self.connection.execute(
+            """
+            SELECT source_lang, target_lang
+            FROM words
+            ORDER BY id DESC
+            LIMIT 1
+            """
+        ).fetchone()
+        if row is None:
+            return None
+        return str(row["source_lang"]), str(row["target_lang"])
 
     def update_word(
         self,
@@ -634,9 +664,22 @@ class WordRepository:
         ).fetchall()
         return [self._to_word(row) for row in rows]
 
-    def statistics(self) -> dict[str, int | float]:
+    def statistics(
+        self, source_lang: str = "", target_lang: str = ""
+    ) -> dict[str, int | float]:
+        if bool(source_lang) != bool(target_lang):
+            raise ValueError("Both languages are required to filter statistics.")
+        if source_lang:
+            source_lang = normalize_language_code(source_lang)
+            target_lang = normalize_language_code(target_lang)
         now = to_storage(utc_now())
         next_week = to_storage(utc_now() + timedelta(days=7))
+        parameters = {
+            "source": source_lang,
+            "target": target_lang,
+            "now": now,
+            "next_week": next_week,
+        }
         row = self.connection.execute(
             """
             SELECT
@@ -645,20 +688,30 @@ class WordRepository:
                     AS new_count,
                 SUM(CASE WHEN fsrs_state = 2 AND stability >= 30 THEN 1 ELSE 0 END)
                     AS known_count,
-                SUM(CASE WHEN due_at <= ? THEN 1 ELSE 0 END) AS due_count,
-                SUM(CASE WHEN due_at <= ? THEN 1 ELSE 0 END) AS forecast_count,
+                SUM(CASE WHEN due_at <= :now THEN 1 ELSE 0 END) AS due_count,
+                SUM(CASE WHEN due_at <= :next_week THEN 1 ELSE 0 END)
+                    AS forecast_count,
                 SUM(know_count) AS knows,
                 SUM(dont_know_count) AS misses
             FROM words
+            WHERE (:source = '' OR (
+                source_lang = :source AND target_lang = :target
+            ))
             """,
-            (now, next_week),
+            parameters,
         ).fetchone()
         reviews_today = self.connection.execute(
             """
-            SELECT COUNT(*) AS total FROM review_log
-            WHERE undone = 0
-              AND date(reviewed_at, 'localtime') = date('now', 'localtime')
-            """
+            SELECT COUNT(*) AS total
+            FROM review_log r
+            JOIN words w ON w.id = r.word_id
+            WHERE r.undone = 0
+              AND date(r.reviewed_at, 'localtime') = date('now', 'localtime')
+              AND (:source = '' OR (
+                  w.source_lang = :source AND w.target_lang = :target
+              ))
+            """,
+            parameters,
         ).fetchone()["total"]
         quiz_summary = self.connection.execute(
             """
@@ -669,18 +722,28 @@ class WordRepository:
                     THEN 1 ELSE 0 END) AS week_attempts
             FROM quiz_log q
             JOIN review_log r ON r.id = q.review_id
+            JOIN words w ON w.id = q.word_id
             WHERE r.undone = 0
-            """
+              AND (:source = '' OR (
+                  w.source_lang = :source AND w.target_lang = :target
+              ))
+            """,
+            parameters,
         ).fetchone()
         active_days = [
             date.fromisoformat(row["day"])
             for row in self.connection.execute(
                 """
-                SELECT DISTINCT date(reviewed_at, 'localtime') AS day
-                FROM review_log
-                WHERE undone = 0
+                SELECT DISTINCT date(r.reviewed_at, 'localtime') AS day
+                FROM review_log r
+                JOIN words w ON w.id = r.word_id
+                WHERE r.undone = 0
+                  AND (:source = '' OR (
+                      w.source_lang = :source AND w.target_lang = :target
+                  ))
                 ORDER BY day DESC
-                """
+                """,
+                parameters,
             ).fetchall()
             if row["day"]
         ]
@@ -717,7 +780,14 @@ class WordRepository:
             "average_difficulty": round(
                 float(
                     self.connection.execute(
-                        "SELECT AVG(difficulty) FROM words WHERE difficulty IS NOT NULL"
+                        """
+                        SELECT AVG(difficulty) FROM words
+                        WHERE difficulty IS NOT NULL
+                          AND (:source = '' OR (
+                              source_lang = :source AND target_lang = :target
+                          ))
+                        """,
+                        parameters,
                     ).fetchone()[0]
                     or 0
                 ),
@@ -730,6 +800,8 @@ class WordRepository:
         exclude_id: int | None = None,
         *,
         adaptive: bool = False,
+        source_lang: str = "",
+        target_lang: str = "",
     ) -> Word | None:
         """
         Never repeat a card within the next five displays. For decks smaller
@@ -742,56 +814,70 @@ class WordRepository:
         cards that are ready for their first quiz or due under FSRS. Passive
         browsing keeps a balanced full-deck rotation.
         """
+        if bool(source_lang) != bool(target_lang):
+            raise ValueError("Both languages are required to filter a deck.")
+        if source_lang:
+            source_lang = normalize_language_code(source_lang)
+            target_lang = normalize_language_code(target_lang)
         now = to_storage(utc_now())
         row = self.connection.execute(
             """
             WITH deck_size(total) AS (
                 SELECT COUNT(*) FROM words
+                WHERE (:source = '' OR (
+                    source_lang = :source AND target_lang = :target
+                ))
             ),
             recent_cards(id) AS (
                 SELECT id
                 FROM words
                 WHERE last_shown_at IS NOT NULL
+                  AND (:source = '' OR (
+                      source_lang = :source AND target_lang = :target
+                  ))
                 ORDER BY last_shown_at DESC, id DESC
                 LIMIT MIN(5, MAX(0, (SELECT total FROM deck_size) - 1))
             )
             SELECT * FROM words
-            WHERE (
+            WHERE (:source = '' OR (
+                    source_lang = :source AND target_lang = :target
+                ))
+              AND (
                     (SELECT total FROM deck_size) = 1
                     OR id NOT IN (SELECT id FROM recent_cards)
                 )
               AND (
-                    ? IS NULL
-                    OR id != ?
+                    :exclude IS NULL
+                    OR id != :exclude
                     OR (SELECT total FROM deck_size) = 1
                 )
             ORDER BY
                 CASE WHEN last_shown_at IS NULL THEN 0 ELSE 1 END,
-                CASE WHEN ? = 1 THEN
+                CASE WHEN :adaptive = 1 THEN
                     CASE
                         WHEN know_count + dont_know_count = 0
                              AND view_count >= 1 THEN 0
                         WHEN know_count + dont_know_count > 0
-                             AND due_at <= ? THEN 0
+                             AND due_at <= :now THEN 0
                         ELSE 1
                     END
                     ELSE 0
                 END,
-                CASE WHEN ? = 1 AND due_at <= ? THEN 0 ELSE 1 END,
+                CASE WHEN :adaptive = 1 AND due_at <= :now THEN 0 ELSE 1 END,
                 CASE
-                    WHEN ? = 1 AND know_count + dont_know_count > 0
-                         AND due_at <= ?
+                    WHEN :adaptive = 1 AND know_count + dont_know_count > 0
+                         AND due_at <= :now
                     THEN CAST(dont_know_count AS REAL)
                          / (know_count + dont_know_count)
                     ELSE 0
                 END DESC,
                 CASE
-                    WHEN ? = 1 AND due_at <= ?
+                    WHEN :adaptive = 1 AND due_at <= :now
                     THEN COALESCE(difficulty, 5)
                     ELSE 0
                 END DESC,
                 COALESCE(last_shown_at, created_at),
-                CASE WHEN due_at <= ? THEN 0 ELSE 1 END,
+                CASE WHEN due_at <= :now THEN 0 ELSE 1 END,
                 CASE
                     WHEN know_count + dont_know_count = 0 THEN 0
                     ELSE CAST(dont_know_count AS REAL)
@@ -802,19 +888,13 @@ class WordRepository:
                 RANDOM()
             LIMIT 1
             """,
-            (
-                exclude_id,
-                exclude_id,
-                int(adaptive),
-                now,
-                int(adaptive),
-                now,
-                int(adaptive),
-                now,
-                int(adaptive),
-                now,
-                now,
-            ),
+            {
+                "source": source_lang,
+                "target": target_lang,
+                "exclude": exclude_id,
+                "adaptive": int(adaptive),
+                "now": now,
+            },
         ).fetchone()
         if row is None:
             return None

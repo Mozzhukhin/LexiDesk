@@ -21,6 +21,8 @@ class Settings:
     desired_retention: float = 0.9
     autocorrect: bool = True
     autostart: bool = False
+    active_source_language: str = ""
+    active_target_language: str = ""
 
 
 class SettingsStore:
@@ -92,6 +94,12 @@ class SettingsStore:
                     if isinstance(raw.get("autostart"), bool)
                     else defaults.autostart
                 ),
+                active_source_language=_language_code(
+                    raw.get("active_source_language")
+                ),
+                active_target_language=_language_code(
+                    raw.get("active_target_language")
+                ),
             )
         except (OSError, ValueError, TypeError):
             return Settings()
@@ -124,3 +132,14 @@ def _optional_int(value: object) -> int | None:
     if isinstance(value, bool) or not isinstance(value, int):
         return None
     return value
+
+
+def _language_code(value: object) -> str:
+    if not isinstance(value, str):
+        return ""
+    from .languages import normalize_language_code
+
+    try:
+        return normalize_language_code(value) if value else ""
+    except ValueError:
+        return ""

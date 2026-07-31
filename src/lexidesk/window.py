@@ -39,7 +39,7 @@ from .batch import BatchAddDialog
 from .config import database_path
 from .database import WordRepository
 from .diagnostics_dialog import DiagnosticsDialog
-from .dialogs import AddWordDialog, SettingsDialog
+from .dialogs import AddWordDialog, DeckSelectionDialog, SettingsDialog
 from .enrichment import needs_example_enrichment
 from .insights import AnalyticsDialog
 from .library import LibraryDialog
@@ -147,6 +147,8 @@ class LexiDeskWindow(QMainWindow):
         add_button.clicked.connect(self.add_word)
 
         card_menu.addSeparator()
+        deck_action = card_menu.addAction("Choose language deck")
+        deck_action.triggered.connect(self.choose_language_deck)
         edit_action = card_menu.addAction("Edit current card")
         edit_action.triggered.connect(self.edit_current_word)
         delete_action = card_menu.addAction("Delete current card")
@@ -327,6 +329,8 @@ class LexiDeskWindow(QMainWindow):
         self.current_word = self.repository.next_word(
             previous_id,
             adaptive=self.settings.practice_mode == "mixed",
+            source_lang=self.settings.active_source_language,
+            target_lang=self.settings.active_target_language,
         )
         self.seconds_left = self.settings.rotation_seconds
         self._update_countdown()
@@ -337,7 +341,10 @@ class LexiDeskWindow(QMainWindow):
         word = self.current_word
         enabled = word is not None
         self.next_button.setEnabled(enabled)
-        stats = self.repository.statistics()
+        stats = self.repository.statistics(
+            self.settings.active_source_language,
+            self.settings.active_target_language,
+        )
         reviews_today = int(stats["reviews_today"])
         self.goal_label.setText(f"{int(stats['total'])} words")
         self.goal_label.setToolTip(
@@ -605,6 +612,9 @@ class LexiDeskWindow(QMainWindow):
             return
         try:
             word_id = self.repository.add_word(**dialog.word_data)
+            self.settings.active_source_language = str(dialog.word_data["source_lang"])
+            self.settings.active_target_language = str(dialog.word_data["target_lang"])
+            self.settings_store.save(self.settings)
             schedule_example_enrichment(word_id)
             self._example_enrichment_scheduled.add(word_id)
         except sqlite3.IntegrityError:
@@ -617,6 +627,26 @@ class LexiDeskWindow(QMainWindow):
         self.current_word = self.repository.get_word(word_id)
         self.seconds_left = self.settings.rotation_seconds
         self._render_card()
+
+    def choose_language_deck(self) -> None:
+        dialog = DeckSelectionDialog(
+            self.repository.language_pairs(),
+            (
+                self.settings.active_source_language,
+                self.settings.active_target_language,
+            ),
+            self,
+        )
+        dialog.setStyleSheet(self.styleSheet())
+        if dialog.exec() != dialog.DialogCode.Accepted or dialog.selected_pair is None:
+            return
+        (
+            self.settings.active_source_language,
+            self.settings.active_target_language,
+        ) = dialog.selected_pair
+        self.settings_store.save(self.settings)
+        self.current_word = None
+        self.next_card()
 
     def open_settings(self) -> None:
         dialog = SettingsDialog(self.settings, self)

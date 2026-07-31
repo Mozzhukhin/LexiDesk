@@ -37,3 +37,22 @@ def test_invalid_settings_are_sanitized(tmp_path: Path) -> None:
     assert settings.desired_retention == 0.99
     assert settings.autocorrect is True
     assert settings.autostart is False
+
+
+def test_active_language_deck_is_persisted_and_validated(tmp_path: Path) -> None:
+    path = tmp_path / "settings.json"
+    store = SettingsStore(path)
+    settings = store.load()
+    settings.active_source_language = "ru"
+    settings.active_target_language = "uk"
+    store.save(settings)
+
+    restored = store.load()
+
+    assert restored.active_source_language == "ru"
+    assert restored.active_target_language == "uk"
+
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    raw["active_source_language"] = "../bad"
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    assert store.load().active_source_language == ""

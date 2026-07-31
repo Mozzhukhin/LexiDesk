@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Keep card rotation, adaptive scheduling, and quizzes inside the explicitly
+  selected source-to-target deck; persist the latest added pair and provide a
+  dedicated deck chooser without merging language data.
 - Accept both current and legacy Argos model layouts, including `bpe.model`
   tokenizers and packages without an optional CTranslate2 `config.json`.
 - Move language management into a dedicated Languages tab behind the + button;

@@ -6,6 +6,7 @@ from pathlib import Path
 from lexidesk.api import (
     adaptive_quiz_due,
     card_payload,
+    execute_request,
     mixed_quiz_due,
     quiz_choices,
     quiz_variants,
@@ -238,6 +239,37 @@ def test_adaptive_mode_introduces_then_quizzes_new_cards(tmp_path: Path) -> None
     assert tested is not None
     assert tested.view_count == 2
     assert adaptive_quiz_due(tested)
+    repository.close()
+
+
+def test_card_and_review_requests_keep_the_selected_language_deck(
+    tmp_path: Path,
+) -> None:
+    repository = WordRepository(tmp_path / "request-decks.db")
+    uk_id = repository.add_word(
+        source_text="спасибо",
+        source_lang="ru",
+        target_text="дякую",
+        target_lang="uk",
+    )
+    repository.add_word(
+        source_text="thanks",
+        source_lang="en",
+        target_text="спасибо",
+        target_lang="ru",
+    )
+    pair = {"source_lang": "ru", "target_lang": "uk"}
+
+    card = execute_request(repository, {"command": "card", **pair})
+    reviewed = execute_request(
+        repository,
+        {"command": "review", "word_id": uk_id, "rating": "good", **pair},
+    )
+    stats = execute_request(repository, {"command": "stats", **pair})
+
+    assert card["direction"] == "RU → UK"
+    assert reviewed["direction"] == "RU → UK"
+    assert stats["total"] == 1
     repository.close()
 
 

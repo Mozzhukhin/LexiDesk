@@ -407,10 +407,14 @@ def execute_request(
     command = str(request.get("command", ""))
     if command == "card":
         exclude = request.get("exclude")
+        source_lang = str(request.get("source_lang", ""))
+        target_lang = str(request.get("target_lang", ""))
         return card_payload(
             repository.next_word(
                 int(exclude) if exclude is not None else None,
                 adaptive=bool(request.get("adaptive", False)),
+                source_lang=source_lang,
+                target_lang=target_lang,
             ),
             repository,
         )
@@ -433,6 +437,8 @@ def execute_request(
             repository.next_word(
                 word_id,
                 adaptive=bool(request.get("adaptive", False)),
+                source_lang=str(request.get("source_lang", "")),
+                target_lang=str(request.get("target_lang", "")),
             ),
             repository,
         )
@@ -451,7 +457,9 @@ def execute_request(
             "suggested_rating": result.suggested_rating,
         }
     if command == "stats":
-        return repository.statistics()
+        source_lang = str(request.get("source_lang", ""))
+        target_lang = str(request.get("target_lang", ""))
+        return repository.statistics(source_lang, target_lang)
     if command == "analytics":
         return {
             "statistics": repository.statistics(),

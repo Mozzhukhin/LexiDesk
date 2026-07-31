@@ -6,10 +6,11 @@ from typing import Any
 
 from .api import execute_request
 from .backup import ensure_daily_backup
-from .config import database_path
+from .config import database_path, settings_path
 from .database import WordRepository
 from .diagnostics import configure_logging
 from .service_client import request_service
+from .settings import SettingsStore
 
 
 def parser() -> argparse.ArgumentParser:
@@ -92,9 +93,34 @@ def main() -> int:
     try:
         args = parser().parse_args()
         request = request_from_arguments(args)
+        if args.command in {"card", "review", "stats"}:
+            settings_store = SettingsStore(settings_path())
+            settings = settings_store.load()
+            if not (
+                settings.active_source_language and settings.active_target_language
+            ):
+                repository = WordRepository(database_path())
+                try:
+                    latest_pair = repository.latest_language_pair()
+                finally:
+                    repository.close()
+                if latest_pair is not None:
+                    (
+                        settings.active_source_language,
+                        settings.active_target_language,
+                    ) = latest_pair
+                    settings_store.save(settings)
+            if settings.active_source_language and settings.active_target_language:
+                request["source_lang"] = settings.active_source_language
+                request["target_lang"] = settings.active_target_language
         payload = request_service(request)
         if payload is None:
-            payload = run()
+            repository = WordRepository(database_path())
+            try:
+                ensure_daily_backup(repository)
+                payload = execute_request(repository, request)
+            finally:
+                repository.close()
         if payload.get("error"):
             raise RuntimeError(str(payload["error"]))
     except Exception as error:
