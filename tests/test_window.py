@@ -45,7 +45,8 @@ def test_standalone_translation_quiz_records_fsrs_review(tmp_path: Path) -> None
     window.advance_timer.stop()
 
     assert repository.get_word(1).know_count == 1
-    assert window.answer_feedback.text() == "Correct"
+    assert window.answer_feedback.text() == ""
+    assert window.answer_feedback.isHidden()
     window.tick_timer.stop()
     repository.close()
 

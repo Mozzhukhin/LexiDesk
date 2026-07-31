@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Remove redundant correct/incorrect captions from choice quizzes and rely on
+  green/red option highlighting before the automatic advance.
 - Unify opposite directions into one bidirectional vocabulary card while
   scheduling, scoring, and tracking each recall direction independently.
 - Alternate new cards across both sides, prioritize the weaker direction over

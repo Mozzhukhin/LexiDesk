@@ -544,13 +544,8 @@ class LexiDeskWindow(QMainWindow):
             self.style().unpolish(button)
             self.style().polish(button)
         self.translation_label.show()
-        self.answer_feedback.setObjectName("know" if correct else "unknown")
-        self.answer_feedback.setText(
-            "Correct" if correct else f"Incorrect — correct answer: {answer}"
-        )
-        self.answer_feedback.show()
-        self.style().unpolish(self.answer_feedback)
-        self.style().polish(self.answer_feedback)
+        self.answer_feedback.clear()
+        self.answer_feedback.hide()
         self._record_quiz("good" if correct else "again", selected, answer)
 
     def _record_quiz(self, rating: str, selected: str, correct: str) -> None:

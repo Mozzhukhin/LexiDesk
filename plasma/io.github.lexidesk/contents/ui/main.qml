@@ -155,14 +155,11 @@ PlasmoidItem {
         if (answer === quizAnswer) {
             suggestedRating = "good"
             quizRating = "know"
-            answerFeedback = i18n("Correct — next word…")
         } else {
             suggestedRating = "again"
             quizRating = "dont-know"
-            answerFeedback = i18n(
-                "Incorrect — correct answer: %1",
-                quizAnswer)
         }
+        answerFeedback = ""
         choiceAdvanceTimer.restart()
     }
 
@@ -862,7 +859,7 @@ PlasmoidItem {
                         Layout.minimumHeight: visible ? 20 : 0
                         horizontalAlignment: Text.AlignHCenter
                         text: answerFeedback
-                        visible: answerChecked
+                        visible: answerChecked && !choiceMode
                         wrapMode: Text.Wrap
                         font.bold: choiceMode
                         font.pixelSize: choiceMode ? 13 : 12

@@ -59,7 +59,8 @@ def test_widget_uses_simple_reviews_and_four_choice_quizzes() -> None:
     assert "Kirigami.Theme.negativeTextColor" in qml
     assert "id: choiceAdvanceTimer" in qml
     assert "interval: 1000" in qml
-    assert "Incorrect — correct answer" in qml
+    assert "Incorrect — correct answer" not in qml
+    assert "visible: answerChecked && !choiceMode" in qml
     assert "exampleColumn.implicitHeight" in qml
     assert "id: examplePanel" in qml
     assert "&& primaryExampleText.length > 0" in qml
