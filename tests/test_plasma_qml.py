@@ -32,12 +32,12 @@ def test_widget_uses_simple_reviews_and_four_choice_quizzes() -> None:
 
     assert 'text: i18n("Don’t know")' not in qml
     assert 'text: i18n("Know")' not in qml
-    assert 'text: i18n("Next")' in qml
+    assert 'text: i18n("Next") + "  →"' in qml
     assert 'quizRating = "dont-know"' in qml
     assert 'quizRating = "know"' in qml
     assert "choiceOptions = quiz.choices || []" in qml
     assert "choiceMode = false" in qml
-    assert "id: quizMenu" in qml
+    assert "id: appMenu" in qml
     assert 'root.selectQuizMode("typing")' in qml
     assert 'text: i18n("Mixed — every fifth card")' in qml
     assert "mixedCardCounter < 5" in qml
@@ -60,6 +60,23 @@ def test_widget_uses_simple_reviews_and_four_choice_quizzes() -> None:
     assert "Easing.OutCubic" in qml
     assert 'text: i18n("Hard")' not in qml
     assert 'text: i18n("Easy")' not in qml
+    assert "Undo last review" not in qml
+    assert "undoReview" not in qml
+
+
+def test_widget_has_compact_navigation_and_hover_actions() -> None:
+    qml = QML_PATH.read_text(encoding="utf-8")
+
+    assert "id: appMenu" in qml
+    assert 'text: i18n("Vocabulary library")' in qml
+    assert 'text: i18n("Settings")' in qml
+    assert "id: countdownProgress" in qml
+    assert "until the next card" in qml
+    assert "id: contentHover" in qml
+    assert 'text: i18n("Edit card")' in qml
+    assert 'text: i18n("Hide for now")' in qml
+    assert 'text: i18n("Delete card…")' in qml
+    assert "maximumLineCount: 2" in qml
 
 
 def test_widget_keeps_english_above_russian_on_regular_cards() -> None:

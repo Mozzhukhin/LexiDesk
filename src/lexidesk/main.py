@@ -7,15 +7,16 @@ import sys
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QMessageBox
 
+from .autostart import set_autostart
 from .backup import ensure_daily_backup
 from .batch import BatchAddDialog
 from .config import APP_ID, APP_NAME, database_path, settings_path
 from .database import WordRepository
 from .diagnostics import configure_logging
-from .dialogs import AddWordDialog
+from .dialogs import AddWordDialog, SettingsDialog
 from .insights import AnalyticsDialog
 from .library import LibraryDialog
-from .service_client import schedule_example_enrichment
+from .service_client import request_service, schedule_example_enrichment
 from .settings import SettingsStore
 from .themes import stylesheet
 from .translation import OfflineTranslator
@@ -38,6 +39,9 @@ def _arguments() -> argparse.Namespace:
     )
     mode.add_argument("--edit", type=int, metavar="ID", help="Edit a vocabulary card")
     mode.add_argument(
+        "--delete", type=int, metavar="ID", help="Delete a vocabulary card"
+    )
+    mode.add_argument(
         "--batch",
         action="store_true",
         help="Open the batch vocabulary importer",
@@ -46,6 +50,11 @@ def _arguments() -> argparse.Namespace:
         "--analytics",
         action="store_true",
         help="Open learning analytics",
+    )
+    mode.add_argument(
+        "--settings",
+        action="store_true",
+        help="Open only the application settings",
     )
     return parser.parse_args()
 
@@ -117,6 +126,23 @@ def main() -> int:
         repository.close()
         return 0
 
+    if arguments.delete is not None:
+        try:
+            word = repository.get_word(arguments.delete)
+        except KeyError:
+            QMessageBox.warning(None, "Card not found", "That card no longer exists.")
+            repository.close()
+            return 1
+        answer = QMessageBox.question(
+            None,
+            "Delete card",
+            f"Delete “{word.source_text}” and its review history?",
+        )
+        if answer == QMessageBox.StandardButton.Yes:
+            repository.delete_word(word.id)
+        repository.close()
+        return 0
+
     if arguments.batch:
         batch_dialog = BatchAddDialog(repository, translator)
         batch_dialog.setStyleSheet(stylesheet(settings.theme, settings.font_scale))
@@ -128,6 +154,22 @@ def main() -> int:
         analytics_dialog = AnalyticsDialog(repository, settings.daily_goal)
         analytics_dialog.setStyleSheet(stylesheet(settings.theme, settings.font_scale))
         analytics_dialog.exec()
+        repository.close()
+        return 0
+
+    if arguments.settings:
+        settings_dialog = SettingsDialog(settings)
+        settings_dialog.setStyleSheet(stylesheet(settings.theme, settings.font_scale))
+        if settings_dialog.exec() == settings_dialog.DialogCode.Accepted:
+            settings_dialog.apply_to(settings)
+            settings_store.save(settings)
+            set_autostart(settings.autostart)
+            request_service(
+                {
+                    "command": "configure",
+                    "desired_retention": settings.desired_retention,
+                }
+            )
         repository.close()
         return 0
 

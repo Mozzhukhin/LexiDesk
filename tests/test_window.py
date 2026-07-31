@@ -70,3 +70,15 @@ def test_standalone_keeps_english_above_russian(tmp_path: Path) -> None:
     assert window.translation_label.text() == "ограниченный"
     window.tick_timer.stop()
     repository.close()
+
+
+def test_standalone_uses_mouse_only_next_and_compact_progress(tmp_path: Path) -> None:
+    window, repository = _window(tmp_path)
+    window.tick_timer.stop()
+
+    assert window.next_button.shortcut().isEmpty()
+    assert not hasattr(window, "undo_review")
+    assert window.countdown_progress.isTextVisible() is False
+    assert "until the next card" in window.countdown_progress.toolTip()
+
+    repository.close()

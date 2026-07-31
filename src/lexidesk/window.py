@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMenu,
     QMessageBox,
+    QProgressBar,
     QPushButton,
     QSizePolicy,
     QVBoxLayout,
@@ -106,10 +107,14 @@ class LexiDeskWindow(QMainWindow):
         self.goal_label.setObjectName("muted")
         self.goal_label.setToolTip("Reviews completed today")
 
-        self.practice_button = QPushButton("▦")
-        self.practice_button.setObjectName("icon")
-        self.practice_button.setToolTip("Choose how LexiDesk tests your knowledge")
-        practice_menu = QMenu(self.practice_button)
+        self.practice_label = QLabel()
+        self.practice_label.setObjectName("modeBadge")
+
+        more_button = QPushButton("⋮")
+        more_button.setObjectName("icon")
+        more_button.setToolTip("LexiDesk menu")
+        card_menu = QMenu(more_button)
+        practice_menu = card_menu.addMenu("Practice mode")
         practice_group = QActionGroup(practice_menu)
         practice_group.setExclusive(True)
         practice_modes = (
@@ -131,17 +136,13 @@ class LexiDeskWindow(QMainWindow):
             )
             practice_group.addAction(action)
             self.practice_actions[mode] = action
-        self.practice_button.setMenu(practice_menu)
 
         add_button = QPushButton("+")
         add_button.setObjectName("icon")
         add_button.setToolTip("Add a word or phrase")
         add_button.clicked.connect(self.add_word)
 
-        more_button = QPushButton("⋮")
-        more_button.setObjectName("icon")
-        more_button.setToolTip("Card actions")
-        card_menu = QMenu(more_button)
+        card_menu.addSeparator()
         edit_action = card_menu.addAction("Edit current card")
         edit_action.triggered.connect(self.edit_current_word)
         delete_action = card_menu.addAction("Delete current card")
@@ -170,7 +171,7 @@ class LexiDeskWindow(QMainWindow):
         header.addStretch()
         header.addWidget(self.goal_label)
         header.addWidget(self.direction_label)
-        header.addWidget(self.practice_button)
+        header.addWidget(self.practice_label)
         header.addWidget(add_button)
         header.addWidget(more_button)
         header.addWidget(close_button)
@@ -192,11 +193,15 @@ class LexiDeskWindow(QMainWindow):
         self.word_label.setObjectName("word")
         self.word_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.word_label.setWordWrap(True)
+        self.word_label.setMinimumHeight(38)
+        self.word_label.setMaximumHeight(72)
 
         self.translation_label = QLabel("Add your first word with the + button")
         self.translation_label.setObjectName("translation")
         self.translation_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.translation_label.setWordWrap(True)
+        self.translation_label.setMinimumHeight(30)
+        self.translation_label.setMaximumHeight(58)
 
         self.reveal_button = QPushButton("Reveal translation")
         self.reveal_button.setShortcut("Space")
@@ -236,12 +241,34 @@ class LexiDeskWindow(QMainWindow):
         self.alternatives_label.setObjectName("metadata")
         self.alternatives_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.alternatives_label.setWordWrap(True)
+        self.alternatives_label.setMaximumHeight(24)
 
         self.example_label = QLabel()
         self.example_label.setObjectName("example")
         self.example_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.example_label.setWordWrap(True)
         self.example_label.setMaximumHeight(82)
+
+        self.card_actions = QWidget(self.card_frame)
+        self.card_actions.setMaximumHeight(28)
+        action_layout = QHBoxLayout(self.card_actions)
+        action_layout.setContentsMargins(0, 0, 0, 0)
+        action_layout.setSpacing(2)
+        action_layout.addStretch()
+        for label, tooltip, callback in (
+            ("✎", "Edit card", self.edit_current_word),
+            ("⇥", "Hide for now", self.next_card),
+            ("✕", "Delete card…", self.delete_current_word),
+            ("☰", "Open vocabulary library", self.open_library),
+        ):
+            action_button = QPushButton(label)
+            action_button.setObjectName("icon")
+            action_button.setToolTip(tooltip)
+            action_button.clicked.connect(callback)
+            action_layout.addWidget(action_button)
+        self.card_actions.hide()
+        self.card_frame.setMouseTracking(True)
+        self.card_frame.installEventFilter(self)
 
         card_layout = QVBoxLayout(self.card_frame)
         card_layout.setContentsMargins(18, 12, 18, 12)
@@ -258,34 +285,22 @@ class LexiDeskWindow(QMainWindow):
         card_layout.addWidget(self.example_label)
         card_layout.addStretch()
 
-        undo_button = QPushButton("Undo")
-        undo_button.setObjectName("secondary")
-        undo_button.setToolTip("Undo the most recent review")
-        undo_button.setShortcut("Ctrl+Z")
-        undo_button.clicked.connect(self.undo_review)
-
-        self.next_button = QPushButton("Next")
+        self.next_button = QPushButton("Next  →")
         self.next_button.setObjectName("primary")
-        self.next_button.setShortcut("N")
         self.next_button.setToolTip("Show another card without recording a review")
         self.next_button.clicked.connect(self.next_card)
 
-        self.countdown_label = QLabel("1:30")
-        self.countdown_label.setObjectName("countdown")
+        self.countdown_progress = QProgressBar()
+        self.countdown_progress.setObjectName("countdown")
+        self.countdown_progress.setRange(0, max(1, self.settings.rotation_seconds))
+        self.countdown_progress.setTextVisible(False)
+        self.countdown_progress.setFixedHeight(4)
+        self._update_countdown()
 
-        footer = QGridLayout()
-        footer.setHorizontalSpacing(6)
-        footer.setVerticalSpacing(3)
-        footer.addWidget(self.next_button, 0, 0, 1, 2)
-        footer.addWidget(undo_button, 1, 0)
-        for column in range(2):
-            footer.setColumnStretch(column, 1)
-        footer.addWidget(
-            self.countdown_label,
-            1,
-            2,
-            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
-        )
+        footer = QVBoxLayout()
+        footer.setSpacing(4)
+        footer.addWidget(self.next_button)
+        footer.addWidget(self.countdown_progress)
 
         layout = QVBoxLayout(root)
         layout.setContentsMargins(10, 8, 10, 9)
@@ -293,6 +308,7 @@ class LexiDeskWindow(QMainWindow):
         layout.addLayout(header)
         layout.addWidget(self.card_frame, 1)
         layout.addLayout(footer)
+        QTimer.singleShot(0, self._position_card_actions)
 
     def _apply_appearance(self) -> None:
         self.setStyleSheet(stylesheet(self.settings.theme, self.settings.font_scale))
@@ -313,9 +329,10 @@ class LexiDeskWindow(QMainWindow):
         self.next_button.setEnabled(enabled)
         stats = self.repository.statistics()
         reviews_today = int(stats["reviews_today"])
-        self.goal_label.setText(
-            f"{min(reviews_today, self.settings.daily_goal)} / "
-            f"{self.settings.daily_goal}"
+        self.goal_label.setText(f"{int(stats['total'])} words")
+        self.goal_label.setToolTip(
+            f"{min(reviews_today, self.settings.daily_goal)} of "
+            f"{self.settings.daily_goal} daily reviews"
         )
         self.answer_edit.clear()
         self.answer_edit.setEnabled(True)
@@ -338,10 +355,10 @@ class LexiDeskWindow(QMainWindow):
             self.reveal_button.hide()
             self.alternatives_label.clear()
             self.example_label.clear()
-            self.practice_button.setEnabled(False)
+            self.practice_label.setEnabled(False)
             return
 
-        self.practice_button.setEnabled(True)
+        self.practice_label.setEnabled(True)
 
         target_language = "RU" if word.source_lang == "en" else "EN"
         self.direction_label.setText(f"{word.source_lang.upper()} → {target_language}")
@@ -426,10 +443,18 @@ class LexiDeskWindow(QMainWindow):
             "typing": "Type the translation",
         }
         selected = labels.get(self.settings.practice_mode, "Off")
-        self.practice_button.setToolTip(f"Practice mode: {selected}")
-        self.practice_button.setProperty("active", self.settings.practice_mode != "off")
-        self.style().unpolish(self.practice_button)
-        self.style().polish(self.practice_button)
+        short_labels = {
+            "off": "",
+            "mixed": "Mixed",
+            "translation": "Translation",
+            "reverse": "Reverse",
+            "cloze": "Sentence",
+            "context": "Context",
+            "typing": "Typing",
+        }
+        self.practice_label.setText(short_labels.get(self.settings.practice_mode, ""))
+        self.practice_label.setVisible(self.settings.practice_mode != "off")
+        self.practice_label.setToolTip(f"Practice mode: {selected}")
 
     def _show_quiz(self, quiz: dict[str, Any]) -> None:
         self._current_quiz = quiz
@@ -485,7 +510,9 @@ class LexiDeskWindow(QMainWindow):
             self.style().polish(button)
         self.translation_label.show()
         self.answer_feedback.setObjectName("know" if correct else "unknown")
-        self.answer_feedback.setText("Correct" if correct else "Incorrect")
+        self.answer_feedback.setText(
+            "Correct" if correct else f"Incorrect — correct answer: {answer}"
+        )
         self.answer_feedback.show()
         self.style().unpolish(self.answer_feedback)
         self.style().polish(self.answer_feedback)
@@ -544,20 +571,6 @@ class LexiDeskWindow(QMainWindow):
         duration = self.review_clock.elapsed() if self.review_clock.isValid() else None
         self.repository.review(self.current_word.id, rating, duration)
         self.next_card()
-
-    def undo_review(self) -> None:
-        restored = self.repository.undo_last_review()
-        if restored is None:
-            QMessageBox.information(
-                self,
-                "Nothing to undo",
-                "There is no recent FSRS review available to undo.",
-            )
-            return
-        self.current_word = restored
-        self.seconds_left = self.settings.rotation_seconds
-        self.review_clock.restart()
-        self._render_card()
 
     def add_word(self) -> None:
         dialog = AddWordDialog(self.translator, self)
@@ -677,7 +690,11 @@ class LexiDeskWindow(QMainWindow):
 
     def _update_countdown(self) -> None:
         minutes, seconds = divmod(max(0, self.seconds_left), 60)
-        self.countdown_label.setText(f"{minutes}:{seconds:02d}")
+        self.countdown_progress.setRange(0, max(1, self.settings.rotation_seconds))
+        self.countdown_progress.setValue(max(0, self.seconds_left))
+        self.countdown_progress.setToolTip(
+            f"{minutes}:{seconds:02d} until the next card"
+        )
 
     def _interaction_active(self) -> bool:
         return (
@@ -686,6 +703,11 @@ class LexiDeskWindow(QMainWindow):
         )
 
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        if hasattr(self, "card_frame") and watched is self.card_frame:
+            if event.type() == QEvent.Type.Enter:
+                self.card_actions.setVisible(self.current_word is not None)
+            elif event.type() == QEvent.Type.Leave:
+                self.card_actions.hide()
         if watched is self.centralWidget():
             if event.type() == QEvent.Type.MouseButtonPress:
                 mouse_event = event
@@ -709,8 +731,18 @@ class LexiDeskWindow(QMainWindow):
                     return True
         return super().eventFilter(watched, event)
 
+    def _position_card_actions(self) -> None:
+        self.card_actions.adjustSize()
+        self.card_actions.move(
+            max(8, self.card_frame.width() - self.card_actions.width() - 8),
+            8,
+        )
+        self.card_actions.raise_()
+
     def resizeEvent(self, event: QResizeEvent) -> None:
         super().resizeEvent(event)
+        if hasattr(self, "card_actions"):
+            self._position_card_actions()
         self.settings.width = self.width()
         self.settings.height = self.height()
 

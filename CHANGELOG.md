@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Simplified the widget header and moved practice selection and management
+  tools into one compact menu.
+- Added hover-only card actions for editing, temporarily skipping, safely
+  deleting, and opening the vocabulary library.
+- Replaced the countdown text with a compact progress bar and removed the
+  `Undo last review` control from both desktop interfaces.
+- Stabilized long-card layouts and improved quiz answer emphasis.
+
 - Move batch translation to a responsive, cancellable background worker.
 - Reduce quiz payload generation from a full-deck scan to a bounded SQL query.
 - Replace generic example fallbacks with compact contextual bilingual sentences.

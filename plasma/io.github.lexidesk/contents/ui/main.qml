@@ -35,6 +35,7 @@ PlasmoidItem {
     property int failureCount: 0
     property int secondsLeft: plasmoid.configuration.rotationSeconds
     property int dueCount: 0
+    property int totalCount: 0
     property int reviewsToday: 0
     property bool answerChecked: false
     property string answerFeedback: ""
@@ -200,6 +201,18 @@ PlasmoidItem {
         }
     }
 
+    function quizModeLabel() {
+        switch (quizMode) {
+        case "mixed": return i18n("Mixed")
+        case "translation": return i18n("Translation")
+        case "reverse": return i18n("Reverse")
+        case "cloze": return i18n("Sentence")
+        case "context": return i18n("Context")
+        case "typing": return i18n("Typing")
+        default: return ""
+        }
+    }
+
     function applyQuizMode() {
         if (quizMode === "off")
             return
@@ -222,10 +235,6 @@ PlasmoidItem {
             var selected = available[Math.floor(Math.random() * available.length)]
             startQuiz(selected, false)
         }
-    }
-
-    function undoReview() {
-        runBridge("undo", "undo")
     }
 
     function launchGui(arguments, kind) {
@@ -307,7 +316,9 @@ PlasmoidItem {
                 retryTimer.restart()
                 return
             }
-            if (pendingKind === "add" || pendingKind === "library") {
+            if (pendingKind === "add" || pendingKind === "edit"
+                    || pendingKind === "delete" || pendingKind === "library"
+                    || pendingKind === "settings") {
                 loadNext()
                 return
             }
@@ -324,6 +335,7 @@ PlasmoidItem {
                 if (payload.error) {
                     errorText = payload.error
                 } else if (pendingKind === "stats") {
+                    totalCount = Number(payload.total || 0)
                     dueCount = Number(payload.due || 0)
                     reviewsToday = Number(payload.reviews_today || 0)
                 } else if (pendingKind === "check") {
@@ -348,11 +360,6 @@ PlasmoidItem {
                     }
                     if (choiceMode)
                         choiceAdvanceTimer.restart()
-                } else if (pendingKind === "undo") {
-                    if (payload.undone)
-                        applyCard(payload)
-                    else
-                        errorText = i18n("There is no recent review to undo.")
                 } else {
                     applyCard(payload)
                     Qt.callLater(requestStats)
@@ -428,9 +435,39 @@ PlasmoidItem {
         border.color: Qt.alpha(Kirigami.Theme.textColor, 0.18)
 
         PlasmaExtras.Menu {
-            id: quizMenu
-            visualParent: quizMenuButton
+            id: appMenu
+            visualParent: appMenuButton
             placement: PlasmaExtras.Menu.BottomPosedLeftAlignedPopup
+
+            PlasmaExtras.MenuItem {
+                text: i18n("Vocabulary library")
+                icon: "view-list-details"
+                onClicked: root.launchGui("--library", "library")
+            }
+            PlasmaExtras.MenuItem {
+                text: i18n("Learning analytics")
+                icon: "office-chart-line"
+                onClicked: root.launchGui("--analytics", "library")
+            }
+            PlasmaExtras.MenuItem {
+                text: i18n("Batch add from text")
+                icon: "document-import"
+                onClicked: root.launchGui("--batch", "library")
+            }
+            PlasmaExtras.MenuItem {
+                text: i18n("Settings")
+                icon: "configure"
+                onClicked: root.launchGui("--settings", "settings")
+            }
+
+            PlasmaExtras.MenuItem {
+                separator: true
+            }
+
+            PlasmaExtras.MenuItem {
+                text: i18n("Practice mode")
+                enabled: false
+            }
 
             PlasmaExtras.MenuItem {
                 text: i18n("Off — normal cards")
@@ -500,8 +537,7 @@ PlasmoidItem {
                 Item { Layout.fillWidth: true }
 
                 PlasmaComponents.Label {
-                    text: Math.min(reviewsToday, plasmoid.configuration.dailyGoal)
-                        + "/" + plasmoid.configuration.dailyGoal
+                    text: i18np("%1 word", "%1 words", totalCount)
                     opacity: 0.55
                     font.pixelSize: 10
                 }
@@ -512,17 +548,12 @@ PlasmoidItem {
                     font.pixelSize: 10
                 }
 
-                PlasmaComponents.ToolButton {
-                    id: quizMenuButton
-                    icon.name: "applications-education-language"
-                    text: i18n("Practice")
-                    display: PlasmaComponents.AbstractButton.IconOnly
-                    enabled: loaded && !empty && !busy
-                    checked: quizMenu.status === PlasmaExtras.Menu.Open
-                        || root.quizMode !== "off"
-                    onPressed: quizMenu.openRelative()
-                    PlasmaComponents.ToolTip.text: i18n("Choose a quiz")
-                    PlasmaComponents.ToolTip.visible: hovered
+                PlasmaComponents.Label {
+                    text: root.quizModeLabel()
+                    visible: text.length > 0
+                    color: Kirigami.Theme.highlightColor
+                    opacity: 0.85
+                    font.pixelSize: 10
                 }
 
                 PlasmaComponents.ToolButton {
@@ -533,10 +564,14 @@ PlasmoidItem {
                 }
 
                 PlasmaComponents.ToolButton {
-                    icon.name: "view-list-details"
-                    text: i18n("Open library")
+                    id: appMenuButton
+                    icon.name: "application-menu"
+                    text: i18n("LexiDesk menu")
                     display: PlasmaComponents.AbstractButton.IconOnly
-                    onClicked: launchGui("--library", "library")
+                    checked: appMenu.status === PlasmaExtras.Menu.Open
+                    onPressed: appMenu.openRelative()
+                    PlasmaComponents.ToolTip.text: text
+                    PlasmaComponents.ToolTip.visible: hovered
                 }
             }
 
@@ -549,6 +584,67 @@ PlasmoidItem {
                 color: Qt.alpha(Kirigami.Theme.textColor, 0.035)
                 border.width: 1
                 border.color: Qt.alpha(Kirigami.Theme.textColor, 0.1)
+
+                HoverHandler {
+                    id: contentHover
+                    acceptedDevices: PointerDevice.Mouse
+                }
+
+                Row {
+                    anchors.top: parent.top
+                    anchors.right: parent.right
+                    anchors.margins: 7
+                    spacing: 2
+                    z: 3
+                    visible: loaded && !empty
+                    opacity: contentHover.hovered ? 1 : 0
+
+                    Behavior on opacity {
+                        NumberAnimation { duration: 120 }
+                    }
+
+                    PlasmaComponents.ToolButton {
+                        icon.name: "document-edit"
+                        text: i18n("Edit card")
+                        display: PlasmaComponents.AbstractButton.IconOnly
+                        enabled: !busy
+                        onClicked: root.launchGui(
+                            "--edit " + root.cardId, "edit")
+                        PlasmaComponents.ToolTip.text: text
+                        PlasmaComponents.ToolTip.visible: hovered
+                    }
+
+                    PlasmaComponents.ToolButton {
+                        icon.name: "go-next-skip"
+                        text: i18n("Hide for now")
+                        display: PlasmaComponents.AbstractButton.IconOnly
+                        enabled: !busy
+                        onClicked: root.loadNext()
+                        PlasmaComponents.ToolTip.text: text
+                        PlasmaComponents.ToolTip.visible: hovered
+                    }
+
+                    PlasmaComponents.ToolButton {
+                        icon.name: "edit-delete"
+                        text: i18n("Delete card…")
+                        display: PlasmaComponents.AbstractButton.IconOnly
+                        enabled: !busy
+                        onClicked: root.launchGui(
+                            "--delete " + root.cardId, "delete")
+                        PlasmaComponents.ToolTip.text: text
+                        PlasmaComponents.ToolTip.visible: hovered
+                    }
+
+                    PlasmaComponents.ToolButton {
+                        icon.name: "view-list-details"
+                        text: i18n("Open library")
+                        display: PlasmaComponents.AbstractButton.IconOnly
+                        enabled: !busy
+                        onClicked: root.launchGui("--library", "library")
+                        PlasmaComponents.ToolTip.text: text
+                        PlasmaComponents.ToolTip.visible: hovered
+                    }
+                }
 
                 Connections {
                     target: root
@@ -591,6 +687,8 @@ PlasmoidItem {
                             : (empty ? i18n("Your vocabulary is empty")
                             : (choiceMode ? quizPrompt : primaryText))
                         wrapMode: Text.Wrap
+                        maximumLineCount: 2
+                        elide: Text.ElideRight
                         font.pixelSize: empty ? 18
                             : (choiceMode
                             && (quizType === "context"
@@ -608,6 +706,8 @@ PlasmoidItem {
                             : (choiceMode ? quizAnswer : secondaryText))
                         visible: loaded && (empty || revealed)
                         wrapMode: Text.Wrap
+                        maximumLineCount: 2
+                        elide: Text.ElideRight
                         color: Kirigami.Theme.highlightColor
                         font.pixelSize: 19
                         font.bold: !empty
@@ -649,6 +749,11 @@ PlasmoidItem {
                                 text: modelData
                                 font.pixelSize: root.quizType === "context" ? 10 : 12
                                 enabled: !busy
+                                opacity: root.choiceAnswered
+                                    && !correctOption && !selectedOption ? 0.42 : 1
+                                Behavior on opacity {
+                                    NumberAnimation { duration: 120 }
+                                }
                                 background: Rectangle {
                                     radius: 7
                                     color: {
@@ -677,6 +782,9 @@ PlasmoidItem {
                                             return Kirigami.Theme.negativeTextColor
                                         return Qt.alpha(
                                             Kirigami.Theme.textColor, 0.18)
+                                    }
+                                    Behavior on color {
+                                        ColorAnimation { duration: 120 }
                                     }
                                 }
                                 onClicked: root.chooseAnswer(text)
@@ -815,7 +923,7 @@ PlasmoidItem {
                 Layout.fillWidth: true
                 visible: !choiceMode
                 implicitHeight: 36
-                text: i18n("Next")
+                text: i18n("Next") + "  →"
                 icon.name: "go-next"
                 enabled: loaded && !empty && !busy
                 onClicked: loadNext()
@@ -823,18 +931,6 @@ PlasmoidItem {
 
             RowLayout {
                 Layout.fillWidth: true
-
-                PlasmaComponents.ToolButton {
-                    icon.name: "edit-undo"
-                    text: i18n("Undo last review")
-                    display: PlasmaComponents.AbstractButton.IconOnly
-                    enabled: !busy
-                    onClicked: undoReview()
-                    PlasmaComponents.ToolTip.text: text
-                    PlasmaComponents.ToolTip.visible: hovered
-                }
-
-                Item { Layout.fillWidth: true }
 
                 PlasmaComponents.BusyIndicator {
                     running: busy
@@ -851,12 +947,22 @@ PlasmoidItem {
                     font.pixelSize: 10
                 }
 
-                PlasmaComponents.Label {
-                    text: Math.floor(secondsLeft / 60) + ":"
-                        + String(secondsLeft % 60).padStart(2, "0")
-                    opacity: 0.6
-                    font.family: "monospace"
-                }
+                Item { Layout.fillWidth: true }
+            }
+
+            PlasmaComponents.ProgressBar {
+                id: countdownProgress
+                Layout.fillWidth: true
+                implicitHeight: 3
+                from: 0
+                to: Math.max(1, plasmoid.configuration.rotationSeconds)
+                value: Math.max(0, secondsLeft)
+                indeterminate: false
+                PlasmaComponents.ToolTip.text: i18n(
+                    "%1:%2 until the next card",
+                    Math.floor(secondsLeft / 60),
+                    String(secondsLeft % 60).padStart(2, "0"))
+                PlasmaComponents.ToolTip.visible: hovered
             }
         }
     }

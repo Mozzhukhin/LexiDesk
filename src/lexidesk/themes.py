@@ -114,6 +114,11 @@ def stylesheet(name: str, scale: int = 100) -> str:
             font-size: {round(10 * factor)}px;
             font-weight: 600;
         }}
+        QLabel#modeBadge {{
+            color: {colors["accent"]};
+            font-size: {round(10 * factor)}px;
+            font-weight: 700;
+        }}
         QPushButton {{
             background: {colors["surface"]};
             border: 1px solid {colors["border"]};
@@ -243,5 +248,14 @@ def stylesheet(name: str, scale: int = 100) -> str:
             background: {colors["surface"]};
             color: {colors["text"]};
             border: 1px solid {colors["border"]};
+        }}
+        QProgressBar#countdown {{
+            background: {colors["border"]};
+            border: none;
+            border-radius: 2px;
+        }}
+        QProgressBar#countdown::chunk {{
+            background: {colors["accent"]};
+            border-radius: 2px;
         }}
     """
