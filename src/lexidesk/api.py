@@ -8,7 +8,6 @@ from typing import Any
 from .answers import evaluate_answer
 from .database import WordRepository
 from .dictionary import OfflineDictionary, normalize_headword
-from .enrichment import useful_examples
 from .models import Word
 
 COMMON_DISTRACTORS = {
@@ -237,17 +236,25 @@ def quiz_variants(
                 else "Choose the Russian word"
             ),
         }
-    stored_examples = useful_examples(repository, word)
-    cloze = _cloze_sentence(
-        word,
-        [example for example, _translation in stored_examples],
+    cloze = _cloze_sentence(word)
+    cloze_answer = word.source_text if word.source_lang == "en" else word.target_text
+    cloze_candidates = [
+        candidate.source_text
+        if candidate.source_lang == "en"
+        else candidate.target_text
+        for candidate in candidates
+    ]
+    cloze_candidates.extend(COMMON_DISTRACTORS["ru"])
+    cloze_choices = _distinct_choices(
+        cloze_answer,
+        cloze_candidates,
     )
-    if cloze and len(reverse_choices) == 4:
+    if cloze and len(cloze_choices) == 4:
         variants["cloze"] = {
             "type": "cloze",
             "prompt": cloze,
-            "answer": word.source_text,
-            "choices": reverse_choices,
+            "answer": cloze_answer,
+            "choices": cloze_choices,
             "instruction": "Complete the sentence",
         }
     category = word.part_of_speech.split(",", 1)[0].strip().casefold()
@@ -268,12 +275,12 @@ def quiz_variants(
             for candidate in context_candidates
             if (masked := _masked_context(candidate))
         ]
-        + list(CONTEXT_DISTRACTORS[word.source_lang]),
+        + list(CONTEXT_DISTRACTORS["en"]),
     )
     if correct_context and len(context_choices) == 4:
         variants["context"] = {
             "type": "context",
-            "prompt": f"Where does “{word.source_text}” fit best?",
+            "prompt": f"Where does “{cloze_answer}” fit best?",
             "answer": correct_context,
             "choices": context_choices,
             "instruction": "Choose the matching context",
@@ -358,23 +365,27 @@ def _distinct_choices(answer: str, candidates: list[str]) -> list[str]:
     return values
 
 
-def _cloze_sentence(word: Word, examples: list[str] | None = None) -> str:
-    candidates = examples or ([word.example] if word.example else [])
-    if not candidates:
+def _cloze_sentence(word: Word) -> str:
+    if word.source_lang == "en":
+        example = word.example
+        term = word.source_text
+    else:
+        example = word.example_translation
+        term = word.target_text
+    if not example or not term:
         return ""
-    example = random.choice(candidates)
     pattern = re.compile(
-        rf"(?<!\w){re.escape(word.source_text)}(?!\w)",
+        rf"(?<!\w){re.escape(term)}(?!\w)",
         flags=re.IGNORECASE,
     )
     masked, replacements = pattern.subn("___", example, count=1)
     if replacements:
         return masked
-    term = normalize_headword(word.source_text)
-    if " " in term or len(term) < 5:
+    normalized_term = normalize_headword(term)
+    if " " in normalized_term or len(normalized_term) < 5:
         return ""
-    stem_length = max(4, len(term) - (5 if word.source_lang == "ru" else 3))
-    stem = term[:stem_length]
+    stem_length = max(4, len(normalized_term) - 3)
+    stem = normalized_term[:stem_length]
     for match in re.finditer(r"[^\W\d_]+", example, flags=re.UNICODE):
         if normalize_headword(match.group()).startswith(stem):
             return f"{example[: match.start()]}___{example[match.end() :]}"

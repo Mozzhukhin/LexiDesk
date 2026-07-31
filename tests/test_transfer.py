@@ -8,7 +8,7 @@ from lexidesk.transfer import export_words, import_words
 
 def test_json_round_trip(tmp_path: Path) -> None:
     source = WordRepository(tmp_path / "source.db")
-    word_id = source.add_word(
+    source.add_word(
         source_text="look forward to",
         source_lang="en",
         target_text="с нетерпением ждать",
@@ -21,14 +21,6 @@ def test_json_round_trip(tmp_path: Path) -> None:
         example_translation="Я с нетерпением жду встречи.",
         tags=["work", "phrases"],
         source_info="Course notes",
-    )
-    source.replace_examples(
-        word_id,
-        [
-            ("I look forward to meeting you.", "Я с нетерпением жду встречи."),
-            ("We look forward to your reply.", "Мы с нетерпением ждём вашего ответа."),
-            ("They look forward to the trip.", "Они с нетерпением ждут поездки."),
-        ],
     )
     export_path = tmp_path / "words.json"
     assert export_words(source, export_path) == 1
@@ -44,7 +36,7 @@ def test_json_round_trip(tmp_path: Path) -> None:
     assert word.transcription == "/lʊk ˈfɔːwəd tuː/"
     assert word.source_info == "Course notes"
     assert word.example_translation == "Я с нетерпением жду встречи."
-    assert len(target.examples_for_word(word.id)) == 3
+    assert len(target.examples_for_word(word.id)) == 1
 
     source.close()
     target.close()

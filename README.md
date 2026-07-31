@@ -41,7 +41,7 @@ a network connection. A source installation downloads this data once during
 - A 99,000-headword FreeDict index cross-checked in both translation directions
 - Compact CTranslate2 neural fallback for phrases and missing dictionary entries
 - Short examples validated against both the studied word and selected meaning
-- Up to five compact examples per card, rotated in sentence-completion quizzes
+- One short verified bilingual example per card
 - Conservative offline autocorrection for misspelled English and Russian words
 - Clean card meanings without sentence-ending periods or duplicate variants
 - Words and short phrases in either language

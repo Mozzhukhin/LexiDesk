@@ -49,7 +49,9 @@ def test_add_select_and_review(tmp_path: Path) -> None:
             ),
         ],
     )
-    assert len(repository.examples_for_word(word_id)) == 3
+    assert repository.examples_for_word(word_id) == [
+        ("The opportunity changed everything.", "Возможность изменила всё.")
+    ]
     assert repository.statistics()["total"] == 1
     backup = ensure_daily_backup(repository)
     assert backup.exists()

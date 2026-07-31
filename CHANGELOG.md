@@ -5,12 +5,12 @@
 - Add an optional developer-support page with a copyable USDT TRC20 address.
 - Let timed rotation skip unanswered quizzes without recording a review.
 - Keep every practice mode selectable while cards rotate.
-- Rotate several per-card examples in sentence-completion quizzes and enrich
-  older cards lazily without loading the full vocabulary.
+- Keep one verified bilingual example per card and always build sentence
+  completion quizzes from the English sentence and English answer.
 - Never replace a selected fixed quiz mode with a normal card; retain the mode
   and provide a clear skip state when a quiz cannot be constructed.
-- Reject generic meta sentences from quizzes and progressively retain only
-  meaning-bearing bilingual examples.
+- Reject generic meta sentences and retain only a meaning-bearing bilingual
+  example.
 - Replace the Argos Python runtime with direct CTranslate2 inference, preserving
   the same models and beam-search output while removing Torch, Stanza, spaCy,
   MiniSBD, and ONNX from Linux and Windows bundles.

@@ -8,7 +8,18 @@ from lexidesk.translation import ExampleResult
 
 
 class StubTranslator:
-    def generate_example(self, *_args) -> ExampleResult:
+    def generate_example(
+        self,
+        source_text: str,
+        _source_language: str,
+        _part_of_speech: str,
+        target_text: str,
+    ) -> ExampleResult:
+        if source_text == "restricted":
+            return ExampleResult(
+                "Access to this area is restricted after closing.",
+                "После закрытия доступ в эту зону ограниченный.",
+            )
         return ExampleResult(
             "A reliable source checks each fact.",
             "Надёжный источник проверяет каждый факт.",
@@ -18,19 +29,6 @@ class StubTranslator:
         return ExampleResult(
             "The result seemed reliable to everyone.",
             "Результат казался надёжным для всех.",
-        )
-
-    def generate_examples(self, *_args) -> tuple[ExampleResult, ...]:
-        return (
-            self.generate_example(),
-            ExampleResult(
-                "The final result was clearly reliable.",
-                "Итоговый результат был явно надёжным.",
-            ),
-            ExampleResult(
-                "Her reliable method worked every time.",
-                "Её надёжный метод работал каждый раз.",
-            ),
         )
 
 
@@ -50,7 +48,7 @@ def test_enrichment_generates_missing_example(tmp_path: Path, monkeypatch) -> No
 
     repository = WordRepository(path)
     assert repository.get_word(word_id).example.startswith("A reliable source")
-    assert len(repository.examples_for_word(word_id)) == 3
+    assert len(repository.examples_for_word(word_id)) == 1
     repository.close()
 
 
@@ -99,5 +97,5 @@ def test_enrichment_replaces_meta_example(tmp_path: Path, monkeypatch) -> None:
     assert enrich_example(path, word_id) is True
 
     repository = WordRepository(path)
-    assert repository.get_word(word_id).example.startswith("A reliable source")
+    assert repository.get_word(word_id).example.startswith("Access to this area")
     repository.close()

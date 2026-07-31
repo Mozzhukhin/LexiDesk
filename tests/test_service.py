@@ -111,7 +111,7 @@ def test_quiz_payload_supports_reverse_cloze_and_context(tmp_path: Path) -> None
     repository.close()
 
 
-def test_cloze_quiz_rotates_between_saved_examples(tmp_path: Path, monkeypatch) -> None:
+def test_cloze_quiz_uses_the_single_saved_example(tmp_path: Path) -> None:
     repository = WordRepository(tmp_path / "varied-cloze.db")
     records = [
         ("reliable", "надёжный"),
@@ -140,18 +140,17 @@ def test_cloze_quiz_rotates_between_saved_examples(tmp_path: Path, monkeypatch) 
             ("Her reliable method worked again.", "Её надёжный метод снова сработал."),
         ],
     )
-    saved_examples = [example for example, _ in repository.examples_for_word(ids[0])]
-    choices = iter(saved_examples)
-    monkeypatch.setattr(
-        "lexidesk.api.random.choice",
-        lambda items: next(choices) if items == saved_examples else items[0],
-    )
     word = repository.get_word(ids[0])
+    payload = quiz_variants(word, repository)["cloze"]
 
-    prompts = [quiz_variants(word, repository)["cloze"]["prompt"] for _ in range(3)]
-
-    assert len(set(prompts)) == 3
-    assert all("___" in prompt for prompt in prompts)
+    assert repository.examples_for_word(ids[0]) == [
+        (
+            "A reliable source checks each fact.",
+            "Надёжный источник проверяет факты.",
+        )
+    ]
+    assert payload["prompt"] == "A ___ source checks each fact."
+    assert payload["answer"] == "reliable"
     repository.close()
 
 
@@ -172,7 +171,9 @@ def test_russian_cloze_uses_safe_fallback_distractors(tmp_path: Path) -> None:
     )
     variants = quiz_variants(repository.get_word(word_id), repository)
 
-    assert variants["cloze"]["prompt"] == "Доступ в эту зону ___ после закрытия."
+    assert variants["cloze"]["prompt"] == ("Access to this area is ___ after closing.")
+    assert variants["cloze"]["answer"] == "restricted"
+    assert all(choice.isascii() for choice in variants["cloze"]["choices"])
     assert len(variants["cloze"]["choices"]) == 4
     assert variants["reverse"]["instruction"] == "Choose the Russian word"
     assert len(variants["context"]["choices"]) == 4
@@ -180,7 +181,7 @@ def test_russian_cloze_uses_safe_fallback_distractors(tmp_path: Path) -> None:
     repository.close()
 
 
-def test_russian_cloze_masks_an_inflected_form(tmp_path: Path) -> None:
+def test_russian_card_cloze_uses_english_example(tmp_path: Path) -> None:
     repository = WordRepository(tmp_path / "inflected-cloze.db")
     word_id = repository.add_word(
         source_text="разъяснения",
@@ -191,7 +192,8 @@ def test_russian_cloze_masks_an_inflected_form(tmp_path: Path) -> None:
     )
     variants = quiz_variants(repository.get_word(word_id), repository)
 
-    assert variants["cloze"]["prompt"] == ("Она попросила ___ перед подписанием формы.")
+    assert variants["cloze"]["prompt"] == ("She asked for ___ before signing the form.")
+    assert variants["cloze"]["answer"] == "clarification"
     repository.close()
 
 

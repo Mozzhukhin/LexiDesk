@@ -421,7 +421,7 @@ class WordRepository:
             if source and target and key not in seen:
                 cleaned.append((source, target))
                 seen.add(key)
-            if len(cleaned) == 5:
+            if cleaned:
                 break
         primary = cleaned[0] if cleaned else ("", "")
         cursor = self.connection.execute(
@@ -457,7 +457,7 @@ class WordRepository:
             FROM word_examples
             WHERE word_id = ?
             ORDER BY position, id
-            LIMIT 5
+            LIMIT 1
             """,
             (word_id,),
         ).fetchall()
