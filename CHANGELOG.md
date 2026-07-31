@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Unify opposite directions into one bidirectional vocabulary card while
+  scheduling, scoring, and tracking each recall direction independently.
+- Alternate new cards across both sides, prioritize the weaker direction over
+  time, and prevent an exact reverse entry from creating a duplicate card.
 - Separate the vocabulary library into source-to-target deck views, default to
   the widget's active pair, and keep learning-status filtering independent.
 - Make the current language direction a compact header control that opens the

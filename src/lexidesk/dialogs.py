@@ -60,9 +60,11 @@ class DeckSelectionDialog(QDialog):
         self.pair_combo = QComboBox()
         for source, target in pairs:
             self.pair_combo.addItem(
-                f"{language_label(source)}  →  {language_label(target)}",
+                f"{language_label(source)}  ⇄  {language_label(target)}",
                 (source, target),
             )
+        current_source, current_target = sorted(current_pair)
+        current_pair = current_source, current_target
         current_index = next(
             (
                 index

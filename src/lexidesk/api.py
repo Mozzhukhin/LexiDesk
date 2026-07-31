@@ -86,6 +86,8 @@ def word_payload(
             "translation": "",
             "target_language": "",
             "direction": "",
+            "deck_direction": "",
+            "presentation_reversed": False,
             "part_of_speech": "",
             "alternatives": [],
             "transcription": "",
@@ -107,6 +109,8 @@ def word_payload(
         "source_language": word.source_lang,
         "target_language": word.target_lang,
         "direction": word.direction,
+        "deck_direction": word.deck_direction,
+        "presentation_reversed": word.presentation_reversed,
         "part_of_speech": word.part_of_speech,
         "alternatives": word.alternatives,
         "transcription": word.transcription,
@@ -432,6 +436,7 @@ def execute_request(
             quiz_type=str(request.get("quiz_type", "")),
             selected_answer=str(request.get("selected_answer", "")),
             correct_answer=str(request.get("correct_answer", "")),
+            reversed=bool(request.get("reversed", False)),
         )
         return card_payload(
             repository.next_word(
@@ -448,7 +453,9 @@ def execute_request(
         payload["undone"] = restored is not None
         return payload
     if command == "check":
-        word = repository.get_word(int(request["word_id"]))
+        word = repository.get_word(
+            int(request["word_id"]), reversed=bool(request.get("reversed", False))
+        )
         result = evaluate_answer(str(request.get("answer", "")), word)
         return {
             "grade": result.grade,

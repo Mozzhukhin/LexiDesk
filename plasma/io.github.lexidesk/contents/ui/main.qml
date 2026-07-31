@@ -25,6 +25,7 @@ PlasmoidItem {
     readonly property string secondaryExampleText: targetFirst
         ? exampleText : exampleTranslationText
     property string directionText: "OFFLINE"
+    property bool presentationReversed: false
     property string metadataText: ""
     property string exampleText: ""
     property string exampleTranslationText: ""
@@ -129,6 +130,8 @@ PlasmoidItem {
                 + " --correct " + shellQuote(quizAnswer)
             if (quizMode === "mixed")
                 metadata += " --adaptive"
+            if (presentationReversed)
+                metadata += " --reversed"
             runBridge("review " + cardId + " " + result + metadata, "card")
         }
     }
@@ -137,7 +140,8 @@ PlasmoidItem {
         var answer = typedAnswer.trim()
         if (cardId > 0 && answer.length > 0)
             runBridge(
-                "check " + cardId + " " + shellQuote(answer),
+                "check " + cardId + " " + shellQuote(answer)
+                    + (presentationReversed ? " --reversed" : ""),
                 "check")
     }
 
@@ -269,7 +273,8 @@ PlasmoidItem {
         translationText = card.translation || ""
         sourceLanguage = card.source_language || "en"
         targetLanguage = card.target_language || (sourceLanguage === "en" ? "ru" : "en")
-        directionText = card.direction || "OFFLINE"
+        directionText = card.deck_direction || card.direction || "OFFLINE"
+        presentationReversed = Boolean(card.presentation_reversed)
         var metadata = []
         if (card.part_of_speech)
             metadata.push(card.part_of_speech)

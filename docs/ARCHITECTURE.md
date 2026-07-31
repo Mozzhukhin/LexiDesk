@@ -67,6 +67,13 @@ explicit ten-minute learning/relearning step. Random ordering is only the final
 tie-breaker. A presentation-layer counter also guarantees a maintenance quiz
 after four ordinary eligible cards when no adaptive review is currently due.
 
+Each vocabulary row owns two learning states. The original direction retains
+its FSRS fields on `words`; the reverse direction uses the one-to-one
+`reverse_progress` row. Presentation alternates the two sides in passive mode,
+while adaptive mode selects the weaker or due side. Review-log entries record
+which side was tested, so undo, analytics, backup, and restore preserve the
+independent histories without duplicating the vocabulary entry.
+
 Quiz distractors come from one bounded, indexed repository query instead of
 materializing the complete vocabulary for every card. Same-part-of-speech and
 previously difficult candidates remain first, while the query stays responsive

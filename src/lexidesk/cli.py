@@ -35,10 +35,12 @@ def parser() -> argparse.ArgumentParser:
     review.add_argument("--selected", default="")
     review.add_argument("--correct", default="")
     review.add_argument("--adaptive", action="store_true")
+    review.add_argument("--reversed", action="store_true")
 
     check = subparsers.add_parser("check", help="Check a typed translation")
     check.add_argument("word_id", type=int)
     check.add_argument("answer")
+    check.add_argument("--reversed", action="store_true")
 
     subparsers.add_parser("undo", help="Undo the most recent review")
     subparsers.add_parser("stats", help="Return vocabulary statistics")
@@ -68,10 +70,17 @@ def request_from_arguments(args: argparse.Namespace) -> dict[str, Any]:
                 "selected_answer": args.selected,
                 "correct_answer": args.correct,
                 "adaptive": args.adaptive,
+                "reversed": args.reversed,
             }
         )
     elif args.command == "check":
-        request.update({"word_id": args.word_id, "answer": args.answer})
+        request.update(
+            {
+                "word_id": args.word_id,
+                "answer": args.answer,
+                "reversed": args.reversed,
+            }
+        )
     elif args.command == "analytics":
         request.update({"days": args.days, "limit": args.limit})
     return request

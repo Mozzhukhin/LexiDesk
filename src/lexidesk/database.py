@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
@@ -64,6 +65,9 @@ class WordRepository:
         self._migrate()
 
     def _migrate(self) -> None:
+        previous_version = int(
+            self.connection.execute("PRAGMA user_version").fetchone()[0]
+        )
         self.connection.executescript(
             """
             CREATE TABLE IF NOT EXISTS words (
@@ -145,6 +149,44 @@ class WordRepository:
             CREATE INDEX IF NOT EXISTS idx_word_examples_word
                 ON word_examples(word_id, position, id);
 
+            CREATE TABLE IF NOT EXISTS reverse_progress (
+                word_id INTEGER PRIMARY KEY REFERENCES words(id) ON DELETE CASCADE,
+                due_at TEXT NOT NULL,
+                know_count INTEGER NOT NULL DEFAULT 0,
+                dont_know_count INTEGER NOT NULL DEFAULT 0,
+                last_reviewed_at TEXT,
+                last_shown_at TEXT,
+                view_count INTEGER NOT NULL DEFAULT 0,
+                fsrs_state INTEGER NOT NULL DEFAULT 1,
+                fsrs_step INTEGER,
+                stability REAL,
+                difficulty REAL
+            );
+
+            CREATE TABLE IF NOT EXISTS card_rotation (
+                word_id INTEGER PRIMARY KEY REFERENCES words(id) ON DELETE CASCADE,
+                last_shown_at TEXT
+            );
+
+            CREATE TRIGGER IF NOT EXISTS create_reverse_progress
+            AFTER INSERT ON words
+            BEGIN
+                INSERT OR IGNORE INTO reverse_progress (word_id, due_at, fsrs_step)
+                VALUES (NEW.id, NEW.created_at, 0);
+                INSERT OR IGNORE INTO card_rotation (word_id) VALUES (NEW.id);
+            END;
+            CREATE TRIGGER IF NOT EXISTS sync_card_rotation
+            AFTER UPDATE OF last_shown_at ON words
+            BEGIN
+                UPDATE card_rotation SET last_shown_at = NEW.last_shown_at
+                WHERE word_id = NEW.id;
+            END;
+
+            INSERT OR IGNORE INTO reverse_progress (word_id, due_at, fsrs_step)
+            SELECT id, created_at, 0 FROM words;
+            INSERT OR IGNORE INTO card_rotation (word_id, last_shown_at)
+            SELECT id, last_shown_at FROM words;
+
             INSERT OR IGNORE INTO word_examples (
                 word_id, example, example_translation, position
             )
@@ -189,6 +231,29 @@ class WordRepository:
             """
         )
         self._migrate_language_schema()
+        self.connection.executescript(
+            """
+            DROP TRIGGER IF EXISTS create_reverse_progress;
+            DROP TRIGGER IF EXISTS sync_card_rotation;
+            CREATE TRIGGER IF NOT EXISTS create_reverse_progress
+            AFTER INSERT ON words
+            BEGIN
+                INSERT OR IGNORE INTO reverse_progress (word_id, due_at, fsrs_step)
+                VALUES (NEW.id, NEW.created_at, 0);
+                INSERT OR IGNORE INTO card_rotation (word_id) VALUES (NEW.id);
+            END;
+            CREATE TRIGGER sync_card_rotation
+            AFTER UPDATE OF last_shown_at ON words
+            BEGIN
+                UPDATE card_rotation SET last_shown_at = NEW.last_shown_at
+                WHERE word_id = NEW.id;
+            END;
+            INSERT OR IGNORE INTO reverse_progress (word_id, due_at, fsrs_step)
+            SELECT id, created_at, 0 FROM words;
+            INSERT OR IGNORE INTO card_rotation (word_id, last_shown_at)
+            SELECT id, last_shown_at FROM words;
+            """
+        )
         self.connection.execute("DROP INDEX IF EXISTS idx_words_quiz_candidates")
         self.connection.execute(
             """
@@ -230,8 +295,88 @@ class WordRepository:
         }
         if "rating" not in review_columns:
             self._migrate_review_log()
-        self.connection.execute("PRAGMA user_version=8")
+            review_columns = {
+                row["name"]
+                for row in self.connection.execute(
+                    "PRAGMA table_info(review_log)"
+                ).fetchall()
+            }
+        if "reversed" not in review_columns:
+            self.connection.execute(
+                "ALTER TABLE review_log ADD COLUMN reversed INTEGER NOT NULL DEFAULT 0"
+            )
+        if previous_version < 9:
+            self._merge_reverse_duplicates()
+        self.connection.execute("PRAGMA user_version=9")
         self.connection.commit()
+
+    def _merge_reverse_duplicates(self) -> None:
+        rows = self.connection.execute(
+            """
+            SELECT id, source_text, source_lang, target_text, target_lang
+            FROM words ORDER BY id
+            """
+        ).fetchall()
+        by_key = {
+            (
+                str(row["source_lang"]),
+                str(row["target_lang"]),
+                str(row["source_text"]).casefold(),
+                str(row["target_text"]).casefold(),
+            ): int(row["id"])
+            for row in rows
+        }
+        removed: set[int] = set()
+        for row in rows:
+            keeper = int(row["id"])
+            if keeper in removed:
+                continue
+            duplicate = by_key.get(
+                (
+                    str(row["target_lang"]),
+                    str(row["source_lang"]),
+                    str(row["target_text"]).casefold(),
+                    str(row["source_text"]).casefold(),
+                )
+            )
+            if duplicate is None or duplicate <= keeper or duplicate in removed:
+                continue
+            with self.connection:
+                self.connection.execute(
+                    """
+                    UPDATE reverse_progress SET
+                        due_at = (SELECT due_at FROM words WHERE id = ?),
+                        know_count = (SELECT know_count FROM words WHERE id = ?),
+                        dont_know_count = (
+                            SELECT dont_know_count FROM words WHERE id = ?
+                        ),
+                        last_reviewed_at = (
+                            SELECT last_reviewed_at FROM words WHERE id = ?
+                        ),
+                        last_shown_at = (SELECT last_shown_at FROM words WHERE id = ?),
+                        view_count = (SELECT view_count FROM words WHERE id = ?),
+                        fsrs_state = (SELECT fsrs_state FROM words WHERE id = ?),
+                        fsrs_step = (SELECT fsrs_step FROM words WHERE id = ?),
+                        stability = (SELECT stability FROM words WHERE id = ?),
+                        difficulty = (SELECT difficulty FROM words WHERE id = ?)
+                    WHERE word_id = ?
+                    """,
+                    (*([duplicate] * 10), keeper),
+                )
+                self.connection.execute(
+                    """
+                    UPDATE review_log
+                    SET word_id = ?, reversed = CASE reversed WHEN 0 THEN 1 ELSE 0 END
+                    WHERE word_id = ?
+                    """,
+                    (keeper, duplicate),
+                )
+                self.connection.execute(
+                    "UPDATE quiz_log SET word_id = ? WHERE word_id = ?",
+                    (keeper, duplicate),
+                )
+                self.connection.execute("DELETE FROM words WHERE id = ?", (duplicate,))
+            removed.add(duplicate)
 
     def _migrate_language_schema(self) -> None:
         table_sql_row = self.connection.execute(
@@ -379,6 +524,18 @@ class WordRepository:
         )
         if source_lang == target_lang:
             raise ValueError("Source and target languages must be different.")
+        reverse_match = self.connection.execute(
+            """
+            SELECT id FROM words
+            WHERE source_lang = ? AND target_lang = ?
+              AND source_text = ? COLLATE NOCASE
+              AND target_text = ? COLLATE NOCASE
+            LIMIT 1
+            """,
+            (target_lang, source_lang, cleaned_target, source_text.strip()),
+        ).fetchone()
+        if reverse_match is not None:
+            return int(reverse_match["id"])
         cursor = self.connection.execute(
             """
             INSERT INTO words (
@@ -425,18 +582,23 @@ class WordRepository:
         row = self.connection.execute(
             """
             SELECT COUNT(*) AS total FROM words
-            WHERE (? = '' OR (source_lang = ? AND target_lang = ?))
+            WHERE (? = '' OR (
+                (source_lang = ? AND target_lang = ?)
+                OR (source_lang = ? AND target_lang = ?)
+            ))
             """,
-            (source_lang, source_lang, target_lang),
+            (source_lang, source_lang, target_lang, target_lang, source_lang),
         ).fetchone()
         return int(row["total"])
 
     def language_pairs(self) -> list[tuple[str, str]]:
         rows = self.connection.execute(
             """
-            SELECT source_lang, target_lang
+            SELECT
+                min(source_lang, target_lang) AS source_lang,
+                max(source_lang, target_lang) AS target_lang
             FROM words
-            GROUP BY source_lang, target_lang
+            GROUP BY min(source_lang, target_lang), max(source_lang, target_lang)
             ORDER BY source_lang, target_lang
             """
         ).fetchall()
@@ -453,7 +615,8 @@ class WordRepository:
         ).fetchone()
         if row is None:
             return None
-        return str(row["source_lang"]), str(row["target_lang"])
+        first, second = sorted((str(row["source_lang"]), str(row["target_lang"])))
+        return first, second
 
     def update_word(
         self,
@@ -483,6 +646,26 @@ class WordRepository:
         )
         if source_lang == target_lang:
             raise ValueError("Source and target languages must be different.")
+        reverse_match = self.connection.execute(
+            """
+            SELECT id FROM words
+            WHERE id != ? AND source_lang = ? AND target_lang = ?
+              AND source_text = ? COLLATE NOCASE
+              AND target_text = ? COLLATE NOCASE
+            LIMIT 1
+            """,
+            (
+                word_id,
+                target_lang,
+                source_lang,
+                cleaned_target,
+                source_text.strip(),
+            ),
+        ).fetchone()
+        if reverse_match is not None:
+            raise sqlite3.IntegrityError(
+                "The reverse side already belongs to another card."
+            )
         cursor = self.connection.execute(
             """
             UPDATE words SET
@@ -593,13 +776,56 @@ class WordRepository:
         ).fetchall()
         return [(str(row["example"]), str(row["example_translation"])) for row in rows]
 
-    def get_word(self, word_id: int) -> Word:
+    def get_word(self, word_id: int, *, reversed: bool = False) -> Word:
         row = self.connection.execute(
             "SELECT * FROM words WHERE id = ?", (word_id,)
         ).fetchone()
         if row is None:
             raise KeyError(f"Unknown word id: {word_id}")
-        return self._to_word(row)
+        word = self._to_word(row)
+        return self._reverse_word(word) if reversed else word
+
+    def _reverse_word(self, word: Word) -> Word:
+        progress = self.connection.execute(
+            "SELECT * FROM reverse_progress WHERE word_id = ?", (word.id,)
+        ).fetchone()
+        if progress is None:
+            raise RuntimeError("Reverse learning progress is missing.")
+        return replace(
+            word,
+            source_text=word.target_text,
+            source_lang=word.target_lang,
+            target_lang=word.source_lang,
+            target_text=word.source_text,
+            alternatives=[],
+            example=word.example_translation,
+            example_translation=word.example,
+            transcription="",
+            forms=[],
+            due_at=from_storage(progress["due_at"]),  # type: ignore[arg-type]
+            know_count=int(progress["know_count"]),
+            dont_know_count=int(progress["dont_know_count"]),
+            last_reviewed_at=from_storage(progress["last_reviewed_at"]),
+            last_shown_at=from_storage(progress["last_shown_at"]),
+            view_count=int(progress["view_count"]),
+            fsrs_state=int(progress["fsrs_state"]),
+            fsrs_step=progress["fsrs_step"],
+            stability=progress["stability"],
+            difficulty=progress["difficulty"],
+            presentation_reversed=True,
+        )
+
+    def _prefer_reverse(self, word: Word, *, adaptive: bool) -> bool:
+        reverse = self._reverse_word(word)
+        if word.last_shown_at is None or reverse.last_shown_at is None:
+            return word.last_shown_at is not None
+        if not adaptive:
+            return reverse.last_shown_at < word.last_shown_at
+        if word.view_count != reverse.view_count:
+            return reverse.view_count < word.view_count
+        if word.due_at != reverse.due_at:
+            return reverse.due_at < word.due_at
+        return reverse.last_shown_at < word.last_shown_at
 
     def list_words(
         self,
@@ -623,7 +849,10 @@ class WordRepository:
                 OR forms_json LIKE ? ESCAPE '\\'
                 OR transcription LIKE ? ESCAPE '\\'
             )
-              AND (? = '' OR (source_lang = ? AND target_lang = ?))
+              AND (? = '' OR (
+                  (source_lang = ? AND target_lang = ?)
+                  OR (source_lang = ? AND target_lang = ?)
+              ))
         """
         escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         pattern = f"%{escaped}%"
@@ -640,12 +869,27 @@ class WordRepository:
                 source_lang,
                 source_lang,
                 target_lang,
+                target_lang,
+                source_lang,
             ),
         ).fetchall()
-        words = [self._to_word(row) for row in rows]
+        words = [self._combined_word(self._to_word(row)) for row in rows]
         if status != "All":
             words = [word for word in words if word.status == status]
         return words
+
+    def _combined_word(self, word: Word) -> Word:
+        reverse = self._reverse_word(word)
+        both_known = word.status == "Known" and reverse.status == "Known"
+        return replace(
+            word,
+            due_at=min(word.due_at, reverse.due_at),
+            know_count=word.know_count + reverse.know_count,
+            dont_know_count=word.dont_know_count + reverse.dont_know_count,
+            fsrs_state=2 if both_known else 1,
+            stability=30.0 if both_known else None,
+            difficulty=max(word.difficulty or 0, reverse.difficulty or 0) or None,
+        )
 
     def quiz_candidates(self, word: Word, limit: int = 64) -> list[Word]:
         """Return a small, ranked candidate pool without loading the full deck."""
@@ -653,7 +897,10 @@ class WordRepository:
         rows = self.connection.execute(
             """
             SELECT * FROM words
-            WHERE id != ? AND source_lang = ? AND target_lang = ?
+            WHERE id != ? AND (
+                (source_lang = ? AND target_lang = ?)
+                OR (source_lang = ? AND target_lang = ?)
+            )
             ORDER BY
                 CASE
                     WHEN lower(trim(
@@ -680,12 +927,20 @@ class WordRepository:
                 word.id,
                 word.source_lang,
                 word.target_lang,
+                word.target_lang,
+                word.source_lang,
                 category,
                 word.difficulty or 5,
                 max(4, min(limit, 256)),
             ),
         ).fetchall()
-        return [self._to_word(row) for row in rows]
+        candidates = [self._to_word(row) for row in rows]
+        return [
+            candidate
+            if candidate.source_lang == word.source_lang
+            else self._reverse_word(candidate)
+            for candidate in candidates
+        ]
 
     def statistics(
         self, source_lang: str = "", target_lang: str = ""
@@ -705,21 +960,46 @@ class WordRepository:
         }
         row = self.connection.execute(
             """
+            WITH selected_words AS (
+                SELECT * FROM words
+                WHERE (:source = '' OR
+                    (source_lang = :source AND target_lang = :target) OR
+                    (source_lang = :target AND target_lang = :source))
+            ),
+            progress AS (
+                SELECT id AS word_id, due_at, know_count, dont_know_count,
+                       fsrs_state, stability, difficulty
+                FROM selected_words
+                UNION ALL
+                SELECT w.id, r.due_at, r.know_count, r.dont_know_count,
+                       r.fsrs_state, r.stability, r.difficulty
+                FROM selected_words w
+                JOIN reverse_progress r ON r.word_id = w.id
+            ),
+            per_word AS (
+                SELECT word_id,
+                       SUM(know_count) AS knows,
+                       SUM(dont_know_count) AS misses,
+                       MIN(CASE WHEN fsrs_state = 2 AND stability >= 30
+                           THEN 1 ELSE 0 END) AS known,
+                       MAX(CASE WHEN due_at <= :now THEN 1 ELSE 0 END) AS due,
+                       MAX(CASE WHEN due_at <= :next_week THEN 1 ELSE 0 END)
+                           AS forecast
+                FROM progress
+                GROUP BY word_id
+            )
             SELECT
                 COUNT(*) AS total,
-                SUM(CASE WHEN know_count = 0 AND dont_know_count = 0 THEN 1 ELSE 0 END)
+                SUM(CASE WHEN knows = 0 AND misses = 0 THEN 1 ELSE 0 END)
                     AS new_count,
-                SUM(CASE WHEN fsrs_state = 2 AND stability >= 30 THEN 1 ELSE 0 END)
-                    AS known_count,
-                SUM(CASE WHEN due_at <= :now THEN 1 ELSE 0 END) AS due_count,
-                SUM(CASE WHEN due_at <= :next_week THEN 1 ELSE 0 END)
-                    AS forecast_count,
-                SUM(know_count) AS knows,
-                SUM(dont_know_count) AS misses
-            FROM words
-            WHERE (:source = '' OR (
-                source_lang = :source AND target_lang = :target
-            ))
+                SUM(known) AS known_count,
+                SUM(due) AS due_count,
+                SUM(forecast) AS forecast_count,
+                SUM(knows) AS knows,
+                SUM(misses) AS misses,
+                (SELECT AVG(difficulty) FROM progress
+                    WHERE difficulty IS NOT NULL) AS average_difficulty
+            FROM per_word
             """,
             parameters,
         ).fetchone()
@@ -730,9 +1010,9 @@ class WordRepository:
             JOIN words w ON w.id = r.word_id
             WHERE r.undone = 0
               AND date(r.reviewed_at, 'localtime') = date('now', 'localtime')
-              AND (:source = '' OR (
-                  w.source_lang = :source AND w.target_lang = :target
-              ))
+              AND (:source = '' OR
+                  (w.source_lang = :source AND w.target_lang = :target) OR
+                  (w.source_lang = :target AND w.target_lang = :source))
             """,
             parameters,
         ).fetchone()["total"]
@@ -747,9 +1027,9 @@ class WordRepository:
             JOIN review_log r ON r.id = q.review_id
             JOIN words w ON w.id = q.word_id
             WHERE r.undone = 0
-              AND (:source = '' OR (
-                  w.source_lang = :source AND w.target_lang = :target
-              ))
+              AND (:source = '' OR
+                  (w.source_lang = :source AND w.target_lang = :target) OR
+                  (w.source_lang = :target AND w.target_lang = :source))
             """,
             parameters,
         ).fetchone()
@@ -761,9 +1041,9 @@ class WordRepository:
                 FROM review_log r
                 JOIN words w ON w.id = r.word_id
                 WHERE r.undone = 0
-                  AND (:source = '' OR (
-                      w.source_lang = :source AND w.target_lang = :target
-                  ))
+                  AND (:source = '' OR
+                      (w.source_lang = :source AND w.target_lang = :target) OR
+                      (w.source_lang = :target AND w.target_lang = :source))
                 ORDER BY day DESC
                 """,
                 parameters,
@@ -801,19 +1081,7 @@ class WordRepository:
             "accuracy": round((knows / reviews * 100), 1) if reviews else 0.0,
             "streak": streak,
             "average_difficulty": round(
-                float(
-                    self.connection.execute(
-                        """
-                        SELECT AVG(difficulty) FROM words
-                        WHERE difficulty IS NOT NULL
-                          AND (:source = '' OR (
-                              source_lang = :source AND target_lang = :target
-                          ))
-                        """,
-                        parameters,
-                    ).fetchone()[0]
-                    or 0
-                ),
+                float(row["average_difficulty"] or 0),
                 1,
             ),
         }
@@ -847,24 +1115,25 @@ class WordRepository:
             """
             WITH deck_size(total) AS (
                 SELECT COUNT(*) FROM words
-                WHERE (:source = '' OR (
-                    source_lang = :source AND target_lang = :target
-                ))
+                WHERE (:source = '' OR
+                    (source_lang = :source AND target_lang = :target) OR
+                    (source_lang = :target AND target_lang = :source))
             ),
             recent_cards(id) AS (
-                SELECT id
-                FROM words
-                WHERE last_shown_at IS NOT NULL
-                  AND (:source = '' OR (
-                      source_lang = :source AND target_lang = :target
-                  ))
-                ORDER BY last_shown_at DESC, id DESC
+                SELECT r.word_id
+                FROM card_rotation r
+                JOIN words w ON w.id = r.word_id
+                WHERE r.last_shown_at IS NOT NULL
+                  AND (:source = '' OR
+                      (w.source_lang = :source AND w.target_lang = :target) OR
+                      (w.source_lang = :target AND w.target_lang = :source))
+                ORDER BY r.last_shown_at DESC, r.word_id DESC
                 LIMIT MIN(5, MAX(0, (SELECT total FROM deck_size) - 1))
             )
             SELECT * FROM words
-            WHERE (:source = '' OR (
-                    source_lang = :source AND target_lang = :target
-                ))
+            WHERE (:source = '' OR
+                    (source_lang = :source AND target_lang = :target) OR
+                    (source_lang = :target AND target_lang = :source))
               AND (
                     (SELECT total FROM deck_size) = 1
                     OR id NOT IN (SELECT id FROM recent_cards)
@@ -880,13 +1149,24 @@ class WordRepository:
                     CASE
                         WHEN know_count + dont_know_count = 0
                              AND view_count >= 1 THEN 0
+                        WHEN (SELECT know_count + dont_know_count
+                              FROM reverse_progress WHERE word_id = words.id) = 0
+                             AND (SELECT view_count FROM reverse_progress
+                                  WHERE word_id = words.id) >= 1 THEN 0
                         WHEN know_count + dont_know_count > 0
                              AND due_at <= :now THEN 0
+                        WHEN (SELECT know_count + dont_know_count
+                              FROM reverse_progress WHERE word_id = words.id) > 0
+                             AND (SELECT due_at FROM reverse_progress
+                                  WHERE word_id = words.id) <= :now THEN 0
                         ELSE 1
                     END
                     ELSE 0
                 END,
-                CASE WHEN :adaptive = 1 AND due_at <= :now THEN 0 ELSE 1 END,
+                CASE WHEN :adaptive = 1 AND (
+                    due_at <= :now OR (SELECT due_at FROM reverse_progress
+                        WHERE word_id = words.id) <= :now
+                ) THEN 0 ELSE 1 END,
                 CASE
                     WHEN :adaptive = 1 AND know_count + dont_know_count > 0
                          AND due_at <= :now
@@ -899,8 +1179,11 @@ class WordRepository:
                     THEN COALESCE(difficulty, 5)
                     ELSE 0
                 END DESC,
-                COALESCE(last_shown_at, created_at),
-                CASE WHEN due_at <= :now THEN 0 ELSE 1 END,
+                COALESCE((SELECT last_shown_at FROM card_rotation
+                          WHERE word_id = words.id), created_at),
+                CASE WHEN due_at <= :now OR
+                    (SELECT due_at FROM reverse_progress
+                     WHERE word_id = words.id) <= :now THEN 0 ELSE 1 END,
                 CASE
                     WHEN know_count + dont_know_count = 0 THEN 0
                     ELSE CAST(dont_know_count AS REAL)
@@ -921,16 +1204,26 @@ class WordRepository:
         ).fetchone()
         if row is None:
             return None
+        word = self._to_word(row)
+        reversed_presentation = bool(source_lang) and self._prefer_reverse(
+            word, adaptive=adaptive
+        )
+        progress_table = "reverse_progress" if reversed_presentation else "words"
+        id_column = "word_id" if reversed_presentation else "id"
         self.connection.execute(
-            """
-            UPDATE words
+            f"""
+            UPDATE {progress_table}
             SET last_shown_at = ?, view_count = view_count + 1
-            WHERE id = ?
+            WHERE {id_column} = ?
             """,
             (now, row["id"]),
         )
+        self.connection.execute(
+            "UPDATE card_rotation SET last_shown_at = ? WHERE word_id = ?",
+            (now, row["id"]),
+        )
         self.connection.commit()
-        return self.get_word(int(row["id"]))
+        return self.get_word(int(row["id"]), reversed=reversed_presentation)
 
     def review(
         self,
@@ -941,9 +1234,12 @@ class WordRepository:
         quiz_type: str = "",
         selected_answer: str = "",
         correct_answer: str = "",
+        reversed: bool = False,
     ) -> Word:
+        progress_table = "reverse_progress" if reversed else "words"
+        id_column = "word_id" if reversed else "id"
         row = self.connection.execute(
-            "SELECT * FROM words WHERE id = ?", (word_id,)
+            f"SELECT * FROM {progress_table} WHERE {id_column} = ?", (word_id,)
         ).fetchone()
         if row is None:
             raise KeyError(f"Unknown word id: {word_id}")
@@ -975,14 +1271,14 @@ class WordRepository:
         miss_increment = int(review_rating == ReviewRating.AGAIN)
         with self.connection:
             self.connection.execute(
-                """
-                UPDATE words SET
+                f"""
+                UPDATE {progress_table} SET
                     due_at = ?, last_reviewed_at = ?,
                     fsrs_state = ?, fsrs_step = ?,
                     stability = ?, difficulty = ?,
                     know_count = know_count + ?,
                     dont_know_count = dont_know_count + ?
-                WHERE id = ?
+                WHERE {id_column} = ?
                 """,
                 (
                     to_storage(schedule.due_at),
@@ -1004,8 +1300,9 @@ class WordRepository:
                     previous_difficulty, previous_due_at,
                     previous_last_reviewed_at,
                     next_state, next_step, next_stability, next_difficulty,
-                    next_due_at, next_last_reviewed_at, review_duration_ms
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    next_due_at, next_last_reviewed_at, review_duration_ms,
+                    reversed
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     word_id,
@@ -1024,6 +1321,7 @@ class WordRepository:
                     to_storage(schedule.due_at),
                     to_storage(schedule.last_reviewed_at),
                     review_duration_ms,
+                    int(reversed),
                 ),
             )
             if quiz_type and cursor.lastrowid is not None:
@@ -1042,7 +1340,7 @@ class WordRepository:
                         correct_answer,
                     ),
                 )
-        return self.get_word(word_id)
+        return self.get_word(word_id, reversed=reversed)
 
     def undo_last_review(self) -> Word | None:
         row = self.connection.execute(
@@ -1057,16 +1355,19 @@ class WordRepository:
             return None
         know_decrement = int(row["rating"] > 1)
         miss_decrement = int(row["rating"] == 1)
+        reversed_presentation = bool(row["reversed"])
+        progress_table = "reverse_progress" if reversed_presentation else "words"
+        id_column = "word_id" if reversed_presentation else "id"
         with self.connection:
             self.connection.execute(
-                """
-                UPDATE words SET
+                f"""
+                UPDATE {progress_table} SET
                     due_at = ?, last_reviewed_at = ?,
                     fsrs_state = ?, fsrs_step = ?,
                     stability = ?, difficulty = ?,
                     know_count = max(0, know_count - ?),
                     dont_know_count = max(0, dont_know_count - ?)
-                WHERE id = ?
+                WHERE {id_column} = ?
                 """,
                 (
                     row["previous_due_at"],
@@ -1084,7 +1385,7 @@ class WordRepository:
                 "UPDATE review_log SET undone = 1 WHERE id = ?",
                 (row["id"],),
             )
-        return self.get_word(row["word_id"])
+        return self.get_word(row["word_id"], reversed=reversed_presentation)
 
     def card_retrievability(
         self, word: Word, now: datetime | None = None

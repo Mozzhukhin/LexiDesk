@@ -161,7 +161,7 @@ class LibraryDialog(QDialog):
             values = (
                 word.source_text,
                 word.target_text,
-                word.direction,
+                word.deck_direction,
                 word.part_of_speech,
                 ", ".join(word.tags),
                 word.status,
@@ -193,12 +193,15 @@ class LibraryDialog(QDialog):
             selected_pair = (
                 self._selected_pair() if self.deck_filter.count() else ("", "")
             )
+        elif all(selected_pair):
+            selected_source, selected_target = sorted(selected_pair)
+            selected_pair = selected_source, selected_target
         self.deck_filter.blockSignals(True)
         self.deck_filter.clear()
         self.deck_filter.addItem("All decks", ("", ""))
         for source, target in self.repository.language_pairs():
             self.deck_filter.addItem(
-                f"{source.upper()} → {target.upper()}",
+                f"{source.upper()} ⇄ {target.upper()}",
                 (source, target),
             )
         selected_index = next(

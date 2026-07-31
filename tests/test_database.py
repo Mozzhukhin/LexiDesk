@@ -128,13 +128,57 @@ def test_language_decks_rotate_without_crossing_pairs(tmp_path: Path) -> None:
 
     assert all(word is not None for word in shown)
     assert {word.id for word in shown if word is not None} == set(ru_uk_ids)
-    assert all(word.direction == "RU → UK" for word in shown if word is not None)
+    assert all(word.deck_direction == "RU ⇄ UK" for word in shown if word is not None)
+    assert {word.direction for word in shown if word is not None} == {
+        "RU → UK",
+        "UK → RU",
+    }
     assert repository.count("ru", "uk") == 2
     assert repository.language_pairs() == [("en", "ru"), ("ru", "uk")]
     assert repository.latest_language_pair() == ("en", "ru")
     assert {
         word.id for word in repository.list_words(source_lang="ru", target_lang="uk")
     } == set(ru_uk_ids)
+    repository.close()
+
+
+def test_bidirectional_card_keeps_independent_learning_progress(tmp_path: Path) -> None:
+    repository = WordRepository(tmp_path / "bidirectional-progress.db")
+    word_id = repository.add_word(
+        source_text="time",
+        source_lang="en",
+        target_text="время",
+        target_lang="ru",
+    )
+
+    reviewed = repository.review(word_id, "good", reversed=True)
+    primary = repository.get_word(word_id)
+
+    assert reviewed.direction == "RU → EN"
+    assert reviewed.know_count == 1
+    assert primary.direction == "EN → RU"
+    assert primary.know_count == 0
+    assert repository.statistics("en", "ru")["total"] == 1
+    repository.close()
+
+
+def test_adding_exact_reverse_reuses_the_bidirectional_card(tmp_path: Path) -> None:
+    repository = WordRepository(tmp_path / "reverse-duplicate.db")
+    first_id = repository.add_word(
+        source_text="time",
+        source_lang="en",
+        target_text="время",
+        target_lang="ru",
+    )
+    reverse_id = repository.add_word(
+        source_text="время",
+        source_lang="ru",
+        target_text="time",
+        target_lang="en",
+    )
+
+    assert reverse_id == first_id
+    assert repository.count("en", "ru") == 1
     repository.close()
 
 
@@ -394,7 +438,7 @@ def test_pre_fsrs_database_is_migrated_without_losing_history(
     assert word.source_text == "reliable"
     assert word.fsrs_state == 2
     assert word.stability == 3.0
-    assert repository.connection.execute("PRAGMA user_version").fetchone()[0] == 8
+    assert repository.connection.execute("PRAGMA user_version").fetchone()[0] == 9
     assert word.view_count == 0
     review = repository.connection.execute("SELECT * FROM review_log").fetchone()
     assert review["rating"] == 3

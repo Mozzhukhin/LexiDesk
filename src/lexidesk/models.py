@@ -33,10 +33,16 @@ class Word:
     fsrs_step: int | None
     stability: float | None
     difficulty: float | None
+    presentation_reversed: bool = False
 
     @property
     def direction(self) -> str:
         return f"{self.source_lang.upper()} → {self.target_lang.upper()}"
+
+    @property
+    def deck_direction(self) -> str:
+        first, second = sorted((self.source_lang.upper(), self.target_lang.upper()))
+        return f"{first} ⇄ {second}"
 
     @property
     def status(self) -> str:

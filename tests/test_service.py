@@ -263,12 +263,18 @@ def test_card_and_review_requests_keep_the_selected_language_deck(
     card = execute_request(repository, {"command": "card", **pair})
     reviewed = execute_request(
         repository,
-        {"command": "review", "word_id": uk_id, "rating": "good", **pair},
+        {
+            "command": "review",
+            "word_id": uk_id,
+            "rating": "good",
+            "reversed": card["presentation_reversed"],
+            **pair,
+        },
     )
     stats = execute_request(repository, {"command": "stats", **pair})
 
     assert card["direction"] == "RU → UK"
-    assert reviewed["direction"] == "RU → UK"
+    assert reviewed["deck_direction"] == "RU ⇄ UK"
     assert stats["total"] == 1
     repository.close()
 

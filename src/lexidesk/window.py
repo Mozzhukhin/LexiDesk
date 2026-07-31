@@ -387,7 +387,7 @@ class LexiDeskWindow(QMainWindow):
             self._example_enrichment_scheduled.add(word.id)
             schedule_example_enrichment(word.id)
 
-        self.direction_label.setText(f"{word.direction}  ▾")
+        self.direction_label.setText(f"{word.deck_direction}  ▾")
         # The English side always stays on top, regardless of which language was
         # entered when the card was created.
         english_first = word.target_lang == "en"
@@ -564,6 +564,7 @@ class LexiDeskWindow(QMainWindow):
             quiz_type=str(self._current_quiz.get("type", "")),
             selected_answer=selected,
             correct_answer=correct,
+            reversed=self.current_word.presentation_reversed,
         )
         self.advance_timer.start()
 
@@ -604,7 +605,12 @@ class LexiDeskWindow(QMainWindow):
         if self.current_word is None:
             return
         duration = self.review_clock.elapsed() if self.review_clock.isValid() else None
-        self.repository.review(self.current_word.id, rating, duration)
+        self.repository.review(
+            self.current_word.id,
+            rating,
+            duration,
+            reversed=self.current_word.presentation_reversed,
+        )
         self.next_card()
 
     def add_word(self) -> None:

@@ -89,6 +89,12 @@ UK→EN plus EN→DE enables UK→DE. Pivot translation is convenient but may lo
 some nuance, so important meanings remain editable before a card is saved.
 Install both directions when you want to study either side of a pair.
 
+Vocabulary decks are bidirectional: one saved meaning such as
+`ambiguous ⇄ неоднозначный` is presented from both sides without creating a
+duplicate library row. FSRS state, due time, accuracy, and mistakes remain
+independent for each recall direction, and Mixed mode prioritizes the weaker
+side. Adding the exact reverse of an existing card reuses that card.
+
 Automatic language detection remains limited to legacy EN/RU use. Languages
 sharing a writing system cannot be identified reliably from a single word, so
 the add and batch dialogs provide explicit source and target selectors.
@@ -267,8 +273,8 @@ and missing entries; no automatic system can infer the intended sense of an
 isolated word with certainty, so every translation remains editable.
 
 Regular cards always place English above Russian for a consistent visual
-hierarchy. On RU→EN cards this only changes presentation: the stored direction
-and quiz prompts still test the requested direction. Single-word model results
+hierarchy. The header identifies the shared deck with `⇄`, while quiz prompts
+and review history retain the direction currently being tested. Single-word model results
 are normalized as card meanings rather than sentences: periods are removed and
 punctuation-only duplicates are collapsed before saving.
 
