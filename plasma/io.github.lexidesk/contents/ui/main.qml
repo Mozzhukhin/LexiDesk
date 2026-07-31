@@ -494,35 +494,30 @@ PlasmoidItem {
                 text: i18n("Choose translation")
                 checkable: true
                 checked: root.quizMode === "translation"
-                enabled: Boolean(root.quizVariants.translation)
                 onClicked: root.selectQuizMode("translation")
             }
             PlasmaExtras.MenuItem {
                 text: i18n("Reverse translation")
                 checkable: true
                 checked: root.quizMode === "reverse"
-                enabled: Boolean(root.quizVariants.reverse)
                 onClicked: root.selectQuizMode("reverse")
             }
             PlasmaExtras.MenuItem {
                 text: i18n("Complete the sentence")
                 checkable: true
                 checked: root.quizMode === "cloze"
-                enabled: Boolean(root.quizVariants.cloze)
                 onClicked: root.selectQuizMode("cloze")
             }
             PlasmaExtras.MenuItem {
                 text: i18n("Choose the context")
                 checkable: true
                 checked: root.quizMode === "context"
-                enabled: Boolean(root.quizVariants.context)
                 onClicked: root.selectQuizMode("context")
             }
             PlasmaExtras.MenuItem {
                 text: i18n("Type the translation")
                 checkable: true
                 checked: root.quizMode === "typing"
-                enabled: Boolean(root.quizVariants.typing)
                 onClicked: root.selectQuizMode("typing")
             }
         }

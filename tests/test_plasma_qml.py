@@ -48,6 +48,7 @@ def test_widget_uses_simple_reviews_and_four_choice_quizzes() -> None:
     assert 'quizMode === "mixed" ? " --adaptive"' in qml
     assert 'var mixedKinds = ["translation", "reverse", "cloze", "context"]' in qml
     assert 'checked: root.quizMode === "mixed"' in qml
+    assert "enabled: Boolean(root.quizVariants" not in qml
     assert "Math.random() < quizProbability" not in qml
     assert 'quizType === "typing"' in qml
     assert 'quizType === "context"' in qml
