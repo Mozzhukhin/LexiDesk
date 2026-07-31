@@ -8,7 +8,7 @@ Standalone PySide6 UI ───────► D-Bus service
                     ┌──────────────┼──────────────┐
                     ▼              ▼              ▼
                   SQLite       FSRS 6       offline language data
-               cards/reviews   scheduler   FreeDict + Argos + WordNet
+               cards/reviews   scheduler   FreeDict + CTranslate2 + WordNet
 ```
 
 The session D-Bus service owns the long-lived repository connection. The CLI
@@ -26,7 +26,7 @@ upgrading a widget instance therefore cannot remove the user's data.
 
 Card creation performs the primary lookup and a fast SQLite WordNet example
 lookup in the UI. Translation of that example is queued in the D-Bus service
-after the card is committed, so loading Argos never blocks Save. If D-Bus is
+after the card is committed, so loading the neural model never blocks Save. If D-Bus is
 unavailable—or on Windows—the application uses one local background worker with
 an isolated SQLite connection. Existing cards are not needlessly regenerated at
 every service start.
@@ -35,15 +35,17 @@ The dictionary installer also builds a reverse index. A direct translation is
 ranked against independently matching entries in the opposite direction;
 confirmed headwords are preferred while markup, stress characters, mixed-script
 notes, and likely spelling variants are removed or demoted. This improves
-single-word quality without adding network access or Argos latency.
+single-word quality without adding network access or neural-model latency.
 
 All repository write paths normalize card meanings. Sentence-ending periods are
 removed from single-card translations while periods in abbreviations such as
 `U.S.` are preserved. Alternatives are de-duplicated after normalization, so
 GUI entry, batch import, and JSON/CSV import behave the same.
 
-Runtime translation forces Stanza resource discovery into offline-only mode and
-sets the Hugging Face offline flags before Argos is imported. Language files are
+Runtime translation calls the packaged CTranslate2 models directly with the
+same four-candidate beam search used previously. A compact sentence splitter is
+sufficient for card phrases and short examples, so Torch, Stanza, spaCy,
+MiniSBD, and ONNX are absent from production bundles. Language files are
 downloaded only by the explicit installation scripts. Neural hypotheses are
 cached for the current process; dictionary lookups remain the fast first path.
 
@@ -54,7 +56,7 @@ LexiDesk schema, and create a timestamped safety backup before replacement.
 The background example task validates both halves of every example. The source
 must contain the card headword and the translated sentence must contain the
 selected target meaning. WordNet examples from another sense and inconsistent
-Argos output are rejected. Quoted definition terms can be aligned safely; when
+neural output are rejected. Quoted definition terms can be aligned safely; when
 that is not possible, the service stores a compact explicit fallback.
 
 Card rotation is deterministic until meaningful ties. Passive browsing covers

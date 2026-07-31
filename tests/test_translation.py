@@ -254,3 +254,18 @@ def test_mismatched_model_example_uses_contextual_fallback() -> None:
     assert "надёжный" in result.translation
     assert "используется слово" not in result.translation.casefold()
     assert "used in this example" not in result.source.casefold()
+
+
+def test_model_candidates_use_compact_runtime_without_argos() -> None:
+    class Registry:
+        def candidates(self, text: str, source: str, target: str) -> tuple[str, ...]:
+            assert (text, source, target) == ("short phrase", "en", "ru")
+            return ("короткая фраза", "краткая фраза")
+
+    translator = OfflineTranslator(dictionary=OfflineDictionary())
+    translator._model_registry = Registry()  # type: ignore[assignment]
+
+    assert translator._model_candidates("short phrase", "en", "ru") == [
+        "короткая фраза",
+        "краткая фраза",
+    ]

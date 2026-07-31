@@ -8,11 +8,11 @@ url="https://github.com/Mozzhukhin/LexiDesk"
 license=('MIT')
 depends=(
   'python'
-  'python-argostranslate'
+  'python-ctranslate2'
   'python-fsrs'
-  'python-nltk'
   'python-platformdirs'
   'python-pyside6'
+  'python-sentencepiece'
 )
 makedepends=('python-build' 'python-installer' 'python-wheel')
 optdepends=('plasma-workspace: native KDE Plasma desktop widget')

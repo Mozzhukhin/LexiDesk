@@ -15,13 +15,14 @@ LexiDesk transforms the TEI files into a local SQLite search index. The
 transformed database remains under the same CC BY-SA 3.0 terms. The original
 TEI files are removed after indexing to avoid duplicate disk usage.
 
-## Argos Translate
+## Argos EN↔RU models and CTranslate2
 
-- Project: [Argos Translate](https://github.com/argosopentech/argos-translate)
+- Models: [Argos Translate](https://github.com/argosopentech/argos-translate)
+- Runtime: [CTranslate2](https://github.com/OpenNMT/CTranslate2)
 - Purpose: offline neural translation fallback for words or phrases not found
   in the bilingual dictionary
-- Software license: MIT / CC0; individual model metadata is retained inside
-  each installed model package
+- Software license: MIT; individual model metadata is retained inside each
+  installed model package
 
 ## Princeton WordNet
 

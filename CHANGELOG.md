@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Replace the Argos Python runtime with direct CTranslate2 inference, preserving
+  the same models and beam-search output while removing Torch, Stanza, spaCy,
+  MiniSBD, and ONNX from Linux and Windows bundles.
+- Add packaged-runtime translation smoke tests to both release jobs and verify
+  downloaded model contents with pinned SHA-256 hashes.
+- Strip Linux debug symbols and omit unused model corpora and the obsolete TIFF
+  plugin from standalone packages.
 - Simplified the widget header and moved practice selection and management
   tools into one compact menu.
 - Added hover-only card actions for editing, temporarily skipping, safely

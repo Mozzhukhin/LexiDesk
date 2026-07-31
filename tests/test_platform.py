@@ -6,6 +6,7 @@ from pathlib import Path
 import lexidesk.service_client as service_client
 from lexidesk.autostart import set_autostart
 from lexidesk.config import autostart_path, data_dir, dictionary_path
+from lexidesk.model_translation import translation_model_roots
 from lexidesk.service_client import request_service
 
 
@@ -90,3 +91,34 @@ def test_bundled_dictionary_is_fallback(monkeypatch, tmp_path: Path) -> None:
     )
 
     assert dictionary_path() == bundled_dictionary
+
+
+def test_bundled_translation_models_are_cross_platform_fallback(
+    monkeypatch, tmp_path: Path
+) -> None:
+    bundled = tmp_path / "language-data"
+    expected = bundled / "argos-translate" / "packages"
+    monkeypatch.setattr(
+        "lexidesk.model_translation.bundled_language_data_dir",
+        lambda: bundled,
+    )
+    monkeypatch.delenv("LEXIDESK_MODELS_DIR", raising=False)
+    monkeypatch.delenv("ARGOS_PACKAGES_DIR", raising=False)
+
+    assert expected in translation_model_roots()
+
+
+def test_bundle_excludes_training_only_translation_dependencies() -> None:
+    spec = (
+        Path(__file__).parents[1] / "packaging" / "pyinstaller" / "lexidesk.spec"
+    ).read_text(encoding="utf-8")
+
+    for dependency in (
+        "argostranslate",
+        "numpy",
+        "onnxruntime",
+        "spacy",
+        "stanza",
+        "torch",
+    ):
+        assert f'"{dependency}"' in spec

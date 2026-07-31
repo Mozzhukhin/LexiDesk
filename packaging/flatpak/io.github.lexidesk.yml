@@ -16,23 +16,6 @@ finish-args:
   - --filesystem=xdg-data/LexiDesk:create
 
 modules:
-  # CPU-only PyTorch wheels live in PyTorch's index rather than PyPI, so they
-  # are pinned separately from the generated dependency manifest.
-  - name: python3-torch-cpu
-    buildsystem: simple
-    build-commands:
-      - pip3 install --prefix=/app --no-deps *.whl
-    sources:
-      - type: file
-        url: https://download-r2.pytorch.org/whl/cpu/torch-2.13.0%2Bcpu-cp312-cp312-manylinux_2_28_x86_64.whl
-        sha256: 4ca4a9394b0c771238a4f73590fdbbc4debad85ed0fa63d026ae1b085da7d6e2
-        only-arches:
-          - x86_64
-      - type: file
-        url: https://download-r2.pytorch.org/whl/cpu/torch-2.13.0%2Bcpu-cp312-cp312-manylinux_2_28_aarch64.whl
-        sha256: 6f307c2c32d764ffc6ff6893b801fad6d4752f3e67966cb8abf1843427c02604
-        only-arches:
-          - aarch64
   - python3-dependencies.json
   - name: lexidesk
     buildsystem: simple

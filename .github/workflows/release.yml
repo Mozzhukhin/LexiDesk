@@ -33,7 +33,7 @@ jobs:
         with:
           python-version: "3.13"
           enable-cache: true
-      - run: uv sync
+      - run: uv sync --extra data-build
       - name: Build offline dictionary, examples, and translation models
         env:
           LEXIDESK_DATA_DIR: ${{ github.workspace }}/bundle-data/LexiDesk
@@ -66,6 +66,8 @@ jobs:
           path: bundle-data
       - name: Build standalone application
         run: uv run pyinstaller --clean --noconfirm packaging/pyinstaller/lexidesk.spec
+      - name: Smoke-test bundled Linux translation
+        run: dist/LexiDesk/LexiDesk --self-test
       - name: Build AppImage and portable archive
         run: |
           mkdir -p release LexiDesk.AppDir/usr/lib/lexidesk
@@ -106,6 +108,11 @@ jobs:
           path: bundle-data
       - name: Build standalone application
         run: uv run pyinstaller --clean --noconfirm packaging/pyinstaller/lexidesk.spec
+      - name: Smoke-test bundled Windows translation
+        shell: pwsh
+        run: |
+          & dist/LexiDesk/LexiDesk.exe --self-test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build portable archive
         shell: pwsh
         run: |

@@ -12,12 +12,12 @@ command -v uv >/dev/null 2>&1 || {
 if python -c "import PySide6" >/dev/null 2>&1; then
     echo "Using the PySide6 package provided by the Linux distribution."
     uv venv --allow-existing --python python --system-site-packages
-    uv pip install torch --index-url https://download.pytorch.org/whl/cpu
-    uv pip install argostranslate nltk platformdirs pytest hatchling
+    uv pip install 'ctranslate2>=4,<5' 'sentencepiece>=0.2,<0.3'
+    uv pip install fsrs nltk platformdirs pytest hatchling
     uv pip install --no-deps --editable .
 else
-    echo "No system PySide6 found; installing the portable Qt wheel."
-    uv sync --extra dev
+    echo "No system PySide6 found; installing the compact portable runtime."
+    uv sync --extra dev --extra data-build
 fi
 "$PROJECT_DIR/.venv/bin/python" scripts/install_models.py
 "$PROJECT_DIR/.venv/bin/python" scripts/install_dictionary.py

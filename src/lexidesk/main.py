@@ -56,12 +56,23 @@ def _arguments() -> argparse.Namespace:
         action="store_true",
         help="Open only the application settings",
     )
+    mode.add_argument(
+        "--self-test",
+        action="store_true",
+        help="Verify the bundled offline translation runtime and exit",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     configure_logging()
     arguments = _arguments()
+    if arguments.self_test:
+        translator = OfflineTranslator()
+        for text in ("This is a practical suggestion.", "Это полезное предложение."):
+            if not translator.translate(text).translation:
+                return 1
+        return 0
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
     app.setApplicationDisplayName(APP_NAME)

@@ -3,9 +3,7 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass
-from functools import partial
 
-from .config import bundled_language_data_dir
 from .dictionary import (
     OfflineDictionary,
     SpellingSuggestion,
@@ -13,6 +11,7 @@ from .dictionary import (
     normalize_headword,
 )
 from .examples import SemanticExampleIndex, example_is_informative
+from .model_translation import OfflineModelRegistry
 
 CYRILLIC_RE = re.compile(r"[\u0400-\u04ff]")
 LATIN_RE = re.compile(r"[A-Za-z]")
@@ -58,37 +57,20 @@ class OfflineTranslator:
         autocorrect: bool = True,
         examples: SemanticExampleIndex | None = None,
     ) -> None:
-        self._translate_module = None
+        self._model_registry: OfflineModelRegistry | None = None
         self._model_cache: dict[tuple[str, str, str], tuple[str, ...]] = {}
         self.dictionary = dictionary or OfflineDictionary()
         self.autocorrect = autocorrect
         self.examples = examples or SemanticExampleIndex()
 
-    def _module(self):
-        if self._translate_module is None:
-            # Translation must stay offline even when a newer Stanza release
-            # changes its default resource-discovery behaviour.
+    def _models(self) -> OfflineModelRegistry:
+        if self._model_registry is None:
+            # Keep third-party runtimes offline even if they are installed by
+            # another application in the same user environment.
             os.environ.setdefault("HF_HUB_OFFLINE", "1")
             os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
-            bundled = bundled_language_data_dir()
-            if bundled is not None:
-                packages = bundled / "argos-translate" / "packages"
-                if packages.is_dir():
-                    os.environ.setdefault("ARGOS_PACKAGES_DIR", str(packages))
-            try:
-                import argostranslate.sbd
-                import argostranslate.translate
-                from stanza.pipeline.core import DownloadMethod
-            except ImportError as error:
-                raise TranslationError(
-                    "Offline translator is not installed. Run scripts/setup.sh."
-                ) from error
-            argostranslate.sbd.stanza.Pipeline = partial(
-                argostranslate.sbd.stanza.Pipeline,
-                download_method=DownloadMethod.NONE,
-            )
-            self._translate_module = argostranslate.translate
-        return self._translate_module
+            self._model_registry = OfflineModelRegistry()
+        return self._model_registry
 
     def translate(self, text: str) -> TranslationResult:
         cleaned = " ".join(text.strip().split())
@@ -239,26 +221,18 @@ class OfflineTranslator:
         cached = self._model_cache.get(cache_key)
         if cached is not None:
             return list(cached)
-        module = self._module()
-        installed = module.get_installed_languages()
-        source_language = next(
-            (language for language in installed if language.code == source), None
-        )
-        target_language = next(
-            (language for language in installed if language.code == target), None
-        )
-        if source_language is None or target_language is None:
+        try:
+            hypotheses = self._models().candidates(cleaned, source, target)
+        except (LookupError, RuntimeError) as error:
             raise TranslationError(
                 f"The {source.upper()} → {target.upper()} model is missing. "
                 "Run scripts/install_models.py while connected to the internet."
-            )
-        engine = source_language.get_translation(target_language)
-        hypotheses = engine.hypotheses(cleaned, num_hypotheses=4)
+            ) from error
         candidates: list[str] = []
         seen: set[str] = set()
         for hypothesis in hypotheses:
             value = _clean_model_candidate(
-                hypothesis.value,
+                hypothesis,
                 single_word=len(cleaned.split()) == 1,
             )
             key = value.casefold()

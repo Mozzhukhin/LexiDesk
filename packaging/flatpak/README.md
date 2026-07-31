@@ -12,9 +12,9 @@ flatpak-builder --force-clean --user --install-deps-from=flathub \
   --install build-flatpak packaging/flatpak/io.github.lexidesk.yml
 ```
 
-The CPU-only PyTorch wheels are pinned separately in the main manifest because
-they are published in PyTorch's wheel index rather than PyPI. PySide6 is
-provided by Flathub's `io.qt.PySide.BaseApp` 6.9 base application.
+The application uses the same compact CTranslate2 inference runtime as the
+Windows and AppImage builds. Torch, Stanza, spaCy, and ONNX are not required.
+PySide6 is provided by Flathub's `io.qt.PySide.BaseApp` 6.9 base application.
 
 Offline language packages must be imported into the sandbox data directory.
 The application itself does not request network access.

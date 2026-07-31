@@ -39,7 +39,7 @@ a network connection. A source installation downloads this data once during
 
 - Fully offline EN ↔ RU translation after initial language-data installation
 - A 99,000-headword FreeDict index cross-checked in both translation directions
-- Argos neural translation fallback for phrases and missing dictionary entries
+- Compact CTranslate2 neural fallback for phrases and missing dictionary entries
 - Short examples validated against both the studied word and selected meaning
 - Conservative offline autocorrection for misspelled English and Russian words
 - Clean card meanings without sentence-ending periods or duplicate variants
@@ -231,7 +231,7 @@ Python CLI bridge ─────► local D-Bus service ◄───── PySi
                                    ▼
 Application core
     ├── FSRS 6 scheduler and answer checker
-    ├── offline Argos translator
+    ├── compact offline CTranslate2 translator
     ├── import/export and backups
     └── SQLite repository + review history
 ```
@@ -241,19 +241,19 @@ service details.
 
 For dictionary words, LexiDesk checks both EN→RU and RU→EN indexes, removes
 stress marks and source markup, demotes likely misspellings, and keeps ambiguous
-meanings available for explicit selection. Argos remains a fallback for phrases
+meanings available for explicit selection. The neural model remains a fallback for phrases
 and missing entries; no automatic system can infer the intended sense of an
 isolated word with certainty, so every translation remains editable.
 
 Regular cards always place English above Russian for a consistent visual
 hierarchy. On RU→EN cards this only changes presentation: the stored direction
-and quiz prompts still test the requested direction. Single-word Argos results
+and quiz prompts still test the requested direction. Single-word model results
 are normalized as card meanings rather than sentences: periods are removed and
 punctuation-only duplicates are collapsed before saving.
 
 Example generation is tied to the selected card meaning. Both sides must contain
 the corresponding studied term (including common inflected forms). A mismatched
-WordNet sense or Argos translation is rejected and replaced with a short safe
+WordNet sense or neural translation is rejected and replaced with a short safe
 contextual example instead of being saved as misleading learning material. The
 compact WordNet SQLite index is retained; its larger source corpus is removed
 automatically after indexing.
@@ -267,8 +267,8 @@ are translated as entered.
 ## Privacy and offline behavior
 
 The regular application, widget, CLI, database, review system, and translation
-engine run locally. Runtime code explicitly disables Stanza and Hugging Face
-resource downloads. Network access is used only by `scripts/install_models.py`
+engine run locally. LexiDesk runs the EN↔RU CTranslate2 models directly and does
+not ship Torch, Stanza, spaCy, or ONNX. Network access is used only by `scripts/install_models.py`
 during the initial EN↔RU model installation,
 `scripts/install_dictionary.py` while building the local FreeDict index, and
 `scripts/install_examples.py` while building the local WordNet example index.
