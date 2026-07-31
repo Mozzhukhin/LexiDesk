@@ -183,6 +183,7 @@ class OfflineTranslator:
             source_text,
             language,
             target_text,
+            part_of_speech,
         )
 
     def complete_example(
@@ -191,6 +192,7 @@ class OfflineTranslator:
         source_text: str,
         source_language: str,
         target_text: str,
+        part_of_speech: str = "",
     ) -> ExampleResult:
         """Translate an example and keep both sides tied to the card meaning."""
         translation = self.translate(sentence).translation
@@ -201,12 +203,15 @@ class OfflineTranslator:
                 target_text,
                 allow_inflection=True,
             ):
-                if source_language == "en":
-                    sentence = f"The word “{source_text}” is used in this example."
-                    translation = f"В этом примере используется слово «{target_text}»."
-                else:
-                    sentence = f"В этом примере используется слово «{source_text}»."
-                    translation = f"The word “{target_text}” is used in this example."
+                fallback = _contextual_fallback(
+                    sentence,
+                    source_text,
+                    source_language,
+                    target_text,
+                    part_of_speech,
+                )
+                sentence = fallback.source
+                translation = fallback.translation
         return ExampleResult(sentence, translation)
 
     def example_sentence(
@@ -435,16 +440,16 @@ def build_example_sentence(
             return semantic
     if source_language == "ru":
         if category.startswith("noun") or category.startswith("сущ"):
-            return f"В тексте встретилось существительное «{term}»."
+            return f"Понятие «{term}» оказалось важным для обсуждения."
         if category.startswith("verb") or category.startswith("глаг"):
-            return f"В этом предложении используется глагол «{term}»."
+            return f"В итоге они решили: «{term}»."
         if category.startswith("adj") or category.startswith("прилаг"):
-            return f"В тексте встретилось прилагательное «{term}»."
+            return f"Результат можно описать как «{term}»."
         if category.startswith("adv") or category.startswith("нареч"):
-            return f"В этом предложении используется наречие «{term}»."
+            return f"Её ответ прозвучал именно «{term}»."
         if category.startswith("phrase") or category.startswith("фраз"):
-            return f"В разговоре прозвучала фраза «{term}»."
-        return f"В разговоре встретилось выражение «{term}»."
+            return f"Фраза «{term}» точно передала её мысль."
+        return f"Выражение «{term}» помогло уточнить смысл разговора."
 
     insertion = term
     if len(term.split()) == 1 and not term.isupper():
@@ -460,3 +465,57 @@ def build_example_sentence(
     if category.startswith("phrase"):
         return f"I heard the phrase “{term}” during the conversation."
     return f"The term “{term}” appeared in the conversation."
+
+
+def _contextual_fallback(
+    source_sentence: str,
+    source_text: str,
+    source_language: str,
+    target_text: str,
+    part_of_speech: str,
+) -> ExampleResult:
+    """Keep a useful source sentence and build a compact meaning-aware pair."""
+    category = part_of_speech.strip().casefold()
+    if source_language == "en":
+        source = source_sentence or build_example_sentence(
+            source_text,
+            "en",
+            category,
+        )
+        if category.startswith("noun"):
+            target = f"Понятие «{target_text}» повлияло на итоговое решение."
+        elif category.startswith("verb"):
+            target = f"Они решили «{target_text}», когда пришло время действовать."
+        elif category.startswith("adj"):
+            target = f"Результат оказался «{target_text}» в этой ситуации."
+        elif category.startswith("adv"):
+            target = f"Она ответила «{target_text}» и объяснила своё решение."
+        else:
+            target = f"Выражение «{target_text}» точно передало смысл разговора."
+        return ExampleResult(source, _shorten_fallback(target, target_text, "ru"))
+
+    source = source_sentence or build_example_sentence(
+        source_text,
+        "ru",
+        category,
+    )
+    if category.startswith("noun"):
+        target = f"The idea of “{target_text}” shaped the final decision."
+    elif category.startswith("verb"):
+        prefix = "" if target_text.casefold().startswith("to ") else "to "
+        target = f"They decided {prefix}{target_text} when the time was right."
+    elif category.startswith("adj"):
+        target = f"The result seemed {target_text} in that situation."
+    elif category.startswith("adv"):
+        target = f"She answered {target_text} and explained her decision."
+    else:
+        target = f"The phrase “{target_text}” expressed the idea clearly."
+    return ExampleResult(source, _shorten_fallback(target, target_text, "en"))
+
+
+def _shorten_fallback(sentence: str, term: str, language: str) -> str:
+    if len(sentence) <= 70:
+        return sentence
+    if language == "ru":
+        return f"Важный смысл здесь — «{term}»."
+    return f"The intended meaning here is “{term}”."

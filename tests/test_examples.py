@@ -1,7 +1,11 @@
 import sqlite3
 from pathlib import Path
 
-from lexidesk.examples import MAX_EXAMPLE_LENGTH, SemanticExampleIndex
+from lexidesk.examples import (
+    MAX_EXAMPLE_LENGTH,
+    SemanticExampleIndex,
+    cleanup_wordnet_sources,
+)
 
 
 def test_semantic_examples_prefer_the_most_frequent_sense(tmp_path: Path) -> None:
@@ -46,6 +50,19 @@ def test_semantic_examples_prefer_the_most_frequent_sense(tmp_path: Path) -> Non
     result = SemanticExampleIndex(path).lookup("suggestion", "noun")
 
     assert result == "The picnic was her suggestion."
+
+
+def test_wordnet_sources_are_removed_after_indexing(tmp_path: Path) -> None:
+    nltk_source = tmp_path / "nltk_data" / "corpora" / "wordnet"
+    legacy_source = tmp_path / "wordnet" / "wordnet"
+    nltk_source.mkdir(parents=True)
+    legacy_source.mkdir(parents=True)
+    (nltk_source / "index.noun").touch()
+    (legacy_source / "index.noun").touch()
+
+    assert cleanup_wordnet_sources(tmp_path) == 2
+    assert not (tmp_path / "nltk_data").exists()
+    assert not (tmp_path / "wordnet").exists()
 
 
 def test_semantic_examples_explain_a_sense_without_an_example(

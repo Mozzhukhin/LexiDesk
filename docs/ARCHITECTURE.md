@@ -63,6 +63,15 @@ miss rate, FSRS difficulty, and due time. This prevents overdue cards from
 starving future cards during passive browsing. Random ordering is only the final
 tie-breaker.
 
+Quiz distractors come from one bounded, indexed repository query instead of
+materializing the complete vocabulary for every card. Same-part-of-speech and
+previously difficult candidates remain first, while the query stays responsive
+for vocabularies containing thousands of cards.
+
+Batch preview owns a dedicated `QThread`. Translation progress is delivered by
+signals, and cancellation is checked between records so closing or cancelling
+the operation never blocks the GUI event loop.
+
 The selector excludes the five most recently displayed card IDs. Its SQL limit
 is `min(5, deck_size - 1)`, so decks containing fewer than six cards remain
 usable while still cycling through every other word before a repeat. A one-card

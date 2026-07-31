@@ -61,6 +61,7 @@ a network connection. A source installation downloads this data once during
 - Daily goals, 30-day activity, recall accuracy, streak, and review forecast
 - Difficult-card ranking based on FSRS difficulty and stability
 - Smart article import that removes stopwords, duplicates, names, and unknown noise
+- Responsive batch translation with progress and cooperative cancellation
 - JSON/CSV import and export
 - Daily SQLite backups with seven-day retention
 - Manual full backup and validated restore of cards, FSRS state, and review history
@@ -252,7 +253,9 @@ punctuation-only duplicates are collapsed before saving.
 Example generation is tied to the selected card meaning. Both sides must contain
 the corresponding studied term (including common inflected forms). A mismatched
 WordNet sense or Argos translation is rejected and replaced with a short safe
-example instead of being saved as misleading learning material.
+contextual example instead of being saved as misleading learning material. The
+compact WordNet SQLite index is retained; its larger source corpus is removed
+automatically after indexing.
 
 For an unknown single word, LexiDesk compares nearby dictionary spellings with
 the offline model's translation and automatically substitutes a correction only

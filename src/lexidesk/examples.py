@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import re
+import shutil
 import sqlite3
+from contextlib import suppress
 from pathlib import Path
 
-from .config import examples_path
+from .config import data_dir, examples_path
 from .dictionary import normalize_headword
 
 POS_CODES = {
@@ -14,6 +16,26 @@ POS_CODES = {
     "adverb": "r",
 }
 MAX_EXAMPLE_LENGTH = 70
+
+
+def cleanup_wordnet_sources(root: Path | None = None) -> int:
+    """Remove corpora retained after the compact SQLite index is ready."""
+    data_root = root or data_dir()
+    removed = 0
+    for source in (
+        data_root / "nltk_data" / "corpora" / "wordnet",
+        data_root / "wordnet",
+    ):
+        if source.is_dir():
+            shutil.rmtree(source)
+            removed += 1
+    for directory in (
+        data_root / "nltk_data" / "corpora",
+        data_root / "nltk_data",
+    ):
+        with suppress(OSError):
+            directory.rmdir()
+    return removed
 
 
 class SemanticExampleIndex:

@@ -3,10 +3,10 @@ from __future__ import annotations
 import re
 import sqlite3
 from collections import Counter
+from collections.abc import Callable
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtWidgets import (
-    QApplication,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -25,6 +25,8 @@ from PySide6.QtWidgets import (
 from .database import WordRepository
 from .service_client import schedule_example_enrichment
 from .translation import OfflineTranslator, TranslationError, detect_language
+
+type PreparedRecord = tuple[str, str, str, str, str, str]
 
 WORD_RE = re.compile(r"[A-Za-zА-Яа-яЁё][A-Za-zА-Яа-яЁё'-]{2,}")
 STOPWORDS = {
@@ -87,6 +89,83 @@ STOPWORDS = {
 }
 
 
+def prepare_batch_records(
+    records: list[tuple[str, str]],
+    translator: OfflineTranslator,
+    *,
+    cancelled: Callable[[], bool] = lambda: False,
+    progress: Callable[[int], None] = lambda _value: None,
+) -> list[PreparedRecord]:
+    """Translate batch records outside the GUI thread with cooperative cancel."""
+    prepared: list[PreparedRecord] = []
+    for index, (source, supplied_target) in enumerate(records):
+        if cancelled():
+            break
+        try:
+            if supplied_target:
+                source_language = detect_language(source)
+                corrected = source
+                target = supplied_target
+                part_of_speech = ""
+            else:
+                result = translator.translate(source)
+                source_language = result.source_language
+                corrected = result.corrected_source or source
+                target = result.translation
+                part_of_speech = result.part_of_speech
+            try:
+                example = translator.example_sentence(
+                    corrected,
+                    source_language,
+                    part_of_speech,
+                )
+            except TranslationError:
+                example = ""
+            prepared.append(
+                (
+                    corrected,
+                    target,
+                    source_language,
+                    part_of_speech,
+                    example,
+                    "",
+                )
+            )
+        except TranslationError:
+            pass
+        finally:
+            progress(index + 1)
+    return prepared
+
+
+class BatchPreviewWorker(QThread):
+    progress_changed = Signal(int)
+    completed = Signal(object, bool)
+    failed = Signal(str)
+
+    def __init__(
+        self,
+        translator: OfflineTranslator,
+        records: list[tuple[str, str]],
+    ) -> None:
+        super().__init__()
+        self.translator = translator
+        self.records = records
+
+    def run(self) -> None:
+        try:
+            prepared = prepare_batch_records(
+                self.records,
+                self.translator,
+                cancelled=self.isInterruptionRequested,
+                progress=self.progress_changed.emit,
+            )
+        except Exception as error:
+            self.failed.emit(str(error))
+            return
+        self.completed.emit(prepared, self.isInterruptionRequested())
+
+
 class BatchAddDialog(QDialog):
     def __init__(
         self,
@@ -97,6 +176,9 @@ class BatchAddDialog(QDialog):
         super().__init__(parent)
         self.repository = repository
         self.translator = translator
+        self._preview_worker: BatchPreviewWorker | None = None
+        self._progress_dialog: QProgressDialog | None = None
+        self._close_after_preview = False
         self.setWindowTitle("Batch add vocabulary")
         self.resize(760, 640)
 
@@ -117,8 +199,8 @@ class BatchAddDialog(QDialog):
             "opportunity = возможность\nlook forward to\n\nor paste an article…"
         )
 
-        preview_button = QPushButton("Build offline preview")
-        preview_button.clicked.connect(self.build_preview)
+        self.preview_button = QPushButton("Build offline preview")
+        self.preview_button.clicked.connect(self.build_preview)
 
         self.table = QTableWidget(0, 3)
         self.table.setHorizontalHeaderLabels(["Add", "Source", "Translation"])
@@ -144,7 +226,7 @@ class BatchAddDialog(QDialog):
         layout.addWidget(hint)
         layout.addWidget(self.mode)
         layout.addWidget(self.input, 1)
-        layout.addWidget(preview_button)
+        layout.addWidget(self.preview_button)
         layout.addWidget(self.table, 1)
         layout.addWidget(buttons)
 
@@ -188,61 +270,42 @@ class BatchAddDialog(QDialog):
         return records[:100]
 
     def build_preview(self) -> None:
+        if self._preview_worker is not None:
+            return
         records = self._sources()
         if not records:
             QMessageBox.information(
                 self, "Nothing to preview", "Paste some text first."
             )
             return
-        progress = QProgressDialog(
+        progress_dialog = QProgressDialog(
             "Translating locally…",
             "Cancel",
             0,
             len(records),
             self,
         )
-        progress.setWindowModality(Qt.WindowModality.WindowModal)
-        prepared: list[tuple[str, str, str, str, str, str]] = []
-        for index, (source, supplied_target) in enumerate(records):
-            progress.setValue(index)
-            QApplication.processEvents()
-            if progress.wasCanceled():
-                break
-            try:
-                if supplied_target:
-                    source_language = detect_language(source)
-                    corrected = source
-                    target = supplied_target
-                    part_of_speech = ""
-                else:
-                    result = self.translator.translate(source)
-                    source_language = result.source_language
-                    corrected = result.corrected_source or source
-                    target = result.translation
-                    part_of_speech = result.part_of_speech
-                try:
-                    example = self.translator.example_sentence(
-                        corrected,
-                        source_language,
-                        part_of_speech,
-                    )
-                except TranslationError:
-                    example = ""
-                example_translation = ""
-                prepared.append(
-                    (
-                        corrected,
-                        target,
-                        source_language,
-                        part_of_speech,
-                        example,
-                        example_translation,
-                    )
-                )
-            except TranslationError:
-                continue
-        progress.setValue(len(records))
+        progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
+        progress_dialog.setMinimumDuration(0)
+        progress_dialog.setAutoClose(False)
+        progress_dialog.setAutoReset(False)
+        worker = BatchPreviewWorker(self.translator, records)
+        worker.progress_changed.connect(progress_dialog.setValue)
+        worker.completed.connect(self._preview_ready)
+        worker.failed.connect(self._preview_failed)
+        worker.finished.connect(self._preview_finished)
+        progress_dialog.canceled.connect(worker.requestInterruption)
+        self._preview_worker = worker
+        self._progress_dialog = progress_dialog
+        self.preview_button.setEnabled(False)
+        progress_dialog.show()
+        worker.start()
 
+    def _preview_ready(
+        self,
+        prepared: list[PreparedRecord],
+        _cancelled: bool,
+    ) -> None:
         self.table.setRowCount(len(prepared))
         for row, record in enumerate(prepared):
             source, target, *_metadata = record
@@ -256,6 +319,37 @@ class BatchAddDialog(QDialog):
             source_item.setData(Qt.ItemDataRole.UserRole, record[2:])
             self.table.setItem(row, 1, source_item)
             self.table.setItem(row, 2, QTableWidgetItem(target))
+
+    def _preview_failed(self, message: str) -> None:
+        QMessageBox.warning(
+            self,
+            "Could not build preview",
+            message or "The offline preview failed unexpectedly.",
+        )
+
+    def _preview_finished(self) -> None:
+        worker = self._preview_worker
+        progress_dialog = self._progress_dialog
+        self._preview_worker = None
+        self._progress_dialog = None
+        self.preview_button.setEnabled(True)
+        if progress_dialog is not None:
+            progress_dialog.close()
+            progress_dialog.deleteLater()
+        if worker is not None:
+            worker.deleteLater()
+        if self._close_after_preview:
+            self._close_after_preview = False
+            super().reject()
+
+    def reject(self) -> None:
+        if self._preview_worker is not None:
+            self._close_after_preview = True
+            self._preview_worker.requestInterruption()
+            if self._progress_dialog is not None:
+                self._progress_dialog.setLabelText("Cancelling after this word…")
+            return
+        super().reject()
 
     def save_selected(self) -> None:
         imported = 0

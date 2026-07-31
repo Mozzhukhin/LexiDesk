@@ -52,6 +52,7 @@ def enrich_example(database: Path, word_id: int) -> bool:
                 word.source_text,
                 word.source_lang,
                 word.target_text,
+                word.part_of_speech,
             )
             example = completed.source
             translation = completed.translation

@@ -21,6 +21,7 @@ dependencies = [
 dev = [
     "mypy>=1.17",
     "pytest>=9",
+    "pytest-cov>=7",
     "ruff>=0.12",
 ]
 bundle = [
@@ -42,6 +43,14 @@ packages = ["src/lexidesk"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+addopts = "--cov=lexidesk --cov-report=term-missing --cov-fail-under=70"
+
+[tool.coverage.run]
+branch = true
+source = ["lexidesk"]
+
+[tool.coverage.report]
+show_missing = true
 
 [tool.ruff]
 target-version = "py313"

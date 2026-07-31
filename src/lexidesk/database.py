@@ -117,6 +117,8 @@ class WordRepository:
             );
 
             CREATE INDEX IF NOT EXISTS idx_words_due ON words(due_at);
+            CREATE INDEX IF NOT EXISTS idx_words_quiz_candidates
+                ON words(source_lang, part_of_speech COLLATE NOCASE);
             CREATE INDEX IF NOT EXISTS idx_review_word ON review_log(word_id);
 
             CREATE TABLE IF NOT EXISTS quiz_log (
@@ -398,6 +400,45 @@ class WordRepository:
         if status != "All":
             words = [word for word in words if word.status == status]
         return words
+
+    def quiz_candidates(self, word: Word, limit: int = 64) -> list[Word]:
+        """Return a small, ranked candidate pool without loading the full deck."""
+        category = word.part_of_speech.split(",", 1)[0].strip().casefold()
+        rows = self.connection.execute(
+            """
+            SELECT * FROM words
+            WHERE id != ? AND source_lang = ?
+            ORDER BY
+                CASE
+                    WHEN lower(trim(
+                        CASE
+                            WHEN instr(part_of_speech, ',') > 0
+                            THEN substr(part_of_speech, 1,
+                                instr(part_of_speech, ',') - 1)
+                            ELSE part_of_speech
+                        END
+                    )) = ? THEN 0
+                    ELSE 1
+                END,
+                CASE
+                    WHEN know_count + dont_know_count = 0 THEN 0
+                    ELSE CAST(dont_know_count AS REAL)
+                         / (know_count + dont_know_count)
+                END DESC,
+                abs(COALESCE(difficulty, 5) - ?),
+                last_shown_at,
+                id
+            LIMIT ?
+            """,
+            (
+                word.id,
+                word.source_lang,
+                category,
+                word.difficulty or 5,
+                max(4, min(limit, 256)),
+            ),
+        ).fetchall()
+        return [self._to_word(row) for row in rows]
 
     def statistics(self) -> dict[str, int | float]:
         now = to_storage(utc_now())

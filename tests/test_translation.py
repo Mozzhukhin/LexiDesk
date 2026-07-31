@@ -214,3 +214,22 @@ def test_russian_example_uses_english_word_meaning(tmp_path) -> None:
 
     assert result.source == "Пикник был её предложением."
     assert result.translation == "The picnic was her suggestion."
+
+
+def test_mismatched_model_example_uses_contextual_fallback() -> None:
+    class MismatchingTranslator(OfflineTranslator):
+        def translate(self, _text: str) -> TranslationResult:
+            return TranslationResult("en", "ru", "Перевод без нужного значения.")
+
+    result = MismatchingTranslator().complete_example(
+        "The result seemed reliable in this situation.",
+        "reliable",
+        "en",
+        "надёжный",
+        "adjective",
+    )
+
+    assert result.source == "The result seemed reliable in this situation."
+    assert "надёжный" in result.translation
+    assert "используется слово" not in result.translation.casefold()
+    assert "used in this example" not in result.source.casefold()

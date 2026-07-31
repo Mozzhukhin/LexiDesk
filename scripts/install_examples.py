@@ -8,7 +8,7 @@ from collections import defaultdict
 from pathlib import Path, PurePosixPath
 
 from lexidesk.config import data_dir, examples_path
-from lexidesk.examples import select_human_example
+from lexidesk.examples import cleanup_wordnet_sources, select_human_example
 
 WORDNET_URL = (
     "https://raw.githubusercontent.com/nltk/nltk_data/"
@@ -112,13 +112,17 @@ def main() -> int:
         finally:
             connection.close()
         if version >= 2:
+            removed = cleanup_wordnet_sources()
             print(f"Semantic examples are already installed: {target}")
+            if removed:
+                print(f"Removed {removed} obsolete WordNet source directories.")
             return 0
         target.unlink()
     nltk_root = data_dir() / "nltk_data"
     download_wordnet(nltk_root / "corpora")
     print("Building the fast semantic-example index…", flush=True)
     build_index(nltk_root, target)
+    cleanup_wordnet_sources()
     print(f"Semantic examples are ready: {target}", flush=True)
     return 0
 

@@ -152,6 +152,30 @@ def test_next_word_covers_unseen_cards_before_repeating(tmp_path: Path) -> None:
     repository.close()
 
 
+def test_quiz_candidates_are_ranked_and_bounded(tmp_path: Path) -> None:
+    repository = WordRepository(tmp_path / "candidates.db")
+    current_id = repository.add_word(
+        source_text="current",
+        source_lang="en",
+        target_text="текущий",
+        part_of_speech="noun",
+    )
+    for index in range(80):
+        repository.add_word(
+            source_text=f"candidate-{index}",
+            source_lang="en",
+            target_text=f"кандидат-{index}",
+            part_of_speech="noun" if index == 70 else "verb",
+        )
+
+    candidates = repository.quiz_candidates(repository.get_word(current_id), limit=8)
+
+    assert len(candidates) == 8
+    assert candidates[0].part_of_speech == "noun"
+    assert all(candidate.id != current_id for candidate in candidates)
+    repository.close()
+
+
 def test_next_word_prefers_oldest_shown_due_card(tmp_path: Path) -> None:
     repository = WordRepository(tmp_path / "priority.db")
     older_id = repository.add_word(

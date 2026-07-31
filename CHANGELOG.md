@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Move batch translation to a responsive, cancellable background worker.
+- Reduce quiz payload generation from a full-deck scan to a bounded SQL query.
+- Replace generic example fallbacks with compact contextual bilingual sentences.
+- Remove retained WordNet source corpora after the SQLite index is built.
+- Raise branch-aware test coverage above 70% and enforce it in the test suite.
+
 ## 1.1.0 — 2026-07-30
 
 - Add native Windows installer and portable Windows build.

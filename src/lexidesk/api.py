@@ -154,7 +154,12 @@ def quiz_variants(
     dictionary: OfflineDictionary | None = None,
 ) -> dict[str, dict[str, Any]]:
     candidates = _ranked_candidates(word, repository)
-    translation_choices = quiz_choices(word, repository, dictionary)
+    translation_choices = quiz_choices(
+        word,
+        repository,
+        dictionary,
+        candidates=candidates,
+    )
     reverse_choices = _distinct_choices(
         word.source_text,
         [candidate.source_text for candidate in candidates],
@@ -223,12 +228,17 @@ def quiz_choices(
     word: Word,
     repository: WordRepository,
     dictionary: OfflineDictionary | None = None,
+    *,
+    candidates: list[Word] | None = None,
 ) -> list[str]:
     excluded = {word.target_text, *word.alternatives}
     seen = {normalize_headword(value) for value in excluded}
     distractors: list[str] = []
 
-    for candidate in _ranked_candidates(word, repository):
+    candidate_pool = (
+        candidates if candidates is not None else _ranked_candidates(word, repository)
+    )
+    for candidate in candidate_pool:
         value = candidate.target_text.strip()
         key = normalize_headword(value)
         if (
@@ -270,20 +280,7 @@ def quiz_choices(
 
 
 def _ranked_candidates(word: Word, repository: WordRepository) -> list[Word]:
-    category = word.part_of_speech.split(",", 1)[0].strip().casefold()
-    candidates = [
-        candidate
-        for candidate in repository.list_words()
-        if candidate.id != word.id and candidate.source_lang == word.source_lang
-    ]
-    candidates.sort(
-        key=lambda candidate: (
-            candidate.part_of_speech.split(",", 1)[0].strip().casefold() != category,
-            -candidate.dont_know_count,
-            abs((candidate.difficulty or 5) - (word.difficulty or 5)),
-        )
-    )
-    return candidates
+    return repository.quiz_candidates(word)
 
 
 def _distinct_choices(answer: str, candidates: list[str]) -> list[str]:
