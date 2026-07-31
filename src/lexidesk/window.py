@@ -44,6 +44,7 @@ from .library import LibraryDialog
 from .models import Word
 from .service_client import request_service, schedule_example_enrichment
 from .settings import SettingsStore
+from .support import SupportDialog
 from .themes import stylesheet
 from .translation import OfflineTranslator
 
@@ -159,6 +160,9 @@ class LexiDeskWindow(QMainWindow):
         settings_action.triggered.connect(self.open_settings)
         diagnostics_action = card_menu.addAction("Diagnostics")
         diagnostics_action.triggered.connect(self.open_diagnostics)
+        card_menu.addSeparator()
+        support_action = card_menu.addAction("Support developer")
+        support_action.triggered.connect(self.open_support)
         more_button.setMenu(card_menu)
 
         close_button = QPushButton("×")
@@ -651,6 +655,11 @@ class LexiDeskWindow(QMainWindow):
         dialog.setStyleSheet(self.styleSheet())
         dialog.exec()
 
+    def open_support(self) -> None:
+        dialog = SupportDialog(self)
+        dialog.setStyleSheet(self.styleSheet())
+        dialog.exec()
+
     def edit_current_word(self) -> None:
         if self.current_word is None:
             return
@@ -687,8 +696,6 @@ class LexiDeskWindow(QMainWindow):
         self.next_card()
 
     def _tick(self) -> None:
-        if self._interaction_active():
-            return
         self.seconds_left -= 1
         if self.seconds_left <= 0:
             self.next_card()
@@ -701,12 +708,6 @@ class LexiDeskWindow(QMainWindow):
         self.countdown_progress.setValue(max(0, self.seconds_left))
         self.countdown_progress.setToolTip(
             f"{minutes}:{seconds:02d} until the next card"
-        )
-
-    def _interaction_active(self) -> bool:
-        return (
-            bool(self._current_quiz is not None and not self._quiz_answered)
-            or self.answer_edit.hasFocus()
         )
 
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:

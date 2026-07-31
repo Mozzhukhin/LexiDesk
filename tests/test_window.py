@@ -102,3 +102,22 @@ def test_standalone_mixed_mode_guarantees_a_quiz(tmp_path: Path) -> None:
 
     window.tick_timer.stop()
     repository.close()
+
+
+def test_rotation_skips_an_unanswered_quiz(tmp_path: Path) -> None:
+    window, repository = _window(tmp_path)
+    window.tick_timer.stop()
+    window.current_word = repository.get_word(1)
+    window.set_practice_mode("translation")
+    previous_id = window.current_word.id
+    assert window._current_quiz is not None
+
+    window.seconds_left = 1
+    window._tick()
+
+    assert window.current_word is not None
+    assert window.current_word.id != previous_id
+    skipped = repository.get_word(previous_id)
+    assert skipped.know_count == 0
+    assert skipped.dont_know_count == 0
+    repository.close()

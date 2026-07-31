@@ -122,3 +122,17 @@ def test_bundle_excludes_training_only_translation_dependencies() -> None:
         "torch",
     ):
         assert f'"{dependency}"' in spec
+
+
+def test_plasma_rotation_does_not_pause_for_an_unanswered_quiz() -> None:
+    qml = (
+        Path(__file__).parents[1]
+        / "plasma"
+        / "io.github.lexidesk"
+        / "contents"
+        / "ui"
+        / "main.qml"
+    ).read_text(encoding="utf-8")
+
+    assert "if (choiceMode && !choiceAnswered)" not in qml
+    assert 'root.launchGui("--support", "support")' in qml

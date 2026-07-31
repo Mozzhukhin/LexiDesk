@@ -108,8 +108,8 @@ def test_widget_keeps_english_above_russian_on_regular_cards() -> None:
     assert "root.primaryExampleText, root.primaryText" in qml
 
 
-def test_widget_pauses_rotation_until_quiz_is_answered() -> None:
+def test_widget_rotation_skips_an_unanswered_quiz() -> None:
     qml = QML_PATH.read_text(encoding="utf-8")
 
-    assert "if (choiceMode && !choiceAnswered)" in qml
+    assert "if (choiceMode && !choiceAnswered)" not in qml
     assert "LexiDesk backend is unavailable" in qml

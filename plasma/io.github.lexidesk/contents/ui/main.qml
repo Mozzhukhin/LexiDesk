@@ -322,7 +322,7 @@ PlasmoidItem {
             }
             if (pendingKind === "add" || pendingKind === "edit"
                     || pendingKind === "delete" || pendingKind === "library"
-                    || pendingKind === "settings") {
+                    || pendingKind === "settings" || pendingKind === "support") {
                 loadNext()
                 return
             }
@@ -398,8 +398,6 @@ PlasmoidItem {
         running: true
         repeat: true
         onTriggered: {
-            if (choiceMode && !choiceAnswered)
-                return
             if (secondsLeft > 0)
                 secondsLeft--
             if (secondsLeft <= 0 && !busy && errorText.length === 0)
@@ -463,6 +461,12 @@ PlasmoidItem {
                 text: i18n("Settings")
                 icon: "configure"
                 onClicked: Plasmoid.internalAction("configure").trigger()
+            }
+
+            PlasmaExtras.MenuItem {
+                text: i18n("Support developer")
+                icon: "help-donate"
+                onClicked: root.launchGui("--support", "support")
             }
 
             PlasmaExtras.MenuItem {

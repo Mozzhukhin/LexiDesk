@@ -285,3 +285,14 @@ of placement, resizing, theming, and lifecycle.
 ## License
 
 MIT
+
+## Support the developer
+
+If LexiDesk is useful to you, you can optionally support its continued
+development:
+
+- Asset: **USDT**
+- Network: **TRON (TRC20)**
+- Address: `TCJxcsKVhm2Mjs7q5XkVvLK492XLpnY8um`
+
+Send only USDT using the TRON (TRC20) network.

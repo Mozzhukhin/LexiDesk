@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add an optional developer-support page with a copyable USDT TRC20 address.
+- Let timed rotation skip unanswered quizzes without recording a review.
 - Replace the Argos Python runtime with direct CTranslate2 inference, preserving
   the same models and beam-search output while removing Torch, Stanza, spaCy,
   MiniSBD, and ONNX from Linux and Windows bundles.

@@ -18,6 +18,7 @@ from .insights import AnalyticsDialog
 from .library import LibraryDialog
 from .service_client import request_service, schedule_example_enrichment
 from .settings import SettingsStore
+from .support import SupportDialog
 from .themes import stylesheet
 from .translation import OfflineTranslator
 from .window import LexiDeskWindow
@@ -55,6 +56,11 @@ def _arguments() -> argparse.Namespace:
         "--settings",
         action="store_true",
         help="Open only the application settings",
+    )
+    mode.add_argument(
+        "--support",
+        action="store_true",
+        help="Open the developer support page",
     )
     mode.add_argument(
         "--self-test",
@@ -181,6 +187,13 @@ def main() -> int:
                     "desired_retention": settings.desired_retention,
                 }
             )
+        repository.close()
+        return 0
+
+    if arguments.support:
+        support_dialog = SupportDialog()
+        support_dialog.setStyleSheet(stylesheet(settings.theme, settings.font_scale))
+        support_dialog.exec()
         repository.close()
         return 0
 
