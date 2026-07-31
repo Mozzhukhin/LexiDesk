@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Make the current language direction a compact header control that opens the
+  deck chooser directly in both the Plasma and standalone interfaces.
 - Keep card rotation, adaptive scheduling, and quizzes inside the explicitly
   selected source-to-target deck; persist the latest added pair and provide a
   dedicated deck chooser without merging language data.

@@ -105,7 +105,7 @@ def stylesheet(name: str, scale: int = 100) -> str:
             font-weight: 800;
             letter-spacing: 1px;
         }}
-        QLabel#badge {{
+        QLabel#badge, QPushButton#badge {{
             color: {colors["muted"]};
             background: {colors["surface"]};
             border: 1px solid {colors["border"]};

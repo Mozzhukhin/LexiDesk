@@ -80,6 +80,8 @@ def test_standalone_uses_mouse_only_next_and_compact_progress(tmp_path: Path) ->
     assert not hasattr(window, "undo_review")
     assert window.countdown_progress.isTextVisible() is False
     assert "until the next card" in window.countdown_progress.toolTip()
+    assert window.direction_label.toolTip() == "Choose language deck"
+    assert window.direction_label.text().endswith("▾")
 
     repository.close()
 

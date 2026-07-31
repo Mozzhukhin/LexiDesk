@@ -105,8 +105,10 @@ class LexiDeskWindow(QMainWindow):
         self.title_label = QLabel("LEXIDESK")
         self.title_label.setObjectName("brand")
 
-        self.direction_label = QLabel("OFFLINE")
+        self.direction_label = QPushButton("OFFLINE  ▾")
         self.direction_label.setObjectName("badge")
+        self.direction_label.setToolTip("Choose language deck")
+        self.direction_label.clicked.connect(self.choose_language_deck)
         self.goal_label = QLabel()
         self.goal_label.setObjectName("muted")
         self.goal_label.setToolTip("Reviews completed today")
@@ -365,7 +367,7 @@ class LexiDeskWindow(QMainWindow):
         self._quiz_answered = False
         self._clear_choices()
         if word is None:
-            self.direction_label.setText("EMPTY")
+            self.direction_label.setText("EMPTY  ▾")
             self.word_label.setText("Your vocabulary is empty")
             self.translation_label.setText("Add your first word with the + button")
             self.translation_label.show()
@@ -385,7 +387,7 @@ class LexiDeskWindow(QMainWindow):
             self._example_enrichment_scheduled.add(word.id)
             schedule_example_enrichment(word.id)
 
-        self.direction_label.setText(word.direction)
+        self.direction_label.setText(f"{word.direction}  ▾")
         # The English side always stays on top, regardless of which language was
         # entered when the card was created.
         english_first = word.target_lang == "en"

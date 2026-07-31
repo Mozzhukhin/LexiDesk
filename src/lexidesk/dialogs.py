@@ -63,8 +63,15 @@ class DeckSelectionDialog(QDialog):
                 f"{language_label(source)}  →  {language_label(target)}",
                 (source, target),
             )
-        current_index = self.pair_combo.findData(current_pair)
-        self.pair_combo.setCurrentIndex(max(0, current_index))
+        current_index = next(
+            (
+                index
+                for index in range(self.pair_combo.count())
+                if self.pair_combo.itemData(index) == current_pair
+            ),
+            0,
+        )
+        self.pair_combo.setCurrentIndex(current_index)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel

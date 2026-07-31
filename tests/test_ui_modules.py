@@ -5,7 +5,7 @@ from pathlib import Path
 from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
 from lexidesk.database import WordRepository
-from lexidesk.dialogs import AddWordDialog, SettingsDialog
+from lexidesk.dialogs import AddWordDialog, DeckSelectionDialog, SettingsDialog
 from lexidesk.insights import AnalyticsDialog
 from lexidesk.library import LibraryDialog
 from lexidesk.settings import Settings
@@ -71,6 +71,19 @@ def test_settings_dialog_applies_every_value(qapp: QApplication) -> None:
     assert settings.rotation_seconds == 120
     assert settings.daily_goal == 30
     assert settings.autostart is True
+
+
+def test_deck_selector_highlights_and_returns_active_pair(
+    qapp: QApplication,
+) -> None:
+    dialog = DeckSelectionDialog(
+        [("en", "ru"), ("ru", "uk")],
+        ("ru", "uk"),
+    )
+
+    assert dialog.pair_combo.currentData() == ("ru", "uk")
+    dialog._accept_pair()
+    assert dialog.selected_pair == ("ru", "uk")
 
 
 def test_add_dialog_applies_translation_and_builds_card(qapp: QApplication) -> None:

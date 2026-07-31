@@ -565,10 +565,13 @@ PlasmoidItem {
                     font.pixelSize: 10
                 }
 
-                PlasmaComponents.Label {
-                    text: directionText
-                    opacity: 0.55
+                PlasmaComponents.ToolButton {
+                    text: directionText + "  ▾"
+                    display: PlasmaComponents.AbstractButton.TextOnly
                     font.pixelSize: 10
+                    onClicked: root.launchGui("--decks", "deck")
+                    PlasmaComponents.ToolTip.text: i18n("Choose language deck")
+                    PlasmaComponents.ToolTip.visible: hovered
                 }
 
                 PlasmaComponents.Label {
