@@ -16,12 +16,11 @@ PACKAGE_INDEX_URL = (
 )
 MAX_DOWNLOAD_SIZE = 500_000_000
 MAX_EXTRACTED_SIZE = 1_200_000_000
-REQUIRED_FILES = (
+REQUIRED_RUNTIME_FILES = (
     "model/model.bin",
-    "model/config.json",
-    "sentencepiece.model",
     "metadata.json",
 )
+TOKENIZER_FILES = ("sentencepiece.model", "bpe.model")
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,22 +120,25 @@ def install_package(
                     raise ValueError("The language package contains an unsafe path.")
                 if (member.external_attr >> 16) & 0o170000 == 0o120000:
                     raise ValueError("The language package contains a symbolic link.")
-            located: dict[str, zipfile.ZipInfo] = {}
-            for relative in REQUIRED_FILES:
-                suffix = PurePosixPath(relative).parts
-                matches = [
-                    member
-                    for member in members
-                    if PurePosixPath(member.filename).parts[-len(suffix) :] == suffix
-                ]
-                if len(matches) != 1:
-                    raise ValueError(
-                        "This package is not compatible with the compact "
-                        f"LexiDesk runtime: {relative} is missing."
-                    )
-                located[relative] = matches[0]
+            located = {
+                relative: _locate_unique_member(members, relative)
+                for relative in REQUIRED_RUNTIME_FILES
+            }
             metadata_parts = PurePosixPath(located["metadata.json"].filename).parts
             root_parts = metadata_parts[:-1]
+            tokenizer: zipfile.ZipInfo | None = None
+            for tokenizer_name in TOKENIZER_FILES:
+                tokenizer_candidate = _member_at_relative_path(
+                    members, root_parts, PurePosixPath(tokenizer_name).parts
+                )
+                if tokenizer_candidate is not None:
+                    tokenizer = tokenizer_candidate
+                    break
+            if tokenizer is None:
+                raise ValueError(
+                    "This package has no compatible SentencePiece tokenizer "
+                    "(sentencepiece.model or bpe.model)."
+                )
             for member in members:
                 parts = PurePosixPath(member.filename).parts
                 if (
@@ -147,12 +149,17 @@ def install_package(
                 relative_parts = parts[len(root_parts) :]
                 if not (
                     relative_parts[0] == "model"
-                    or relative_parts in (("metadata.json",), ("sentencepiece.model",))
+                    or member == located["metadata.json"]
+                    or member == tokenizer
                 ):
                     continue
                 if member.is_dir():
                     continue
-                destination = extracted.joinpath(*relative_parts)
+                destination = (
+                    extracted / "sentencepiece.model"
+                    if member == tokenizer
+                    else extracted.joinpath(*relative_parts)
+                )
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 with bundle.open(member) as source, destination.open("wb") as out:
                     shutil.copyfileobj(source, out)
@@ -181,7 +188,8 @@ def package_for_pair(
 
 
 def _validate_installed(path: Path, package: LanguagePackage) -> None:
-    if any(not (path / relative).is_file() for relative in REQUIRED_FILES):
+    required = (*REQUIRED_RUNTIME_FILES, "sentencepiece.model")
+    if any(not (path / relative).is_file() for relative in required):
         raise ValueError("The installed language package is incomplete.")
     metadata = json.loads((path / "metadata.json").read_text(encoding="utf-8"))
     if (
@@ -189,6 +197,37 @@ def _validate_installed(path: Path, package: LanguagePackage) -> None:
         or str(metadata.get("to_code", "")).casefold() != package.target
     ):
         raise ValueError("The downloaded model metadata does not match its pair.")
+
+
+def _locate_unique_member(
+    members: list[zipfile.ZipInfo], relative: str
+) -> zipfile.ZipInfo:
+    suffix = PurePosixPath(relative).parts
+    matches = [
+        member
+        for member in members
+        if PurePosixPath(member.filename).parts[-len(suffix) :] == suffix
+    ]
+    if len(matches) != 1:
+        raise ValueError(
+            "This package is not compatible with the compact "
+            f"LexiDesk runtime: {relative} is missing or ambiguous."
+        )
+    return matches[0]
+
+
+def _member_at_relative_path(
+    members: list[zipfile.ZipInfo],
+    root_parts: tuple[str, ...],
+    relative_parts: tuple[str, ...],
+) -> zipfile.ZipInfo | None:
+    expected = root_parts + relative_parts
+    matches = [
+        member for member in members if PurePosixPath(member.filename).parts == expected
+    ]
+    if len(matches) > 1:
+        raise ValueError("The language package contains duplicate runtime files.")
+    return matches[0] if matches else None
 
 
 def _parse_catalog(value: object) -> tuple[LanguagePackage, ...]:

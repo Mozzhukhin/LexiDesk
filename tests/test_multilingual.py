@@ -48,14 +48,21 @@ def package(source: str = "de", target: str = "fr") -> LanguagePackage:
     )
 
 
-def model_archive(source: str = "de", target: str = "fr") -> bytes:
+def model_archive(
+    source: str = "de",
+    target: str = "fr",
+    *,
+    tokenizer_name: str = "sentencepiece.model",
+    include_config: bool = True,
+) -> bytes:
     output = io.BytesIO()
     metadata = json.dumps({"from_code": source, "to_code": target}).encode()
     with zipfile.ZipFile(output, "w") as bundle:
         bundle.writestr("translate/model/model.bin", b"model")
-        bundle.writestr("translate/model/config.json", b"{}")
+        if include_config:
+            bundle.writestr("translate/model/config.json", b"{}")
         bundle.writestr("translate/model/shared_vocabulary.json", b"{}")
-        bundle.writestr("translate/sentencepiece.model", b"tokenizer")
+        bundle.writestr(f"translate/{tokenizer_name}", b"tokenizer")
         bundle.writestr("translate/metadata.json", metadata)
     return output.getvalue()
 
@@ -171,6 +178,36 @@ def test_package_install_extracts_only_runtime_files(
     assert (installed / "sentencepiece.model").is_file()
     assert progress[-1] == 100
     assert install_package(package()) == installed
+
+
+def test_package_install_accepts_legacy_bpe_layout(tmp_path: Path, monkeypatch) -> None:
+    payload = model_archive(tokenizer_name="bpe.model", include_config=False)
+    monkeypatch.setattr(
+        "lexidesk.language_packages.urllib.request.urlopen",
+        lambda *_args, **_kwargs: Response(payload),
+    )
+    monkeypatch.setattr("lexidesk.language_packages.data_dir", lambda: tmp_path)
+
+    installed = install_package(package())
+
+    assert (installed / "model/model.bin").read_bytes() == b"model"
+    assert (installed / "sentencepiece.model").read_bytes() == b"tokenizer"
+    assert not (installed / "bpe.model").exists()
+    assert not (installed / "model/config.json").exists()
+
+
+def test_package_install_rejects_archive_without_tokenizer(
+    tmp_path: Path, monkeypatch
+) -> None:
+    payload = model_archive(tokenizer_name="unrelated.model")
+    monkeypatch.setattr(
+        "lexidesk.language_packages.urllib.request.urlopen",
+        lambda *_args, **_kwargs: Response(payload),
+    )
+    monkeypatch.setattr("lexidesk.language_packages.data_dir", lambda: tmp_path)
+
+    with pytest.raises(ValueError, match="no compatible SentencePiece tokenizer"):
+        install_package(package())
 
 
 def test_language_dialog_groups_installed_languages_first(

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Accept both current and legacy Argos model layouts, including `bpe.model`
+  tokenizers and packages without an optional CTranslate2 `config.json`.
 - Move language management into a dedicated Languages tab behind the + button;
   group the full catalog by installed status and alphabetize both groups.
 - Add a multilingual card schema with automatic migration from EN/RU cards.
