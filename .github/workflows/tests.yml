@@ -6,14 +6,26 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: "3.12"
+          - os: ubuntu-latest
+            python: "3.14"
+          - os: windows-latest
+            python: "3.13"
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: astral-sh/setup-uv@v9.0.0
         with:
-          python-version: "3.13"
+          python-version: ${{ matrix.python }}
       - run: uv sync --extra dev
       - run: uv run ruff format --check .
       - run: uv run ruff check .
       - run: uv run mypy
       - run: uv run pytest -q
+      - name: Audit Python dependencies
+        run: uv run --with pip-audit pip-audit

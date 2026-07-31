@@ -1,11 +1,23 @@
 from __future__ import annotations
 
+import random
 import sqlite3
+from typing import Any
 
-from PySide6.QtCore import QElapsedTimer, QEvent, QObject, QPoint, Qt, QTimer
-from PySide6.QtGui import QCloseEvent, QMouseEvent, QResizeEvent
+from PySide6.QtCore import (
+    QEasingCurve,
+    QElapsedTimer,
+    QEvent,
+    QObject,
+    QPoint,
+    QPropertyAnimation,
+    Qt,
+    QTimer,
+)
+from PySide6.QtGui import QActionGroup, QCloseEvent, QMouseEvent, QResizeEvent
 from PySide6.QtWidgets import (
     QFrame,
+    QGraphicsOpacityEffect,
     QGridLayout,
     QHBoxLayout,
     QLabel,
@@ -20,9 +32,11 @@ from PySide6.QtWidgets import (
 )
 
 from .answers import AnswerGrade, evaluate_answer
+from .api import quiz_variants
 from .autostart import set_autostart
 from .batch import BatchAddDialog
 from .database import WordRepository
+from .diagnostics_dialog import DiagnosticsDialog
 from .dialogs import AddWordDialog, SettingsDialog
 from .insights import AnalyticsDialog
 from .library import LibraryDialog
@@ -49,6 +63,14 @@ class LexiDeskWindow(QMainWindow):
         self.seconds_left = self.settings.rotation_seconds
         self.review_clock = QElapsedTimer()
         self._drag_origin = QPoint()
+        self._current_quiz: dict[str, Any] | None = None
+        self._choice_buttons: list[QPushButton] = []
+        self._mixed_card_counter = 0
+        self._quiz_answered = False
+        self.advance_timer = QTimer(self)
+        self.advance_timer.setSingleShot(True)
+        self.advance_timer.setInterval(1000)
+        self.advance_timer.timeout.connect(self.next_card)
 
         self.setWindowTitle("LexiDesk")
         self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
@@ -59,6 +81,7 @@ class LexiDeskWindow(QMainWindow):
             self.move(self.settings.x, self.settings.y)
 
         self._build_ui()
+        self._update_practice_button()
         self._apply_appearance()
 
         self.tick_timer = QTimer(self)
@@ -83,6 +106,33 @@ class LexiDeskWindow(QMainWindow):
         self.goal_label.setObjectName("muted")
         self.goal_label.setToolTip("Reviews completed today")
 
+        self.practice_button = QPushButton("▦")
+        self.practice_button.setObjectName("icon")
+        self.practice_button.setToolTip("Choose how LexiDesk tests your knowledge")
+        practice_menu = QMenu(self.practice_button)
+        practice_group = QActionGroup(practice_menu)
+        practice_group.setExclusive(True)
+        practice_modes = (
+            ("Off", "off"),
+            ("Mixed — every fifth card", "mixed"),
+            ("Choose translation", "translation"),
+            ("Reverse translation", "reverse"),
+            ("Complete the sentence", "cloze"),
+            ("Choose the context", "context"),
+            ("Type the translation", "typing"),
+        )
+        self.practice_actions = {}
+        for label, mode in practice_modes:
+            action = practice_menu.addAction(label)
+            action.setCheckable(True)
+            action.setChecked(mode == self.settings.practice_mode)
+            action.triggered.connect(
+                lambda _checked=False, selected=mode: self.set_practice_mode(selected)
+            )
+            practice_group.addAction(action)
+            self.practice_actions[mode] = action
+        self.practice_button.setMenu(practice_menu)
+
         add_button = QPushButton("+")
         add_button.setObjectName("icon")
         add_button.setToolTip("Add a word or phrase")
@@ -106,6 +156,8 @@ class LexiDeskWindow(QMainWindow):
         card_menu.addSeparator()
         settings_action = card_menu.addAction("Settings")
         settings_action.triggered.connect(self.open_settings)
+        diagnostics_action = card_menu.addAction("Diagnostics")
+        diagnostics_action.triggered.connect(self.open_diagnostics)
         more_button.setMenu(card_menu)
 
         close_button = QPushButton("×")
@@ -118,13 +170,23 @@ class LexiDeskWindow(QMainWindow):
         header.addStretch()
         header.addWidget(self.goal_label)
         header.addWidget(self.direction_label)
+        header.addWidget(self.practice_button)
         header.addWidget(add_button)
         header.addWidget(more_button)
         header.addWidget(close_button)
 
-        card = QFrame()
-        card.setObjectName("card")
-        card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.card_frame = QFrame()
+        self.card_frame.setObjectName("card")
+        self.card_frame.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
+        self.card_opacity = QGraphicsOpacityEffect(self.card_frame)
+        self.card_frame.setGraphicsEffect(self.card_opacity)
+        self.card_animation = QPropertyAnimation(self.card_opacity, b"opacity", self)
+        self.card_animation.setDuration(180)
+        self.card_animation.setStartValue(0.2)
+        self.card_animation.setEndValue(1.0)
+        self.card_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
 
         self.word_label = QLabel("Your vocabulary is empty")
         self.word_label.setObjectName("word")
@@ -160,6 +222,16 @@ class LexiDeskWindow(QMainWindow):
         self.answer_feedback.setWordWrap(True)
         self.answer_feedback.hide()
 
+        self.quiz_instruction = QLabel()
+        self.quiz_instruction.setObjectName("muted")
+        self.quiz_instruction.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.quiz_instruction.setWordWrap(True)
+        self.quiz_instruction.hide()
+
+        self.choice_grid = QGridLayout()
+        self.choice_grid.setHorizontalSpacing(6)
+        self.choice_grid.setVerticalSpacing(6)
+
         self.alternatives_label = QLabel()
         self.alternatives_label.setObjectName("metadata")
         self.alternatives_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -171,14 +243,16 @@ class LexiDeskWindow(QMainWindow):
         self.example_label.setWordWrap(True)
         self.example_label.setMaximumHeight(82)
 
-        card_layout = QVBoxLayout(card)
+        card_layout = QVBoxLayout(self.card_frame)
         card_layout.setContentsMargins(18, 12, 18, 12)
         card_layout.setSpacing(4)
         card_layout.addStretch()
         card_layout.addWidget(self.word_label)
         card_layout.addWidget(self.translation_label)
+        card_layout.addWidget(self.quiz_instruction)
         card_layout.addWidget(self.reveal_button, 0, Qt.AlignmentFlag.AlignCenter)
         card_layout.addLayout(answer_row)
+        card_layout.addLayout(self.choice_grid)
         card_layout.addWidget(self.answer_feedback)
         card_layout.addWidget(self.alternatives_label)
         card_layout.addWidget(self.example_label)
@@ -191,7 +265,7 @@ class LexiDeskWindow(QMainWindow):
         undo_button.clicked.connect(self.undo_review)
 
         self.next_button = QPushButton("Next")
-        self.next_button.setObjectName("know")
+        self.next_button.setObjectName("primary")
         self.next_button.setShortcut("N")
         self.next_button.setToolTip("Show another card without recording a review")
         self.next_button.clicked.connect(self.next_card)
@@ -217,7 +291,7 @@ class LexiDeskWindow(QMainWindow):
         layout.setContentsMargins(10, 8, 10, 9)
         layout.setSpacing(7)
         layout.addLayout(header)
-        layout.addWidget(card, 1)
+        layout.addWidget(self.card_frame, 1)
         layout.addLayout(footer)
 
     def _apply_appearance(self) -> None:
@@ -225,9 +299,11 @@ class LexiDeskWindow(QMainWindow):
         self.setWindowOpacity(self.settings.opacity)
 
     def next_card(self) -> None:
+        self.advance_timer.stop()
         previous_id = self.current_word.id if self.current_word else None
         self.current_word = self.repository.next_word(previous_id)
         self.seconds_left = self.settings.rotation_seconds
+        self._update_countdown()
         self.review_clock.restart()
         self._render_card()
 
@@ -248,6 +324,12 @@ class LexiDeskWindow(QMainWindow):
         self.check_answer_button.hide()
         self.answer_feedback.clear()
         self.answer_feedback.hide()
+        self.answer_feedback.setObjectName("")
+        self.quiz_instruction.clear()
+        self.quiz_instruction.hide()
+        self._current_quiz = None
+        self._quiz_answered = False
+        self._clear_choices()
         if word is None:
             self.direction_label.setText("EMPTY")
             self.word_label.setText("Your vocabulary is empty")
@@ -256,11 +338,16 @@ class LexiDeskWindow(QMainWindow):
             self.reveal_button.hide()
             self.alternatives_label.clear()
             self.example_label.clear()
+            self.practice_button.setEnabled(False)
             return
+
+        self.practice_button.setEnabled(True)
 
         target_language = "RU" if word.source_lang == "en" else "EN"
         self.direction_label.setText(f"{word.source_lang.upper()} → {target_language}")
-        english_first = word.source_lang == "ru" and self.settings.reveal_mode == "both"
+        # The English side always stays on top, regardless of which language was
+        # entered when the card was created.
+        english_first = word.source_lang == "ru"
         self.word_label.setText(word.target_text if english_first else word.source_text)
         self.translation_label.setText(
             word.source_text if english_first else word.target_text
@@ -282,21 +369,141 @@ class LexiDeskWindow(QMainWindow):
         )
         example_parts = [part for part in examples if part]
         self.example_label.setText("\n".join(example_parts))
-        if self.settings.reveal_mode == "quiz":
+        variants = quiz_variants(word, self.repository)
+        practice_mode = self._practice_for_card(variants)
+        selected_quiz = variants.get(practice_mode)
+        if selected_quiz is not None:
+            self._show_quiz(selected_quiz)
+        elif practice_mode not in {"off", "mixed"}:
+            self.quiz_instruction.setText(
+                "This practice mode needs more cards or suitable examples."
+            )
+            self.quiz_instruction.show()
+            self.reveal_translation()
+        elif self.settings.reveal_mode == "quiz":
             self.translation_label.hide()
             self.alternatives_label.hide()
             self.example_label.hide()
             self.reveal_button.show()
-        elif self.settings.reveal_mode == "typing":
-            self.translation_label.hide()
-            self.alternatives_label.hide()
-            self.example_label.hide()
-            self.reveal_button.hide()
+        else:
+            self.reveal_translation()
+        self.card_animation.stop()
+        self.card_animation.start()
+
+    def _practice_for_card(self, variants: dict[str, dict[str, Any]]) -> str:
+        mode = self.settings.practice_mode
+        if mode != "mixed":
+            return mode
+        self._mixed_card_counter += 1
+        if self._mixed_card_counter < 5:
+            return "off"
+        self._mixed_card_counter = 0
+        available = [
+            candidate
+            for candidate in ("translation", "reverse", "cloze", "context")
+            if candidate in variants
+        ]
+        return random.choice(available) if available else "off"
+
+    def set_practice_mode(self, mode: str) -> None:
+        if mode not in self.practice_actions:
+            return
+        self.settings.practice_mode = mode
+        self.settings_store.save(self.settings)
+        self._mixed_card_counter = 0
+        self.practice_actions[mode].setChecked(True)
+        self._update_practice_button()
+        self._render_card()
+
+    def _update_practice_button(self) -> None:
+        labels = {
+            "off": "Off",
+            "mixed": "Mixed — every fifth card",
+            "translation": "Choose translation",
+            "reverse": "Reverse translation",
+            "cloze": "Complete the sentence",
+            "context": "Choose the context",
+            "typing": "Type the translation",
+        }
+        selected = labels.get(self.settings.practice_mode, "Off")
+        self.practice_button.setToolTip(f"Practice mode: {selected}")
+        self.practice_button.setProperty("active", self.settings.practice_mode != "off")
+        self.style().unpolish(self.practice_button)
+        self.style().polish(self.practice_button)
+
+    def _show_quiz(self, quiz: dict[str, Any]) -> None:
+        self._current_quiz = quiz
+        self.word_label.setText(str(quiz.get("prompt", "")))
+        self.translation_label.setText(str(quiz.get("answer", "")))
+        self.translation_label.hide()
+        self.alternatives_label.hide()
+        self.example_label.hide()
+        self.reveal_button.hide()
+        self.quiz_instruction.setText(str(quiz.get("instruction", "")))
+        self.quiz_instruction.show()
+        if quiz.get("type") == "typing":
             self.answer_edit.show()
             self.check_answer_button.show()
             self.answer_edit.setFocus()
-        else:
-            self.reveal_translation()
+            return
+        choices = [str(choice) for choice in quiz.get("choices", [])]
+        for index, choice in enumerate(choices):
+            button = QPushButton(choice)
+            button.setMinimumHeight(38)
+            button.clicked.connect(
+                lambda _checked=False, selected=choice: self.choose_answer(selected)
+            )
+            columns = 1 if quiz.get("type") == "context" else 2
+            self.choice_grid.addWidget(button, index // columns, index % columns)
+            self._choice_buttons.append(button)
+
+    def _clear_choices(self) -> None:
+        while self.choice_grid.count():
+            item = self.choice_grid.takeAt(0)
+            if item is None:
+                continue
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+        self._choice_buttons.clear()
+
+    def choose_answer(self, selected: str) -> None:
+        if self.current_word is None or self._current_quiz is None:
+            return
+        if self._quiz_answered:
+            return
+        self._quiz_answered = True
+        answer = str(self._current_quiz.get("answer", ""))
+        correct = selected == answer
+        for button in self._choice_buttons:
+            button.setEnabled(False)
+            if button.text() == answer:
+                button.setObjectName("correctChoice")
+            elif button.text() == selected:
+                button.setObjectName("wrongChoice")
+            self.style().unpolish(button)
+            self.style().polish(button)
+        self.translation_label.show()
+        self.answer_feedback.setObjectName("know" if correct else "unknown")
+        self.answer_feedback.setText("Correct" if correct else "Incorrect")
+        self.answer_feedback.show()
+        self.style().unpolish(self.answer_feedback)
+        self.style().polish(self.answer_feedback)
+        self._record_quiz("good" if correct else "again", selected, answer)
+
+    def _record_quiz(self, rating: str, selected: str, correct: str) -> None:
+        if self.current_word is None or self._current_quiz is None:
+            return
+        duration = self.review_clock.elapsed() if self.review_clock.isValid() else None
+        self.repository.review(
+            self.current_word.id,
+            rating,
+            duration,
+            quiz_type=str(self._current_quiz.get("type", "")),
+            selected_answer=selected,
+            correct_answer=correct,
+        )
+        self.advance_timer.start()
 
     def reveal_translation(self) -> None:
         self.translation_label.show()
@@ -323,6 +530,13 @@ class LexiDeskWindow(QMainWindow):
         self.style().polish(self.answer_feedback)
         self.answer_edit.setEnabled(False)
         self.check_answer_button.setEnabled(False)
+        if self._current_quiz is not None and not self._quiz_answered:
+            self._quiz_answered = True
+            self._record_quiz(
+                result.suggested_rating,
+                self.answer_edit.text().strip(),
+                result.expected,
+            )
 
     def review(self, rating: str) -> None:
         if self.current_word is None:
@@ -382,7 +596,7 @@ class LexiDeskWindow(QMainWindow):
         )
         self.seconds_left = min(self.seconds_left, self.settings.rotation_seconds)
         self._apply_appearance()
-        self._render_card()
+        self.set_practice_mode(self.settings.practice_mode)
 
     def open_library(self) -> None:
         dialog = LibraryDialog(
@@ -409,6 +623,11 @@ class LexiDeskWindow(QMainWindow):
             self.settings.daily_goal,
             self,
         )
+        dialog.setStyleSheet(self.styleSheet())
+        dialog.exec()
+
+    def open_diagnostics(self) -> None:
+        dialog = DiagnosticsDialog(self.repository, self)
         dialog.setStyleSheet(self.styleSheet())
         dialog.exec()
 
@@ -448,11 +667,23 @@ class LexiDeskWindow(QMainWindow):
         self.next_card()
 
     def _tick(self) -> None:
+        if self._interaction_active():
+            return
         self.seconds_left -= 1
         if self.seconds_left <= 0:
             self.next_card()
+            return
+        self._update_countdown()
+
+    def _update_countdown(self) -> None:
         minutes, seconds = divmod(max(0, self.seconds_left), 60)
         self.countdown_label.setText(f"{minutes}:{seconds:02d}")
+
+    def _interaction_active(self) -> bool:
+        return (
+            bool(self._current_quiz is not None and not self._quiz_answered)
+            or self.answer_edit.hasFocus()
+        )
 
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
         if watched is self.centralWidget():

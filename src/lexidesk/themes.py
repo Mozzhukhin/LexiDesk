@@ -127,6 +127,10 @@ def stylesheet(name: str, scale: int = 100) -> str:
         QPushButton:pressed {{
             background: {colors["border"]};
         }}
+        QPushButton[active="true"] {{
+            color: {colors["accent"]};
+            border-color: {colors["accent"]};
+        }}
         QPushButton:disabled {{
             color: {colors["muted"]};
             border-color: transparent;
@@ -138,8 +142,34 @@ def stylesheet(name: str, scale: int = 100) -> str:
             color: {colors["success"]};
             font-weight: 700;
         }}
+        QPushButton#primary {{
+            color: {colors["accent"]};
+            font-weight: 700;
+        }}
         QPushButton#unknown {{
             color: {colors["danger"]};
+            font-weight: 700;
+        }}
+        QLabel#know {{
+            color: {colors["success"]};
+            font-weight: 700;
+        }}
+        QLabel#unknown {{
+            color: {colors["danger"]};
+            font-weight: 700;
+        }}
+        QLabel#hard {{
+            color: {colors["warning"]};
+            font-weight: 700;
+        }}
+        QPushButton#correctChoice {{
+            color: {colors["success"]};
+            border-color: {colors["success"]};
+            font-weight: 700;
+        }}
+        QPushButton#wrongChoice {{
+            color: {colors["danger"]};
+            border-color: {colors["danger"]};
             font-weight: 700;
         }}
         QPushButton#hard {{

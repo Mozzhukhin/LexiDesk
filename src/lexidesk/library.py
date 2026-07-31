@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -101,6 +102,12 @@ class LibraryDialog(QDialog):
         batch_button.clicked.connect(self.batch_add)
         export_button = QPushButton("Export")
         export_button.clicked.connect(self.export_file)
+        backup_button = QPushButton("Full backup")
+        backup_button.setToolTip("Save cards, review history, and learning progress")
+        backup_button.clicked.connect(self.backup_database)
+        restore_button = QPushButton("Restore")
+        restore_button.setToolTip("Restore cards and all learning progress")
+        restore_button.clicked.connect(self.restore_database)
         analytics_button = QPushButton("Analytics")
         analytics_button.clicked.connect(self.open_analytics)
         close_button = QPushButton("Close")
@@ -114,6 +121,8 @@ class LibraryDialog(QDialog):
         actions.addWidget(batch_button)
         actions.addWidget(import_button)
         actions.addWidget(export_button)
+        actions.addWidget(backup_button)
+        actions.addWidget(restore_button)
         actions.addWidget(analytics_button)
         actions.addWidget(close_button)
 
@@ -248,6 +257,65 @@ class LibraryDialog(QDialog):
             self,
             "Import complete",
             f"Imported {imported} cards; skipped {skipped}.",
+        )
+
+    def backup_database(self) -> None:
+        filename, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save complete LexiDesk backup",
+            str(Path.home() / f"lexidesk-backup-{datetime.now():%Y-%m-%d}.db"),
+            "LexiDesk database (*.db)",
+        )
+        if not filename:
+            return
+        path = Path(filename)
+        if not path.suffix:
+            path = path.with_suffix(".db")
+        try:
+            self.repository.backup_to(path)
+        except (OSError, sqlite3.Error) as error:
+            QMessageBox.warning(self, "Backup failed", str(error))
+            return
+        QMessageBox.information(
+            self,
+            "Backup complete",
+            "Cards, examples, settings-independent learning progress, and review "
+            "history were saved.",
+        )
+
+    def restore_database(self) -> None:
+        filename, _ = QFileDialog.getOpenFileName(
+            self,
+            "Restore complete LexiDesk backup",
+            str(Path.home()),
+            "LexiDesk database (*.db)",
+        )
+        if not filename:
+            return
+        confirmation = QMessageBox.question(
+            self,
+            "Replace current library?",
+            "This will replace all current cards and review history. LexiDesk will "
+            "first create a safety backup beside its database.",
+        )
+        if confirmation != QMessageBox.StandardButton.Yes:
+            return
+        safety = (
+            self.repository.path.parent
+            / "backups"
+            / (f"before-restore-{datetime.now():%Y%m%d-%H%M%S}.db")
+        )
+        try:
+            self.repository.backup_to(safety)
+            self.repository.restore_from(Path(filename))
+        except (OSError, sqlite3.Error, ValueError) as error:
+            QMessageBox.warning(self, "Restore failed", str(error))
+            return
+        self.refresh()
+        QMessageBox.information(
+            self,
+            "Restore complete",
+            f"The complete library was restored. Safety backup: {safety}",
         )
 
     def batch_add(self) -> None:

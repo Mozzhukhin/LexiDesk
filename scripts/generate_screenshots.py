@@ -4,6 +4,7 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
 from lexidesk.database import WordRepository
@@ -58,6 +59,7 @@ def main() -> None:
     )
     window.show()
     app.processEvents()
+    QTest.qWait(220)
     window.grab().save(str(output / "desktop-window.png"))
     window.close()
 

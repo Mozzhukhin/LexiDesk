@@ -11,6 +11,7 @@ from .backup import ensure_daily_backup
 from .batch import BatchAddDialog
 from .config import APP_ID, APP_NAME, database_path, settings_path
 from .database import WordRepository
+from .diagnostics import configure_logging
 from .dialogs import AddWordDialog
 from .insights import AnalyticsDialog
 from .library import LibraryDialog
@@ -50,6 +51,7 @@ def _arguments() -> argparse.Namespace:
 
 
 def main() -> int:
+    configure_logging()
     arguments = _arguments()
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)

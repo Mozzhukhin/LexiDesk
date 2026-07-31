@@ -89,6 +89,48 @@ def test_card_meanings_drop_sentence_periods_and_duplicates(tmp_path: Path) -> N
     repository.close()
 
 
+def test_card_meanings_preserve_abbreviation_periods(tmp_path: Path) -> None:
+    repository = WordRepository(tmp_path / "abbreviations.db")
+    word_id = repository.add_word(
+        source_text="США",
+        source_lang="ru",
+        target_text="U.S.",
+    )
+
+    assert repository.get_word(word_id).target_text == "U.S."
+    repository.close()
+
+
+def test_complete_backup_can_restore_learning_history(tmp_path: Path) -> None:
+    repository = WordRepository(tmp_path / "current.db")
+    word_id = repository.add_word(
+        source_text="reliable",
+        source_lang="en",
+        target_text="надёжный",
+    )
+    repository.review(word_id, "good", quiz_type="translation")
+    backup = tmp_path / "complete.db"
+    repository.backup_to(backup)
+    repository.delete_word(word_id)
+
+    repository.restore_from(backup)
+
+    assert repository.get_word(word_id).know_count == 1
+    assert repository.quiz_breakdown()[0]["attempts"] == 1
+    repository.close()
+
+
+def test_restore_rejects_unrelated_database(tmp_path: Path) -> None:
+    unrelated = tmp_path / "unrelated.db"
+    sqlite3.connect(unrelated).close()
+    repository = WordRepository(tmp_path / "current.db")
+
+    with pytest.raises(ValueError, match="not a LexiDesk"):
+        repository.restore_from(unrelated)
+
+    repository.close()
+
+
 def test_next_word_covers_unseen_cards_before_repeating(tmp_path: Path) -> None:
     repository = WordRepository(tmp_path / "rotation.db")
     ids = [

@@ -1,0 +1,72 @@
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+from PySide6.QtWidgets import QApplication
+
+from lexidesk.database import WordRepository
+from lexidesk.settings import SettingsStore
+from lexidesk.window import LexiDeskWindow
+
+
+def _application() -> QApplication:
+    return QApplication.instance() or QApplication([])
+
+
+def _window(tmp_path: Path) -> tuple[LexiDeskWindow, WordRepository]:
+    _application()
+    repository = WordRepository(tmp_path / "widget.db")
+    for source, target in (
+        ("reliable", "надёжный"),
+        ("careful", "осторожный"),
+        ("useful", "полезный"),
+        ("simple", "простой"),
+    ):
+        repository.add_word(
+            source_text=source,
+            source_lang="en",
+            target_text=target,
+        )
+    settings_store = SettingsStore(tmp_path / "settings.json")
+    window = LexiDeskWindow(repository, settings_store, object())  # type: ignore[arg-type]
+    return window, repository
+
+
+def test_standalone_translation_quiz_records_fsrs_review(tmp_path: Path) -> None:
+    window, repository = _window(tmp_path)
+    window.current_word = repository.get_word(1)
+    window.set_practice_mode("translation")
+    assert window._current_quiz is not None
+
+    window.choose_answer(str(window._current_quiz["answer"]))
+    window.advance_timer.stop()
+
+    assert repository.get_word(1).know_count == 1
+    assert window.answer_feedback.text() == "Correct"
+    window.tick_timer.stop()
+    repository.close()
+
+
+def test_standalone_keeps_english_above_russian(tmp_path: Path) -> None:
+    _application()
+    repository = WordRepository(tmp_path / "russian.db")
+    word_id = repository.add_word(
+        source_text="ограниченный",
+        source_lang="ru",
+        target_text="restricted",
+    )
+    window = LexiDeskWindow(
+        repository,
+        SettingsStore(tmp_path / "settings.json"),
+        object(),  # type: ignore[arg-type]
+    )
+    window.current_word = repository.get_word(word_id)
+    window._render_card()
+
+    assert window.word_label.text() == "restricted"
+    assert window.translation_label.text() == "ограниченный"
+    window.tick_timer.stop()
+    repository.close()

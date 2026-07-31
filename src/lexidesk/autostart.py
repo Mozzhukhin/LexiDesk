@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import shlex
 import subprocess
 import sys
@@ -14,11 +15,14 @@ def set_autostart(enabled: bool) -> None:
         return
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    arguments = (
-        [sys.executable]
-        if getattr(sys, "frozen", False)
-        else [sys.executable, "-m", "lexidesk.main"]
-    )
+    appimage = os.environ.get("APPIMAGE")
+    if appimage and sys.platform != "win32":
+        # APPDIR is temporary; autostart must point to the persistent AppImage.
+        arguments = [appimage]
+    elif getattr(sys, "frozen", False):
+        arguments = [sys.executable]
+    else:
+        arguments = [sys.executable, "-m", "lexidesk.main"]
     if sys.platform == "win32":
         command = subprocess.list2cmdline(arguments)
         content = f'@start "" {command}\n'

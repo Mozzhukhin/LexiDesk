@@ -26,7 +26,10 @@ upgrading a widget instance therefore cannot remove the user's data.
 
 Card creation performs the primary lookup and a fast SQLite WordNet example
 lookup in the UI. Translation of that example is queued in the D-Bus service
-after the card is committed, so loading Argos never blocks Save.
+after the card is committed, so loading Argos never blocks Save. If D-Bus is
+unavailable—or on Windows—the application uses one local background worker with
+an isolated SQLite connection. Existing cards are not needlessly regenerated at
+every service start.
 
 The dictionary installer also builds a reverse index. A direct translation is
 ranked against independently matching entries in the opposite direction;
@@ -35,8 +38,18 @@ notes, and likely spelling variants are removed or demoted. This improves
 single-word quality without adding network access or Argos latency.
 
 All repository write paths normalize card meanings. Sentence-ending periods are
-removed from single-card translations and alternatives are de-duplicated after
-normalization, so GUI entry, batch import, and JSON/CSV import behave the same.
+removed from single-card translations while periods in abbreviations such as
+`U.S.` are preserved. Alternatives are de-duplicated after normalization, so
+GUI entry, batch import, and JSON/CSV import behave the same.
+
+Runtime translation forces Stanza resource discovery into offline-only mode and
+sets the Hugging Face offline flags before Argos is imported. Language files are
+downloaded only by the explicit installation scripts. Neural hypotheses are
+cached for the current process; dictionary lookups remain the fast first path.
+
+Daily SQLite snapshots keep seven days of recoverable state. Manual full backup
+and restore use SQLite's online backup API, validate `integrity_check` and the
+LexiDesk schema, and create a timestamped safety backup before replacement.
 
 The background example task validates both halves of every example. The source
 must contain the card headword and the translated sentence must contain the

@@ -296,7 +296,9 @@ def _clean_translations(values: object) -> tuple[str, ...]:
     result: list[str] = []
     seen: set[str] = set()
     for raw_value in values:
-        value = clean_dictionary_text(str(raw_value)).replace(".", "")
+        value = clean_dictionary_text(str(raw_value))
+        if value.endswith(".") and value.count(".") == 1:
+            value = value[:-1]
         key = normalize_headword(value)
         if (
             not value

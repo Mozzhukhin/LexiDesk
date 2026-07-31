@@ -8,6 +8,7 @@ from .api import execute_request
 from .backup import ensure_daily_backup
 from .config import database_path
 from .database import WordRepository
+from .diagnostics import configure_logging
 from .service_client import request_service
 
 
@@ -82,6 +83,7 @@ def run(arguments: list[str] | None = None) -> dict[str, Any]:
 
 
 def main() -> int:
+    configure_logging()
     try:
         args = parser().parse_args()
         request = request_from_arguments(args)

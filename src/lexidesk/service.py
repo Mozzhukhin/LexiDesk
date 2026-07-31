@@ -12,10 +12,10 @@ from .api import execute_request
 from .backup import ensure_daily_backup
 from .config import APP_NAME, database_path, settings_path
 from .database import WordRepository
-from .examples import MAX_EXAMPLE_LENGTH, example_is_suitable
+from .diagnostics import configure_logging
+from .enrichment import enrich_example
 from .service_client import INTERFACE_NAME, OBJECT_PATH, SERVICE_NAME
 from .settings import SettingsStore
-from .translation import OfflineTranslator
 
 
 class ExampleEnrichmentTask(QRunnable):
@@ -25,58 +25,7 @@ class ExampleEnrichmentTask(QRunnable):
         self.word_id = word_id
 
     def run(self) -> None:
-        repository = WordRepository(self.database)
-        try:
-            word = repository.get_word(self.word_id)
-            example = word.example
-            translation = word.example_translation
-            translator = OfflineTranslator()
-            refresh_example = (
-                not example
-                or len(example) > MAX_EXAMPLE_LENGTH
-                or not example_is_suitable(
-                    example,
-                    word.source_text,
-                    allow_inflection=word.source_lang == "ru",
-                )
-                or (
-                    word.source_lang == "en"
-                    and example.casefold().startswith(
-                        f"{word.source_text.casefold()} means "
-                    )
-                )
-            )
-            if refresh_example:
-                generated = translator.generate_example(
-                    word.source_text,
-                    word.source_lang,
-                    word.part_of_speech,
-                    word.target_text,
-                )
-                example = generated.source
-                translation = generated.translation
-            elif not example_is_suitable(
-                translation,
-                word.target_text,
-                allow_inflection=True,
-            ):
-                completed = translator.complete_example(
-                    example,
-                    word.source_text,
-                    word.source_lang,
-                    word.target_text,
-                )
-                example = completed.source
-                translation = completed.translation
-            if example:
-                repository.update_example(word.id, example, translation)
-        except Exception as error:
-            print(
-                f"Could not enrich card {self.word_id}: {error}",
-                file=sys.stderr,
-            )
-        finally:
-            repository.close()
+        enrich_example(self.database, self.word_id)
 
 
 class LexiDeskService(QObject):
@@ -85,8 +34,6 @@ class LexiDeskService(QObject):
         self.repository = repository
         self.thread_pool = QThreadPool.globalInstance()
         self.thread_pool.setMaxThreadCount(1)
-        for word in self.repository.list_words():
-            self.thread_pool.start(ExampleEnrichmentTask(self.repository.path, word.id))
 
     @Slot(str, result=str)
     def Request(self, raw_request: str) -> str:  # noqa: N802
@@ -110,6 +57,7 @@ class LexiDeskService(QObject):
 
 
 def main() -> int:
+    configure_logging()
     app = QCoreApplication(sys.argv)
     app.setApplicationName(f"{APP_NAME} Service")
     settings = SettingsStore(settings_path()).load()

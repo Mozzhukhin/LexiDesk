@@ -16,6 +16,7 @@ class Settings:
     width: int = 390
     height: int = 310
     reveal_mode: str = "both"
+    practice_mode: str = "off"
     daily_goal: int = 20
     desired_retention: float = 0.9
     autocorrect: bool = True
@@ -51,8 +52,26 @@ class SettingsStore:
                 height=_bounded_int(raw.get("height"), defaults.height, 290, 1600),
                 reveal_mode=(
                     raw["reveal_mode"]
-                    if raw.get("reveal_mode") in {"both", "quiz", "typing"}
+                    if raw.get("reveal_mode") in {"both", "quiz"}
                     else defaults.reveal_mode
+                ),
+                practice_mode=(
+                    raw["practice_mode"]
+                    if raw.get("practice_mode")
+                    in {
+                        "off",
+                        "mixed",
+                        "translation",
+                        "reverse",
+                        "cloze",
+                        "context",
+                        "typing",
+                    }
+                    else (
+                        "typing"
+                        if raw.get("reveal_mode") == "typing"
+                        else defaults.practice_mode
+                    )
                 ),
                 daily_goal=_bounded_int(
                     raw.get("daily_goal"), defaults.daily_goal, 1, 500

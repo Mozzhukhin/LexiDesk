@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass
+from functools import partial
 
 from .config import bundled_language_data_dir
 from .dictionary import (
@@ -58,23 +59,34 @@ class OfflineTranslator:
         examples: SemanticExampleIndex | None = None,
     ) -> None:
         self._translate_module = None
+        self._model_cache: dict[tuple[str, str, str], tuple[str, ...]] = {}
         self.dictionary = dictionary or OfflineDictionary()
         self.autocorrect = autocorrect
         self.examples = examples or SemanticExampleIndex()
 
     def _module(self):
         if self._translate_module is None:
+            # Translation must stay offline even when a newer Stanza release
+            # changes its default resource-discovery behaviour.
+            os.environ.setdefault("HF_HUB_OFFLINE", "1")
+            os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
             bundled = bundled_language_data_dir()
             if bundled is not None:
                 packages = bundled / "argos-translate" / "packages"
                 if packages.is_dir():
                     os.environ.setdefault("ARGOS_PACKAGES_DIR", str(packages))
             try:
+                import argostranslate.sbd
                 import argostranslate.translate
+                from stanza.pipeline.core import DownloadMethod
             except ImportError as error:
                 raise TranslationError(
                     "Offline translator is not installed. Run scripts/setup.sh."
                 ) from error
+            argostranslate.sbd.stanza.Pipeline = partial(
+                argostranslate.sbd.stanza.Pipeline,
+                download_method=DownloadMethod.NONE,
+            )
             self._translate_module = argostranslate.translate
         return self._translate_module
 
@@ -212,6 +224,10 @@ class OfflineTranslator:
         )
 
     def _model_candidates(self, cleaned: str, source: str, target: str) -> list[str]:
+        cache_key = (cleaned, source, target)
+        cached = self._model_cache.get(cache_key)
+        if cached is not None:
+            return list(cached)
         module = self._module()
         installed = module.get_installed_languages()
         source_language = next(
@@ -238,6 +254,9 @@ class OfflineTranslator:
             if value and key not in seen:
                 candidates.append(value)
                 seen.add(key)
+        if len(self._model_cache) >= 256:
+            self._model_cache.pop(next(iter(self._model_cache)))
+        self._model_cache[cache_key] = tuple(candidates)
         return candidates
 
     def _is_known_inflection(self, text: str, source_language: str) -> bool:
@@ -251,7 +270,9 @@ class OfflineTranslator:
 
 def _clean_model_candidate(value: str, *, single_word: bool) -> str:
     cleaned = " ".join(value.strip().split())
-    return cleaned.replace(".", "").strip() if single_word else cleaned
+    if single_word and cleaned.endswith(".") and cleaned.count(".") == 1:
+        cleaned = cleaned[:-1]
+    return cleaned.strip()
 
 
 def _match_source_case(correction: str, original: str) -> str:

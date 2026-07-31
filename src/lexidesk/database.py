@@ -28,7 +28,13 @@ def _clean_meanings(
     """Remove sentence periods and duplicates from card-sized meanings."""
 
     def clean(value: str) -> str:
-        return " ".join(value.strip().split()).replace(".", "").strip()
+        cleaned = " ".join(value.strip().split())
+        # Translation models often add one sentence-ending dot to a single
+        # meaning. Preserve meaningful punctuation in abbreviations such as
+        # "U.S." and in multi-sentence phrases.
+        if cleaned.endswith(".") and cleaned.count(".") == 1:
+            cleaned = cleaned[:-1]
+        return cleaned.strip()
 
     target = clean(target_text)
     if not target:
@@ -814,6 +820,32 @@ class WordRepository:
             self.connection.backup(destination)
         finally:
             destination.close()
+
+    def restore_from(self, path: Path) -> None:
+        """Restore a complete LexiDesk database after validating the backup."""
+        if not path.is_file():
+            raise ValueError("The selected backup does not exist.")
+        if path.resolve() == self.path.resolve():
+            raise ValueError("Select a backup file, not the active database.")
+        source = sqlite3.connect(path)
+        try:
+            integrity = source.execute("PRAGMA integrity_check").fetchone()
+            if integrity is None or integrity[0] != "ok":
+                raise ValueError("The selected backup is damaged.")
+            tables = {
+                str(row[0])
+                for row in source.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table'"
+                )
+            }
+            if "words" not in tables:
+                raise ValueError("This is not a LexiDesk database backup.")
+            self.connection.commit()
+            source.backup(self.connection)
+            self.connection.commit()
+            self._migrate()
+        finally:
+            source.close()
 
     @staticmethod
     def _to_word(row: sqlite3.Row) -> Word:

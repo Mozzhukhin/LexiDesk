@@ -46,7 +46,7 @@ a network connection. A source installation downloads this data once during
 - Words and short phrases in either language
 - Explicit selection among up to four offline translation meanings
 - Editable translations, meanings, transcription, forms, frequency, and sources
-- Three modes: always visible, click-to-reveal, and typed translation
+- Two regular card modes: always visible and click-to-reveal
 - Passive **Next** browsing that never changes learning statistics
 - Persistent Practice modes: Off, Mixed, translation, reverse, cloze, context,
   and typed answer
@@ -63,6 +63,8 @@ a network connection. A source installation downloads this data once during
 - Smart article import that removes stopwords, duplicates, names, and unknown noise
 - JSON/CSV import and export
 - Daily SQLite backups with seven-day retention
+- Manual full backup and validated restore of cards, FSRS state, and review history
+- Built-in diagnostics report with database integrity and rotating local logs
 - KDE shortcut `Ctrl+Alt+L` to add the current clipboard text
 - Compact JSON CLI used by the widget and available for automation
 - Persistent local D-Bus service with automatic direct-database fallback
@@ -102,7 +104,7 @@ LexiDesk cycles through every other available card before allowing a repeat.
    and is limited to one compact sentence.
 3. **Next** requests another card without recording whether the word is known.
    The 90-second timer performs the same passive change automatically.
-4. The Practice button opens a separate menu. Off keeps normal cards. Mixed
+4. The compact Practice icon opens a separate menu. Off keeps normal cards. Mixed
    inserts translation, reverse, sentence-gap, or context practice every fifth
    card. Selecting one exact quiz type uses only that type on subsequent words.
    The active mode is check-marked and remembered by Plasma.
@@ -165,6 +167,9 @@ is stored in `~/.local/share/LexiDesk`, and settings in
 `~/.config/LexiDesk`. Automatic backups are stored under
 `~/.local/share/LexiDesk/backups`.
 
+JSON/CSV export is intended for moving vocabulary between applications. Use
+**Library → Full backup** when review history and FSRS progress must be retained.
+
 ## Development
 
 ```bash
@@ -206,6 +211,10 @@ Check the local bridge independently from Plasma:
 If Plasma still displays a cached widget after an upgrade, log out and back in,
 or remove and add only the widget instance. Vocabulary and review history remain
 in `~/.local/share/LexiDesk` and are not stored inside the widget.
+
+For unexpected errors, open **Menu → Diagnostics**. The report checks database
+integrity and shows the exact database, dictionary, settings, bridge, and log
+locations without including vocabulary contents.
 
 ## Architecture
 
@@ -254,7 +263,8 @@ are translated as entered.
 ## Privacy and offline behavior
 
 The regular application, widget, CLI, database, review system, and translation
-engine run locally. Network access is used only by `scripts/install_models.py`
+engine run locally. Runtime code explicitly disables Stanza and Hugging Face
+resource downloads. Network access is used only by `scripts/install_models.py`
 during the initial EN↔RU model installation,
 `scripts/install_dictionary.py` while building the local FreeDict index, and
 `scripts/install_examples.py` while building the local WordNet example index.

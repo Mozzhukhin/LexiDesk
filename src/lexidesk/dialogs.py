@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from contextlib import suppress
 from typing import Any
 
@@ -31,6 +32,8 @@ from .translation import (
     detect_language,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class TranslationWorker(QThread):
     completed = Signal(object)
@@ -46,6 +49,12 @@ class TranslationWorker(QThread):
             self.completed.emit(self.translator.translate(self.text))
         except TranslationError as error:
             self.failed.emit(str(error))
+        except Exception:
+            logger.exception("Unexpected offline translation failure")
+            self.failed.emit(
+                "The offline translator failed unexpectedly. Open Diagnostics "
+                "from the menu to find the log file."
+            )
 
 
 class AddWordDialog(QDialog):
@@ -192,7 +201,7 @@ class AddWordDialog(QDialog):
             self.source_edit.setFocus()
             return
         self.translate_button.setEnabled(False)
-        self.translate_button.setText("Translating…")
+        self.translate_button.setText("Checking offline data…")
         self.buttons.setEnabled(False)
         self.setCursor(Qt.CursorShape.WaitCursor)
         worker = TranslationWorker(self.translator, text)
@@ -387,9 +396,19 @@ class SettingsDialog(QDialog):
         self.reveal_combo = QComboBox()
         self.reveal_combo.addItem("Show word and translation", "both")
         self.reveal_combo.addItem("Click to reveal translation", "quiz")
-        self.reveal_combo.addItem("Type the translation", "typing")
         index = self.reveal_combo.findData(settings.reveal_mode)
         self.reveal_combo.setCurrentIndex(max(0, index))
+
+        self.practice_combo = QComboBox()
+        self.practice_combo.addItem("Off — normal cards", "off")
+        self.practice_combo.addItem("Mixed — quiz every fifth card", "mixed")
+        self.practice_combo.addItem("Choose translation", "translation")
+        self.practice_combo.addItem("Reverse translation", "reverse")
+        self.practice_combo.addItem("Complete the sentence", "cloze")
+        self.practice_combo.addItem("Choose the context", "context")
+        self.practice_combo.addItem("Type the translation", "typing")
+        practice_index = self.practice_combo.findData(settings.practice_mode)
+        self.practice_combo.setCurrentIndex(max(0, practice_index))
 
         self.rotation_spin = QSpinBox()
         self.rotation_spin.setRange(30, 3600)
@@ -426,6 +445,7 @@ class SettingsDialog(QDialog):
         form = QFormLayout()
         form.addRow("Theme", self.theme_combo)
         form.addRow("Card mode", self.reveal_combo)
+        form.addRow("Practice mode", self.practice_combo)
         form.addRow("Change card every", self.rotation_spin)
         form.addRow("Opacity", self.opacity_spin)
         form.addRow("Text size", self.font_spin)
@@ -456,6 +476,7 @@ class SettingsDialog(QDialog):
     def apply_to(self, settings: Settings) -> None:
         settings.theme = self.theme_combo.currentText()
         settings.reveal_mode = str(self.reveal_combo.currentData())
+        settings.practice_mode = str(self.practice_combo.currentData())
         settings.rotation_seconds = self.rotation_spin.value()
         settings.opacity = self.opacity_spin.value()
         settings.font_scale = self.font_spin.value()

@@ -13,6 +13,7 @@ dependencies = [
     "platformdirs>=4.3",
     "pyside6-essentials>=6.10",
     "spacy==3.8.13; python_version >= '3.14'",
+    "stanza>=1.12.2",
     "torch>=2.2",
 ]
 
@@ -55,6 +56,12 @@ files = ["src/lexidesk"]
 ignore_missing_imports = true
 warn_unused_ignores = true
 check_untyped_defs = true
+
+[tool.uv]
+# Argos Translate 1.11 pins an unsafe Stanza release. Stanza keeps the public
+# Pipeline API compatible, so use the security-fixed release until Argos lifts
+# its exact dependency pin.
+override-dependencies = ["stanza>=1.12.2"]
 
 [[tool.uv.index]]
 name = "pytorch-cpu"

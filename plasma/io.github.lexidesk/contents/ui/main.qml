@@ -156,8 +156,17 @@ PlasmoidItem {
 
     function startQuiz(kind, animate) {
         var quiz = quizVariants[kind]
-        if (!quiz || busy || empty)
+        if (busy || empty)
             return
+        if (!quiz) {
+            choiceMode = false
+            revealed = true
+            answerChecked = true
+            suggestedRating = ""
+            answerFeedback = i18n(
+                "This quiz needs more cards or suitable examples.")
+            return
+        }
         quizType = quiz.type || kind
         quizPrompt = quiz.prompt || sourceText
         quizAnswer = quiz.answer || translationText
@@ -290,7 +299,9 @@ PlasmoidItem {
                 if (pendingKind === "stats")
                     return
                 failureCount++
-                errorText = i18n("LexiDesk could not reach its local Python bridge.")
+                errorText = i18n(
+                    "LexiDesk backend is unavailable. Run scripts/setup.sh, "
+                    + "then remove and add the widget again.")
                 secondsLeft = 0
                 retryTimer.interval = Math.min(30000, 3000 * Math.pow(2, failureCount - 1))
                 retryTimer.restart()
@@ -376,6 +387,8 @@ PlasmoidItem {
         running: true
         repeat: true
         onTriggered: {
+            if (choiceMode && !choiceAnswered)
+                return
             if (secondsLeft > 0)
                 secondsLeft--
             if (secondsLeft <= 0 && !busy && errorText.length === 0)
@@ -707,9 +720,11 @@ PlasmoidItem {
                         wrapMode: Text.Wrap
                         font.bold: choiceMode
                         font.pixelSize: choiceMode ? 13 : 12
-                        color: suggestedRating === "again"
-                            ? Kirigami.Theme.negativeTextColor
-                            : Kirigami.Theme.positiveTextColor
+                        color: suggestedRating.length === 0
+                            ? Kirigami.Theme.textColor
+                            : (suggestedRating === "again"
+                                ? Kirigami.Theme.negativeTextColor
+                                : Kirigami.Theme.positiveTextColor)
                     }
 
                     PlasmaComponents.Label {

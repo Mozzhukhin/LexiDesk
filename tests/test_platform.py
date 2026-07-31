@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import lexidesk.service_client as service_client
 from lexidesk.autostart import set_autostart
 from lexidesk.config import autostart_path, data_dir, dictionary_path
 from lexidesk.service_client import request_service
@@ -11,6 +12,20 @@ from lexidesk.service_client import request_service
 def test_windows_does_not_try_to_load_dbus(monkeypatch) -> None:
     monkeypatch.setattr(sys, "platform", "win32")
     assert request_service({"command": "stats"}) is None
+
+
+def test_example_enrichment_falls_back_without_dbus(monkeypatch) -> None:
+    scheduled: list[int] = []
+    monkeypatch.setattr(service_client, "request_service", lambda _request: None)
+    monkeypatch.setattr(service_client, "_start_local_worker", lambda: None)
+    monkeypatch.setattr(
+        service_client._enrichment_queue,
+        "put",
+        scheduled.append,
+    )
+
+    assert service_client.schedule_example_enrichment(42) is True
+    assert scheduled == [42]
 
 
 def test_windows_autostart_path(monkeypatch, tmp_path: Path) -> None:
@@ -40,6 +55,18 @@ def test_windows_autostart_script(monkeypatch, tmp_path: Path) -> None:
 
     set_autostart(False)
     assert not path.exists()
+
+
+def test_appimage_autostart_uses_persistent_image(monkeypatch, tmp_path: Path) -> None:
+    path = tmp_path / "lexidesk.desktop"
+    appimage = tmp_path / "LexiDesk.AppImage"
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setenv("APPIMAGE", str(appimage))
+    monkeypatch.setattr("lexidesk.autostart.autostart_path", lambda: path)
+
+    set_autostart(True)
+
+    assert f"Exec={appimage}" in path.read_text(encoding="utf-8")
 
 
 def test_data_directory_override(monkeypatch, tmp_path: Path) -> None:
