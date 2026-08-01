@@ -16,6 +16,7 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import QActionGroup, QCloseEvent, QMouseEvent, QResizeEvent
 from PySide6.QtWidgets import (
+    QApplication,
     QFrame,
     QGraphicsOpacityEffect,
     QGridLayout,
@@ -47,7 +48,7 @@ from .models import Word
 from .service_client import request_service, schedule_example_enrichment
 from .settings import SettingsStore
 from .support import SupportDialog
-from .themes import stylesheet
+from .themes import apply_application_theme, stylesheet
 from .translation import OfflineTranslator
 
 
@@ -327,6 +328,9 @@ class LexiDeskWindow(QMainWindow):
         QTimer.singleShot(0, self._position_card_actions)
 
     def _apply_appearance(self) -> None:
+        app = QApplication.instance()
+        if isinstance(app, QApplication):
+            apply_application_theme(app, self.settings.theme, self.settings.font_scale)
         self.setStyleSheet(stylesheet(self.settings.theme, self.settings.font_scale))
         self.setWindowOpacity(self.settings.opacity)
 

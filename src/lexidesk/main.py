@@ -20,7 +20,7 @@ from .library import LibraryDialog
 from .service_client import request_service, schedule_example_enrichment
 from .settings import SettingsStore
 from .support import SupportDialog
-from .themes import stylesheet
+from .themes import apply_application_theme, stylesheet
 from .translation import OfflineTranslator
 from .window import LexiDeskWindow
 
@@ -99,6 +99,7 @@ def main() -> int:
 
     settings_store = SettingsStore(settings_path())
     settings = settings_store.load()
+    apply_application_theme(app, settings.theme, settings.font_scale)
     repository = WordRepository(
         database_path(), desired_retention=settings.desired_retention
     )

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Apply themes at application scope with a cross-platform Fusion palette so
+  Windows combo popups, menus, tabs, lists, tables, inputs, and disabled states
+  keep readable, consistent foreground and background colors.
 - Restore the language-deck chooser on the header direction and place a
   persistent `⇄` direction switch beside it in Plasma and standalone windows;
   reversing the prompt and translation keeps one shared vocabulary deck.
