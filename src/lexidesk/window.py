@@ -285,8 +285,6 @@ class LexiDeskWindow(QMainWindow):
             action_button.clicked.connect(callback)
             action_layout.addWidget(action_button)
         self.card_actions.hide()
-        self.card_frame.setMouseTracking(True)
-        self.card_frame.installEventFilter(self)
 
         card_layout = QVBoxLayout(self.card_frame)
         card_layout.setContentsMargins(18, 12, 18, 12)
@@ -353,6 +351,9 @@ class LexiDeskWindow(QMainWindow):
         word = self.current_word
         enabled = word is not None
         self.next_button.setEnabled(enabled)
+        self.card_actions.setVisible(enabled)
+        if enabled:
+            self._position_card_actions()
         stats = self.repository.statistics(
             self.settings.active_source_language,
             self.settings.active_target_language,
@@ -789,11 +790,6 @@ class LexiDeskWindow(QMainWindow):
         )
 
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
-        if hasattr(self, "card_frame") and watched is self.card_frame:
-            if event.type() == QEvent.Type.Enter:
-                self.card_actions.setVisible(self.current_word is not None)
-            elif event.type() == QEvent.Type.Leave:
-                self.card_actions.hide()
         if watched is self.centralWidget():
             if event.type() == QEvent.Type.MouseButtonPress:
                 mouse_event = event

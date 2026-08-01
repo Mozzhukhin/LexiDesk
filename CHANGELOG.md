@@ -6,6 +6,7 @@
 - Fixed high-DPI clipping in settings, add-card, analytics, and support dialogs.
 - Added themed progress bars and consistent combo/spin input styling.
 - Kept the add-card form scrollable while its Save and Cancel actions stay visible.
+- Keep card edit, skip, delete, and library actions visible without requiring hover.
 
 - Apply themes at application scope with a cross-platform Fusion palette so
   Windows combo popups, menus, tabs, lists, tables, inputs, and disabled states

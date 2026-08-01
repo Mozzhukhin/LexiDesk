@@ -110,6 +110,20 @@ def test_compact_window_hides_nonessential_header_labels(tmp_path: Path) -> None
     repository.close()
 
 
+def test_card_actions_stay_visible_without_hover(tmp_path: Path) -> None:
+    window, repository = _window(tmp_path)
+    window.tick_timer.stop()
+    window.next_card()
+
+    assert window.current_word is not None
+    assert not window.card_actions.isHidden()
+
+    window.current_word = None
+    window._render_card()
+    assert window.card_actions.isHidden()
+    repository.close()
+
+
 def test_standalone_direction_button_reverses_the_same_deck(tmp_path: Path) -> None:
     window, repository = _window(tmp_path)
     window.tick_timer.stop()
