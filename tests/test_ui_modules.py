@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
+from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox, QScrollArea
 
 from lexidesk.database import WordRepository
 from lexidesk.dialogs import AddWordDialog, DeckSelectionDialog, SettingsDialog
@@ -93,6 +93,7 @@ def test_add_dialog_applies_translation_and_builds_card(qapp: QApplication) -> N
         "Add word",
         "Languages",
     ]
+    assert dialog.findChild(QScrollArea, "formScroll") is not None
     result = translator.translate("relyable")
 
     dialog._apply_translation(result, "relyable")
@@ -119,6 +120,7 @@ def test_analytics_dialog_populates_all_tables(
     dialog = AnalyticsDialog(repository, daily_goal=5)
 
     assert "1 meanings" in dialog.summary.text()
+    assert dialog.summary.objectName() == "heading"
     assert dialog.activity.rowCount() == 1
     assert dialog.difficult.rowCount() == 1
     assert dialog.quiz_types.rowCount() == 1

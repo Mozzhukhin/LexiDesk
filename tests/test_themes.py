@@ -15,6 +15,8 @@ def test_every_theme_styles_popup_and_container_controls() -> None:
         "QTabBar::tab:selected",
         "QScrollBar::handle",
         "QLineEdit:disabled",
+        "QProgressBar::chunk",
+        "QComboBox:focus",
     )
 
     for name, colors in THEMES.items():

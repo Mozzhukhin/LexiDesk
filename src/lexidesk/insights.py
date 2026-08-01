@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QDialog,
+    QFrame,
     QHeaderView,
     QLabel,
     QProgressBar,
     QPushButton,
+    QScrollArea,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -27,10 +29,10 @@ class AnalyticsDialog(QDialog):
         self.repository = repository
         self.daily_goal = max(1, daily_goal)
         self.setWindowTitle("LexiDesk Learning Analytics")
-        self.resize(820, 760)
+        self.resize(820, 680)
 
         self.summary = QLabel()
-        self.summary.setObjectName("word")
+        self.summary.setObjectName("heading")
         self.summary.setWordWrap(True)
 
         self.goal_label = QLabel()
@@ -85,18 +87,30 @@ class AnalyticsDialog(QDialog):
         close_button = QPushButton("Close")
         close_button.clicked.connect(self.accept)
 
+        content = QWidget()
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.addWidget(self.summary)
+        content_layout.addWidget(self.goal_label)
+        content_layout.addWidget(self.goal_progress)
+        content_layout.addWidget(activity_title)
+        content_layout.addWidget(self.activity)
+        content_layout.addWidget(difficult_title)
+        content_layout.addWidget(self.difficult)
+        content_layout.addWidget(quiz_title)
+        content_layout.addWidget(self.quiz_types)
+        content_layout.addWidget(confusion_title)
+        content_layout.addWidget(self.confusions)
+
+        scroll = QScrollArea()
+        scroll.setObjectName("analyticsScroll")
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidget(content)
+        QTimer.singleShot(0, lambda: scroll.verticalScrollBar().setValue(0))
+
         layout = QVBoxLayout(self)
-        layout.addWidget(self.summary)
-        layout.addWidget(self.goal_label)
-        layout.addWidget(self.goal_progress)
-        layout.addWidget(activity_title)
-        layout.addWidget(self.activity, 1)
-        layout.addWidget(difficult_title)
-        layout.addWidget(self.difficult, 1)
-        layout.addWidget(quiz_title)
-        layout.addWidget(self.quiz_types, 1)
-        layout.addWidget(confusion_title)
-        layout.addWidget(self.confusions, 1)
+        layout.addWidget(scroll, 1)
         layout.addWidget(close_button, 0, Qt.AlignmentFlag.AlignRight)
         self.refresh()
 

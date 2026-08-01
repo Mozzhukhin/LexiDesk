@@ -14,3 +14,4 @@ def test_support_dialog_copies_public_trc20_address() -> None:
     assert SUPPORT_NETWORK == "TRON (TRC20)"
     assert app.clipboard().text() == SUPPORT_ADDRESS
     assert dialog.copy_button.text() == "Copied"
+    assert dialog.address_label.text() == SUPPORT_ADDRESS

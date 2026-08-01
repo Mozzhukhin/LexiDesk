@@ -167,6 +167,10 @@ def stylesheet(name: str, scale: int = 100) -> str:
             font-weight: 800;
             letter-spacing: 1px;
         }}
+        QLabel#heading, QLabel#dialogTitle {{
+            font-size: {round(18 * factor)}px;
+            font-weight: 700;
+        }}
         QLabel#badge, QPushButton#badge {{
             color: {colors["muted"]};
             background: {colors["surface"]};
@@ -283,6 +287,22 @@ def stylesheet(name: str, scale: int = 100) -> str:
             border-color: {colors["accent"]};
         }}
         QLineEdit:disabled, QTextEdit:disabled, QPlainTextEdit:disabled {{
+            color: {colors["muted"]};
+            background: {colors["window"]};
+        }}
+        QComboBox, QSpinBox, QDoubleSpinBox {{
+            background: {colors["surface"]};
+            color: {colors["text"]};
+            border: 1px solid {colors["border"]};
+            border-radius: 7px;
+            padding: 5px 7px;
+            selection-background-color: {colors["accent"]};
+            selection-color: {colors["accent_text"]};
+        }}
+        QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {{
+            border-color: {colors["accent"]};
+        }}
+        QComboBox:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled {{
             color: {colors["muted"]};
             background: {colors["window"]};
         }}
@@ -426,10 +446,24 @@ def stylesheet(name: str, scale: int = 100) -> str:
             color: {colors["text"]};
             border: 1px solid {colors["border"]};
         }}
+        QProgressBar {{
+            color: {colors["text"]};
+            background: {colors["surface"]};
+            border: 1px solid {colors["border"]};
+            border-radius: 6px;
+            text-align: center;
+            min-height: 18px;
+        }}
+        QProgressBar::chunk {{
+            background: {colors["accent"]};
+            border-radius: 5px;
+        }}
         QProgressBar#countdown {{
             background: {colors["border"]};
             border: none;
             border-radius: 2px;
+            min-height: 0;
+            max-height: 4px;
         }}
         QProgressBar#countdown::chunk {{
             background: {colors["accent"]};

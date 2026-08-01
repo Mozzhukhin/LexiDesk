@@ -88,6 +88,7 @@ class LexiDeskWindow(QMainWindow):
 
         self._build_ui()
         self._update_practice_button()
+        self._update_header_density()
         self._apply_appearance()
 
         self.tick_timer = QTimer(self)
@@ -824,10 +825,17 @@ class LexiDeskWindow(QMainWindow):
         )
         self.card_actions.raise_()
 
+    def _update_header_density(self) -> None:
+        """Keep the header readable at the supported compact width."""
+        compact = self.width() < 370
+        self.title_label.setVisible(not compact)
+        self.goal_label.setVisible(not compact)
+
     def resizeEvent(self, event: QResizeEvent) -> None:
         super().resizeEvent(event)
         if hasattr(self, "card_actions"):
             self._position_card_actions()
+            self._update_header_density()
         self.settings.width = self.width()
         self.settings.height = self.height()
 

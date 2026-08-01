@@ -92,6 +92,24 @@ def test_standalone_uses_mouse_only_next_and_compact_progress(tmp_path: Path) ->
     repository.close()
 
 
+def test_compact_window_hides_nonessential_header_labels(tmp_path: Path) -> None:
+    window, repository = _window(tmp_path)
+    window.resize(330, 290)
+    window._update_header_density()
+
+    assert window.title_label.isHidden()
+    assert window.goal_label.isHidden()
+    assert not window.direction_label.isHidden()
+    assert not window.swap_direction_button.isHidden()
+
+    window.resize(390, 310)
+    window._update_header_density()
+    assert not window.title_label.isHidden()
+    assert not window.goal_label.isHidden()
+    window.tick_timer.stop()
+    repository.close()
+
+
 def test_standalone_direction_button_reverses_the_same_deck(tmp_path: Path) -> None:
     window, repository = _window(tmp_path)
     window.tick_timer.stop()

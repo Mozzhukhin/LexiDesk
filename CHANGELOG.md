@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Made the widget header responsive at its compact 330 px width.
+- Fixed high-DPI clipping in settings, add-card, analytics, and support dialogs.
+- Added themed progress bars and consistent combo/spin input styling.
+- Kept the add-card form scrollable while its Save and Cancel actions stay visible.
+
 - Apply themes at application scope with a cross-platform Fusion palette so
   Windows combo popups, menus, tabs, lists, tables, inputs, and disabled states
   keep readable, consistent foreground and background colors.

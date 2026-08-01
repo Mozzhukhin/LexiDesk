@@ -12,11 +12,13 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QDoubleSpinBox,
     QFormLayout,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSpinBox,
     QTabWidget,
     QVBoxLayout,
@@ -156,7 +158,8 @@ class AddWordDialog(QDialog):
         self.source_edit.setPlaceholderText("Word or phrase")
         self.source_edit.returnPressed.connect(self.translate)
 
-        self.translate_button = QPushButton("Translate offline")
+        self.translate_button = QPushButton("Translate")
+        self.translate_button.setToolTip("Translate using installed offline data")
         self.translate_button.clicked.connect(self.translate)
 
         source_row = QHBoxLayout()
@@ -227,6 +230,7 @@ class AddWordDialog(QDialog):
         self.source_info_edit.setPlaceholderText("FreeDict, course, book, personal…")
 
         form = QFormLayout()
+        form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
         form.addRow("Word / phrase", source_widget)
         form.addRow("Languages", language_widget)
         form.addRow("", direction_widget)
@@ -258,9 +262,18 @@ class AddWordDialog(QDialog):
         buttons.rejected.connect(self.reject)
         self.buttons = buttons
 
+        form_widget = QWidget()
+        form_widget.setLayout(form)
+        form_scroll = QScrollArea()
+        form_scroll.setObjectName("formScroll")
+        form_scroll.setWidgetResizable(True)
+        form_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        form_scroll.setWidget(form_widget)
+
         card_page = QWidget()
         card_layout = QVBoxLayout(card_page)
-        card_layout.addLayout(form)
+        card_layout.setContentsMargins(0, 0, 0, 0)
+        card_layout.addWidget(form_scroll, 1)
         card_layout.addWidget(hint)
         card_layout.addWidget(buttons)
         layout = QVBoxLayout(self)
@@ -460,7 +473,7 @@ class AddWordDialog(QDialog):
         if worker is not None:
             worker.deleteLater()
         self.unsetCursor()
-        self.translate_button.setText("Translate offline")
+        self.translate_button.setText("Translate")
         self.translate_button.setEnabled(True)
         self.buttons.setEnabled(True)
 
@@ -605,13 +618,14 @@ class SettingsDialog(QDialog):
         self.retention_spin.setDecimals(2)
         self.retention_spin.setValue(settings.desired_retention)
 
-        self.autocorrect_check = QCheckBox("Correct confident spelling mistakes")
+        self.autocorrect_check = QCheckBox("Autocorrect spelling errors")
         self.autocorrect_check.setChecked(settings.autocorrect)
 
-        self.autostart_check = QCheckBox("Launch automatically after login")
+        self.autostart_check = QCheckBox("Start after login")
         self.autostart_check.setChecked(settings.autostart)
 
         form = QFormLayout()
+        form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
         form.addRow("Theme", self.theme_combo)
         form.addRow("Card mode", self.reveal_combo)
         form.addRow("Practice mode", self.practice_combo)

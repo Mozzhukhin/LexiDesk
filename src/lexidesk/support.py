@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QPushButton,
     QVBoxLayout,
 )
@@ -33,11 +33,10 @@ class SupportDialog(QDialog):
         network = QLabel(f"{SUPPORT_ASSET} · {SUPPORT_NETWORK}")
         network.setObjectName("metadata")
 
-        self.address_label = QLabel(SUPPORT_ADDRESS)
-        self.address_label.setTextInteractionFlags(
-            Qt.TextInteractionFlag.TextSelectableByMouse
-        )
-        self.address_label.setWordWrap(True)
+        self.address_label = QLineEdit(SUPPORT_ADDRESS)
+        self.address_label.setReadOnly(True)
+        self.address_label.setCursorPosition(0)
+        self.address_label.setToolTip("USDT TRC20 wallet address")
 
         self.copy_button = QPushButton("Copy address")
         self.copy_button.clicked.connect(self.copy_address)
