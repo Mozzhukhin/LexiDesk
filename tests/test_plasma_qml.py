@@ -112,8 +112,10 @@ def test_widget_direction_button_controls_the_front_side() -> None:
     assert "root.primaryExampleText, root.primaryText" in qml
     assert 'runBridge("swap-direction", "direction")' in qml
     assert 'directionText = card.direction || "OFFLINE"' in qml
-    assert 'text: directionText + "  ⇄"' in qml
-    assert 'i18n("Switch study direction")' in qml
+    assert 'text: directionText + "  ▾"' in qml
+    assert 'root.launchGui("--decks", "deck")' in qml
+    assert 'text: "⇄"' in qml
+    assert 'i18n("Swap languages")' in qml
 
 
 def test_widget_rotation_skips_an_unanswered_quiz() -> None:

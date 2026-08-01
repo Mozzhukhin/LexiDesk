@@ -91,10 +91,11 @@ Install both directions when you want to study either side of a pair.
 
 Vocabulary decks are bidirectional: one saved meaning such as
 `ambiguous ⇄ неоднозначный` can be studied from either side without creating a
-duplicate library row. The direction button in the widget header switches
-which language is shown above the translation and remembers that choice. FSRS
-state, due time, accuracy, and mistakes remain independent for each recall
-direction. Adding the exact reverse of an existing card reuses that card.
+duplicate library row. The direction menu in the widget header selects a
+language pair, while the adjacent `⇄` button switches which language is shown
+above the translation and remembers that choice. FSRS state, due time,
+accuracy, and mistakes remain independent for each recall direction. Adding
+the exact reverse of an existing card reuses that card.
 
 Automatic language detection remains limited to legacy EN/RU use. Languages
 sharing a writing system cannot be identified reliably from a single word, so
@@ -274,9 +275,10 @@ and missing entries; no automatic system can infer the intended sense of an
 isolated word with certainty, so every translation remains editable.
 
 Regular cards place the selected source language above its translation. The
-header button shows the current direction and switches it with `⇄`; the deck
-remains one shared bidirectional vocabulary. Quiz prompts and review history
-retain the direction currently being tested. Single-word model results
+header direction opens the deck chooser, and its adjacent `⇄` button reverses
+the prompt and translation; the deck remains one shared bidirectional
+vocabulary. Quiz prompts and review history retain the direction currently
+being tested. Single-word model results
 are normalized as card meanings rather than sentences: periods are removed and
 punctuation-only duplicates are collapsed before saving.
 

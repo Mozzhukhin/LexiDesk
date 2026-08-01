@@ -107,8 +107,12 @@ class LexiDeskWindow(QMainWindow):
 
         self.direction_label = QPushButton("OFFLINE  ▾")
         self.direction_label.setObjectName("badge")
-        self.direction_label.setToolTip("Switch study direction")
-        self.direction_label.clicked.connect(self.swap_study_direction)
+        self.direction_label.setToolTip("Choose language deck")
+        self.direction_label.clicked.connect(self.choose_language_deck)
+        self.swap_direction_button = QPushButton("⇄")
+        self.swap_direction_button.setObjectName("icon")
+        self.swap_direction_button.setToolTip("Swap languages")
+        self.swap_direction_button.clicked.connect(self.swap_study_direction)
         self.goal_label = QLabel()
         self.goal_label.setObjectName("muted")
         self.goal_label.setToolTip("Reviews completed today")
@@ -182,6 +186,7 @@ class LexiDeskWindow(QMainWindow):
         header.addStretch()
         header.addWidget(self.goal_label)
         header.addWidget(self.direction_label)
+        header.addWidget(self.swap_direction_button)
         header.addWidget(self.practice_label)
         header.addWidget(add_button)
         header.addWidget(more_button)
@@ -387,7 +392,7 @@ class LexiDeskWindow(QMainWindow):
             self._example_enrichment_scheduled.add(word.id)
             schedule_example_enrichment(word.id)
 
-        self.direction_label.setText(f"{word.direction}  ⇄")
+        self.direction_label.setText(f"{word.direction}  ▾")
         self.word_label.setText(word.source_text)
         self.translation_label.setText(word.target_text)
         metadata = []

@@ -568,12 +568,22 @@ PlasmoidItem {
                 }
 
                 PlasmaComponents.ToolButton {
-                    text: directionText + "  ⇄"
+                    text: directionText + "  ▾"
                     display: PlasmaComponents.AbstractButton.TextOnly
                     font.pixelSize: 10
                     enabled: loaded && !empty && !busy
+                    onClicked: root.launchGui("--decks", "deck")
+                    PlasmaComponents.ToolTip.text: i18n("Choose language deck")
+                    PlasmaComponents.ToolTip.visible: hovered
+                }
+
+                PlasmaComponents.ToolButton {
+                    text: "⇄"
+                    display: PlasmaComponents.AbstractButton.TextOnly
+                    font.pixelSize: 13
+                    enabled: loaded && !empty && !busy
                     onClicked: root.swapDirection()
-                    PlasmaComponents.ToolTip.text: i18n("Switch study direction")
+                    PlasmaComponents.ToolTip.text: i18n("Swap languages")
                     PlasmaComponents.ToolTip.visible: hovered
                 }
 

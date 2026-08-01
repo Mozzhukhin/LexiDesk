@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Add a persistent direction switch to the Plasma and standalone headers;
+- Restore the language-deck chooser on the header direction and place a
+  persistent `⇄` direction switch beside it in Plasma and standalone windows;
   reversing the prompt and translation keeps one shared vocabulary deck.
 - Enforce a strict five-presentation cadence in Mixed mode so a backlog of
   FSRS-due cards cannot produce consecutive quizzes.
