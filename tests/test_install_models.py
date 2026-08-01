@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+import urllib.request
 import zipfile
 from pathlib import Path
 from types import ModuleType
+
+import pytest
 
 
 def _installer() -> ModuleType:
@@ -55,3 +58,32 @@ def test_model_installer_verifies_and_extracts_pinned_files(tmp_path: Path) -> N
 
     assert (destination / "translate-en_ru-test" / "model" / "model.bin").is_file()
     assert not (destination / "translate-en_ru-test" / "stanza").exists()
+
+
+def test_model_download_identifies_lexidesk_to_the_package_host(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    installer = _installer()
+    source = tmp_path / "source.argosmodel"
+    source.write_bytes(b"not-an-archive")
+    captured: list[urllib.request.Request] = []
+
+    def open_request(request: urllib.request.Request, timeout: int):
+        captured.append(request)
+        assert timeout == 120
+        return source.open("rb")
+
+    monkeypatch.setattr(installer.urllib.request, "urlopen", open_request)
+
+    with pytest.raises(zipfile.BadZipFile):
+        installer.install_model(
+            "test-model",
+            "https://example.test/model.argosmodel",
+            source.stat().st_size,
+            {},
+            tmp_path / "models",
+        )
+
+    assert captured
+    assert captured[0].get_header("User-agent") == ("LexiDesk offline model installer")

@@ -102,7 +102,14 @@ def install_model(
     staging.mkdir()
     try:
         print(f"Downloading {name}…", flush=True)
-        with urllib.request.urlopen(url) as response, archive.open("wb") as output:
+        request = urllib.request.Request(
+            url,
+            headers={"User-Agent": "LexiDesk offline model installer"},
+        )
+        with (
+            urllib.request.urlopen(request, timeout=120) as response,
+            archive.open("wb") as output,
+        ):
             while chunk := response.read(1024 * 1024):
                 output.write(chunk)
         if archive.stat().st_size != archive_size:
