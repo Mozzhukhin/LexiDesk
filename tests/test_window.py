@@ -51,7 +51,9 @@ def test_standalone_translation_quiz_records_fsrs_review(tmp_path: Path) -> None
     repository.close()
 
 
-def test_standalone_keeps_english_above_russian(tmp_path: Path) -> None:
+def test_standalone_keeps_the_selected_language_above_translation(
+    tmp_path: Path,
+) -> None:
     _application()
     repository = WordRepository(tmp_path / "russian.db")
     word_id = repository.add_word(
@@ -67,8 +69,8 @@ def test_standalone_keeps_english_above_russian(tmp_path: Path) -> None:
     window.current_word = repository.get_word(word_id)
     window._render_card()
 
-    assert window.word_label.text() == "restricted"
-    assert window.translation_label.text() == "ограниченный"
+    assert window.word_label.text() == "ограниченный"
+    assert window.translation_label.text() == "restricted"
     window.tick_timer.stop()
     repository.close()
 
@@ -76,14 +78,33 @@ def test_standalone_keeps_english_above_russian(tmp_path: Path) -> None:
 def test_standalone_uses_mouse_only_next_and_compact_progress(tmp_path: Path) -> None:
     window, repository = _window(tmp_path)
     window.tick_timer.stop()
+    window.next_card()
 
     assert window.next_button.shortcut().isEmpty()
     assert not hasattr(window, "undo_review")
     assert window.countdown_progress.isTextVisible() is False
     assert "until the next card" in window.countdown_progress.toolTip()
-    assert window.direction_label.toolTip() == "Choose language deck"
-    assert window.direction_label.text().endswith("▾")
+    assert window.direction_label.toolTip() == "Switch study direction"
+    assert window.direction_label.text().endswith("⇄")
 
+    repository.close()
+
+
+def test_standalone_direction_button_reverses_the_same_deck(tmp_path: Path) -> None:
+    window, repository = _window(tmp_path)
+    window.tick_timer.stop()
+    window.next_card()
+    first_id = window.current_word.id if window.current_word else 0
+    assert window.current_word is not None
+    assert window.current_word.direction == "EN → RU"
+
+    window.swap_study_direction()
+
+    assert window.current_word is not None
+    assert window.current_word.direction == "RU → EN"
+    assert repository.count("en", "ru") == 4
+    assert repository.count("ru", "en") == 4
+    assert first_id in {word.id for word in repository.list_words()}
     repository.close()
 
 

@@ -44,6 +44,10 @@ def parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("undo", help="Undo the most recent review")
     subparsers.add_parser("stats", help="Return vocabulary statistics")
+    subparsers.add_parser(
+        "swap-direction",
+        help="Reverse the active deck's presentation direction",
+    )
 
     analytics = subparsers.add_parser("analytics", help="Return learning analytics")
     analytics.add_argument("--days", type=int, default=30)
@@ -97,11 +101,60 @@ def run(arguments: list[str] | None = None) -> dict[str, Any]:
         repository.close()
 
 
+def swap_active_direction(
+    settings_store: SettingsStore,
+    repository: WordRepository,
+) -> dict[str, Any]:
+    """Reverse presentation while keeping one shared bidirectional deck."""
+    settings = settings_store.load()
+    if not (settings.active_source_language and settings.active_target_language):
+        latest_pair = repository.latest_language_pair()
+        if latest_pair is None:
+            return {"changed": False, "direction": ""}
+        (
+            settings.active_source_language,
+            settings.active_target_language,
+        ) = latest_pair
+    (
+        settings.active_source_language,
+        settings.active_target_language,
+    ) = (
+        settings.active_target_language,
+        settings.active_source_language,
+    )
+    settings_store.save(settings)
+    return {
+        "changed": True,
+        "source_language": settings.active_source_language,
+        "target_language": settings.active_target_language,
+        "direction": (
+            f"{settings.active_source_language.upper()} → "
+            f"{settings.active_target_language.upper()}"
+        ),
+    }
+
+
 def main() -> int:
     configure_logging()
     try:
         args = parser().parse_args()
         request = request_from_arguments(args)
+        if args.command == "swap-direction":
+            repository = WordRepository(database_path())
+            try:
+                direction_payload = swap_active_direction(
+                    SettingsStore(settings_path()), repository
+                )
+            finally:
+                repository.close()
+            print(
+                json.dumps(
+                    direction_payload,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                )
+            )
+            return 0
         if args.command in {"card", "review", "stats"}:
             settings_store = SettingsStore(settings_path())
             settings = settings_store.load()

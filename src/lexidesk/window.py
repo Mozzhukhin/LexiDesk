@@ -107,8 +107,8 @@ class LexiDeskWindow(QMainWindow):
 
         self.direction_label = QPushButton("OFFLINE  ▾")
         self.direction_label.setObjectName("badge")
-        self.direction_label.setToolTip("Choose language deck")
-        self.direction_label.clicked.connect(self.choose_language_deck)
+        self.direction_label.setToolTip("Switch study direction")
+        self.direction_label.clicked.connect(self.swap_study_direction)
         self.goal_label = QLabel()
         self.goal_label.setObjectName("muted")
         self.goal_label.setToolTip("Reviews completed today")
@@ -387,14 +387,9 @@ class LexiDeskWindow(QMainWindow):
             self._example_enrichment_scheduled.add(word.id)
             schedule_example_enrichment(word.id)
 
-        self.direction_label.setText(f"{word.deck_direction}  ▾")
-        # The English side always stays on top, regardless of which language was
-        # entered when the card was created.
-        english_first = word.target_lang == "en"
-        self.word_label.setText(word.target_text if english_first else word.source_text)
-        self.translation_label.setText(
-            word.source_text if english_first else word.target_text
-        )
+        self.direction_label.setText(f"{word.direction}  ⇄")
+        self.word_label.setText(word.source_text)
+        self.translation_label.setText(word.target_text)
         metadata = []
         if word.transcription:
             metadata.append(word.transcription)
@@ -405,11 +400,7 @@ class LexiDeskWindow(QMainWindow):
         metadata.extend(word.alternatives)
         metadata.extend(word.forms)
         self.alternatives_label.setText(" · ".join(metadata))
-        examples = (
-            (word.example_translation, word.example)
-            if english_first
-            else (word.example, word.example_translation)
-        )
+        examples = (word.example, word.example_translation)
         example_parts = [part for part in examples if part]
         self.example_label.setText("\n".join(example_parts))
         variants = quiz_variants(word, self.repository)
@@ -647,6 +638,29 @@ class LexiDeskWindow(QMainWindow):
             self.settings.active_source_language,
             self.settings.active_target_language,
         ) = dialog.selected_pair
+        self.settings_store.save(self.settings)
+        self.current_word = None
+        self.next_card()
+
+    def swap_study_direction(self) -> None:
+        if not (
+            self.settings.active_source_language
+            and self.settings.active_target_language
+        ):
+            latest_pair = self.repository.latest_language_pair()
+            if latest_pair is None:
+                return
+            (
+                self.settings.active_source_language,
+                self.settings.active_target_language,
+            ) = latest_pair
+        (
+            self.settings.active_source_language,
+            self.settings.active_target_language,
+        ) = (
+            self.settings.active_target_language,
+            self.settings.active_source_language,
+        )
         self.settings_store.save(self.settings)
         self.current_word = None
         self.next_card()

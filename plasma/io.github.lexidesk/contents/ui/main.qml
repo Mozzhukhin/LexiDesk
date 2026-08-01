@@ -15,15 +15,10 @@ PlasmoidItem {
     property string translationText: ""
     property string sourceLanguage: ""
     property string targetLanguage: ""
-    readonly property bool targetFirst: targetLanguage === "en"
-    readonly property string primaryText: targetFirst
-        ? translationText : sourceText
-    readonly property string secondaryText: targetFirst
-        ? sourceText : translationText
-    readonly property string primaryExampleText: targetFirst
-        ? exampleTranslationText : exampleText
-    readonly property string secondaryExampleText: targetFirst
-        ? exampleText : exampleTranslationText
+    readonly property string primaryText: sourceText
+    readonly property string secondaryText: translationText
+    readonly property string primaryExampleText: exampleText
+    readonly property string secondaryExampleText: exampleTranslationText
     property string directionText: "OFFLINE"
     property bool presentationReversed: false
     property string metadataText: ""
@@ -119,6 +114,11 @@ PlasmoidItem {
         var exclusion = cardId > 0 ? " --exclude " + cardId : ""
         var adaptive = quizMode === "mixed" ? " --adaptive" : ""
         runBridge("card" + exclusion + adaptive, "card")
+    }
+
+    function swapDirection() {
+        if (!busy && !empty)
+            runBridge("swap-direction", "direction")
     }
 
     function review(result) {
@@ -269,7 +269,7 @@ PlasmoidItem {
         translationText = card.translation || ""
         sourceLanguage = card.source_language || "en"
         targetLanguage = card.target_language || (sourceLanguage === "en" ? "ru" : "en")
-        directionText = card.deck_direction || card.direction || "OFFLINE"
+        directionText = card.direction || "OFFLINE"
         presentationReversed = Boolean(card.presentation_reversed)
         var metadata = []
         if (card.part_of_speech)
@@ -356,6 +356,8 @@ PlasmoidItem {
                     totalCount = Number(payload.total || 0)
                     dueCount = Number(payload.due || 0)
                     reviewsToday = Number(payload.reviews_today || 0)
+                } else if (pendingKind === "direction") {
+                    loadNext()
                 } else if (pendingKind === "check") {
                     answerChecked = true
                     revealed = true
@@ -566,11 +568,12 @@ PlasmoidItem {
                 }
 
                 PlasmaComponents.ToolButton {
-                    text: directionText + "  ▾"
+                    text: directionText + "  ⇄"
                     display: PlasmaComponents.AbstractButton.TextOnly
                     font.pixelSize: 10
-                    onClicked: root.launchGui("--decks", "deck")
-                    PlasmaComponents.ToolTip.text: i18n("Choose language deck")
+                    enabled: loaded && !empty && !busy
+                    onClicked: root.swapDirection()
+                    PlasmaComponents.ToolTip.text: i18n("Switch study direction")
                     PlasmaComponents.ToolTip.visible: hovered
                 }
 

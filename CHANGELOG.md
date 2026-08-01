@@ -2,18 +2,20 @@
 
 ## Unreleased
 
+- Add a persistent direction switch to the Plasma and standalone headers;
+  reversing the prompt and translation keeps one shared vocabulary deck.
 - Enforce a strict five-presentation cadence in Mixed mode so a backlog of
   FSRS-due cards cannot produce consecutive quizzes.
 - Remove redundant correct/incorrect captions from choice quizzes and rely on
   green/red option highlighting before the automatic advance.
 - Unify opposite directions into one bidirectional vocabulary card while
   scheduling, scoring, and tracking each recall direction independently.
-- Alternate new cards across both sides, prioritize the weaker direction over
-  time, and prevent an exact reverse entry from creating a duplicate card.
+- Keep independent progress for both sides and prevent an exact reverse entry
+  from creating a duplicate card.
 - Separate the vocabulary library into source-to-target deck views, default to
   the widget's active pair, and keep learning-status filtering independent.
-- Make the current language direction a compact header control that opens the
-  deck chooser directly in both the Plasma and standalone interfaces.
+- Make the current language direction a compact header control in both the
+  Plasma and standalone interfaces.
 - Keep card rotation, adaptive scheduling, and quizzes inside the explicitly
   selected source-to-target deck; persist the latest added pair and provide a
   dedicated deck chooser without merging language data.

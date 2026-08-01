@@ -815,18 +815,6 @@ class WordRepository:
             presentation_reversed=True,
         )
 
-    def _prefer_reverse(self, word: Word, *, adaptive: bool) -> bool:
-        reverse = self._reverse_word(word)
-        if word.last_shown_at is None or reverse.last_shown_at is None:
-            return word.last_shown_at is not None
-        if not adaptive:
-            return reverse.last_shown_at < word.last_shown_at
-        if word.view_count != reverse.view_count:
-            return reverse.view_count < word.view_count
-        if word.due_at != reverse.due_at:
-            return reverse.due_at < word.due_at
-        return reverse.last_shown_at < word.last_shown_at
-
     def list_words(
         self,
         search: str = "",
@@ -1129,68 +1117,80 @@ class WordRepository:
                       (w.source_lang = :target AND w.target_lang = :source))
                 ORDER BY r.last_shown_at DESC, r.word_id DESC
                 LIMIT MIN(5, MAX(0, (SELECT total FROM deck_size) - 1))
+            ),
+            eligible AS (
+                SELECT w.*,
+                    CASE WHEN :source != '' AND w.source_lang != :source
+                        THEN rp.last_shown_at ELSE w.last_shown_at
+                    END AS active_last_shown_at,
+                    CASE WHEN :source != '' AND w.source_lang != :source
+                        THEN rp.view_count ELSE w.view_count
+                    END AS active_view_count,
+                    CASE WHEN :source != '' AND w.source_lang != :source
+                        THEN rp.know_count ELSE w.know_count
+                    END AS active_know_count,
+                    CASE WHEN :source != '' AND w.source_lang != :source
+                        THEN rp.dont_know_count ELSE w.dont_know_count
+                    END AS active_dont_know_count,
+                    CASE WHEN :source != '' AND w.source_lang != :source
+                        THEN rp.due_at ELSE w.due_at
+                    END AS active_due_at,
+                    CASE WHEN :source != '' AND w.source_lang != :source
+                        THEN rp.difficulty ELSE w.difficulty
+                    END AS active_difficulty
+                FROM words w
+                JOIN reverse_progress rp ON rp.word_id = w.id
+                WHERE (:source = '' OR
+                        (w.source_lang = :source AND w.target_lang = :target) OR
+                        (w.source_lang = :target AND w.target_lang = :source))
+                  AND (
+                        (SELECT total FROM deck_size) = 1
+                        OR w.id NOT IN (SELECT id FROM recent_cards)
+                    )
+                  AND (
+                        :exclude IS NULL
+                        OR w.id != :exclude
+                        OR (SELECT total FROM deck_size) = 1
+                    )
             )
-            SELECT * FROM words
-            WHERE (:source = '' OR
-                    (source_lang = :source AND target_lang = :target) OR
-                    (source_lang = :target AND target_lang = :source))
-              AND (
-                    (SELECT total FROM deck_size) = 1
-                    OR id NOT IN (SELECT id FROM recent_cards)
-                )
-              AND (
-                    :exclude IS NULL
-                    OR id != :exclude
-                    OR (SELECT total FROM deck_size) = 1
-                )
+            SELECT * FROM eligible
             ORDER BY
-                CASE WHEN last_shown_at IS NULL THEN 0 ELSE 1 END,
+                CASE WHEN active_last_shown_at IS NULL THEN 0 ELSE 1 END,
                 CASE WHEN :adaptive = 1 THEN
                     CASE
-                        WHEN know_count + dont_know_count = 0
-                             AND view_count >= 1 THEN 0
-                        WHEN (SELECT know_count + dont_know_count
-                              FROM reverse_progress WHERE word_id = words.id) = 0
-                             AND (SELECT view_count FROM reverse_progress
-                                  WHERE word_id = words.id) >= 1 THEN 0
-                        WHEN know_count + dont_know_count > 0
-                             AND due_at <= :now THEN 0
-                        WHEN (SELECT know_count + dont_know_count
-                              FROM reverse_progress WHERE word_id = words.id) > 0
-                             AND (SELECT due_at FROM reverse_progress
-                                  WHERE word_id = words.id) <= :now THEN 0
+                        WHEN active_know_count + active_dont_know_count = 0
+                             AND active_view_count >= 1 THEN 0
+                        WHEN active_know_count + active_dont_know_count > 0
+                             AND active_due_at <= :now THEN 0
                         ELSE 1
                     END
                     ELSE 0
                 END,
-                CASE WHEN :adaptive = 1 AND (
-                    due_at <= :now OR (SELECT due_at FROM reverse_progress
-                        WHERE word_id = words.id) <= :now
-                ) THEN 0 ELSE 1 END,
+                CASE WHEN :adaptive = 1 AND active_due_at <= :now
+                    THEN 0 ELSE 1 END,
                 CASE
-                    WHEN :adaptive = 1 AND know_count + dont_know_count > 0
-                         AND due_at <= :now
-                    THEN CAST(dont_know_count AS REAL)
-                         / (know_count + dont_know_count)
+                    WHEN :adaptive = 1
+                         AND active_know_count + active_dont_know_count > 0
+                         AND active_due_at <= :now
+                    THEN CAST(active_dont_know_count AS REAL)
+                         / (active_know_count + active_dont_know_count)
                     ELSE 0
                 END DESC,
                 CASE
-                    WHEN :adaptive = 1 AND due_at <= :now
-                    THEN COALESCE(difficulty, 5)
+                    WHEN :adaptive = 1 AND active_due_at <= :now
+                    THEN COALESCE(active_difficulty, 5)
                     ELSE 0
                 END DESC,
                 COALESCE((SELECT last_shown_at FROM card_rotation
-                          WHERE word_id = words.id), created_at),
-                CASE WHEN due_at <= :now OR
-                    (SELECT due_at FROM reverse_progress
-                     WHERE word_id = words.id) <= :now THEN 0 ELSE 1 END,
+                          WHERE word_id = eligible.id), created_at),
+                CASE WHEN active_due_at <= :now THEN 0 ELSE 1 END,
                 CASE
-                    WHEN know_count + dont_know_count = 0 THEN 0
-                    ELSE CAST(dont_know_count AS REAL)
-                         / (know_count + dont_know_count)
+                    WHEN active_know_count + active_dont_know_count = 0 THEN 0
+                    ELSE CAST(active_dont_know_count AS REAL)
+                         / (active_know_count + active_dont_know_count)
                 END DESC,
-                COALESCE(difficulty, 5) DESC,
-                due_at,
+                COALESCE(active_difficulty, 5) DESC,
+                active_due_at,
                 RANDOM()
             LIMIT 1
             """,
@@ -1205,9 +1205,13 @@ class WordRepository:
         if row is None:
             return None
         word = self._to_word(row)
-        reversed_presentation = bool(source_lang) and self._prefer_reverse(
-            word, adaptive=adaptive
-        )
+        if source_lang:
+            # A language pair is one logical deck, but its order is the user's
+            # chosen study direction. Keep the requested language on the front
+            # without creating or filtering a second deck.
+            reversed_presentation = word.source_lang != source_lang
+        else:
+            reversed_presentation = False
         progress_table = "reverse_progress" if reversed_presentation else "words"
         id_column = "word_id" if reversed_presentation else "id"
         self.connection.execute(

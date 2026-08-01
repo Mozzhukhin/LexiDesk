@@ -129,16 +129,36 @@ def test_language_decks_rotate_without_crossing_pairs(tmp_path: Path) -> None:
     assert all(word is not None for word in shown)
     assert {word.id for word in shown if word is not None} == set(ru_uk_ids)
     assert all(word.deck_direction == "RU ⇄ UK" for word in shown if word is not None)
-    assert {word.direction for word in shown if word is not None} == {
-        "RU → UK",
-        "UK → RU",
-    }
+    assert {word.direction for word in shown if word is not None} == {"RU → UK"}
     assert repository.count("ru", "uk") == 2
     assert repository.language_pairs() == [("en", "ru"), ("ru", "uk")]
     assert repository.latest_language_pair() == ("en", "ru")
     assert {
         word.id for word in repository.list_words(source_lang="ru", target_lang="uk")
     } == set(ru_uk_ids)
+    repository.close()
+
+
+def test_deck_order_controls_presentation_without_splitting_cards(
+    tmp_path: Path,
+) -> None:
+    repository = WordRepository(tmp_path / "direction.db")
+    word_id = repository.add_word(
+        source_text="thanks",
+        source_lang="en",
+        target_text="спасибо",
+        target_lang="ru",
+    )
+
+    english_first = repository.next_word(source_lang="en", target_lang="ru")
+    russian_first = repository.next_word(source_lang="ru", target_lang="en")
+
+    assert english_first is not None and russian_first is not None
+    assert english_first.id == russian_first.id == word_id
+    assert english_first.direction == "EN → RU"
+    assert russian_first.direction == "RU → EN"
+    assert repository.count("en", "ru") == repository.count("ru", "en") == 1
+    assert repository.language_pairs() == [("en", "ru")]
     repository.close()
 
 

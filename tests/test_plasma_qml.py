@@ -102,15 +102,18 @@ def test_widget_settings_write_string_values() -> None:
     assert "onActivated: form.cfg_quizMode = currentValue" in config
 
 
-def test_widget_keeps_english_above_russian_on_regular_cards() -> None:
+def test_widget_direction_button_controls_the_front_side() -> None:
     qml = QML_PATH.read_text(encoding="utf-8")
 
-    assert 'targetLanguage === "en"' in qml
-    assert "? translationText : sourceText" in qml
-    assert "? sourceText : translationText" in qml
+    assert "readonly property string primaryText: sourceText" in qml
+    assert "readonly property string secondaryText: translationText" in qml
     assert "(choiceMode ? quizPrompt : primaryText)" in qml
     assert "(choiceMode ? quizAnswer : secondaryText)" in qml
     assert "root.primaryExampleText, root.primaryText" in qml
+    assert 'runBridge("swap-direction", "direction")' in qml
+    assert 'directionText = card.direction || "OFFLINE"' in qml
+    assert 'text: directionText + "  ⇄"' in qml
+    assert 'i18n("Switch study direction")' in qml
 
 
 def test_widget_rotation_skips_an_unanswered_quiz() -> None:

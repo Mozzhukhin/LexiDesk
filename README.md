@@ -90,10 +90,11 @@ some nuance, so important meanings remain editable before a card is saved.
 Install both directions when you want to study either side of a pair.
 
 Vocabulary decks are bidirectional: one saved meaning such as
-`ambiguous ⇄ неоднозначный` is presented from both sides without creating a
-duplicate library row. FSRS state, due time, accuracy, and mistakes remain
-independent for each recall direction, and Mixed mode prioritizes the weaker
-side. Adding the exact reverse of an existing card reuses that card.
+`ambiguous ⇄ неоднозначный` can be studied from either side without creating a
+duplicate library row. The direction button in the widget header switches
+which language is shown above the translation and remembers that choice. FSRS
+state, due time, accuracy, and mistakes remain independent for each recall
+direction. Adding the exact reverse of an existing card reuses that card.
 
 Automatic language detection remains limited to legacy EN/RU use. Languages
 sharing a writing system cannot be identified reliably from a single word, so
@@ -272,9 +273,10 @@ meanings available for explicit selection. The neural model remains a fallback f
 and missing entries; no automatic system can infer the intended sense of an
 isolated word with certainty, so every translation remains editable.
 
-Regular cards always place English above Russian for a consistent visual
-hierarchy. The header identifies the shared deck with `⇄`, while quiz prompts
-and review history retain the direction currently being tested. Single-word model results
+Regular cards place the selected source language above its translation. The
+header button shows the current direction and switches it with `⇄`; the deck
+remains one shared bidirectional vocabulary. Quiz prompts and review history
+retain the direction currently being tested. Single-word model results
 are normalized as card meanings rather than sentences: periods are removed and
 punctuation-only duplicates are collapsed before saving.
 

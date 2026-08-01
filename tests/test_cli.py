@@ -2,6 +2,7 @@ from pathlib import Path
 
 import lexidesk.cli
 from lexidesk.database import WordRepository
+from lexidesk.settings import SettingsStore
 
 
 def test_cli_card_and_review(tmp_path: Path, monkeypatch) -> None:
@@ -28,3 +29,29 @@ def test_cli_card_and_review(tmp_path: Path, monkeypatch) -> None:
     assert stats["accuracy"] == 100.0
     restored = lexidesk.cli.run(["undo"])
     assert restored["undone"] is True
+
+
+def test_swap_direction_keeps_one_deck_and_persists_order(tmp_path: Path) -> None:
+    repository = WordRepository(tmp_path / "cli-direction.db")
+    repository.add_word(
+        source_text="time",
+        source_lang="en",
+        target_text="время",
+        target_lang="ru",
+    )
+    store = SettingsStore(tmp_path / "settings.json")
+    settings = store.load()
+    settings.active_source_language = "en"
+    settings.active_target_language = "ru"
+    store.save(settings)
+
+    payload = lexidesk.cli.swap_active_direction(store, repository)
+
+    restored = store.load()
+    assert payload["direction"] == "RU → EN"
+    assert (restored.active_source_language, restored.active_target_language) == (
+        "ru",
+        "en",
+    )
+    assert repository.language_pairs() == [("en", "ru")]
+    repository.close()
