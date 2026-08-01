@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shlex
 import sys
 from pathlib import Path
 
@@ -67,7 +68,7 @@ def test_appimage_autostart_uses_persistent_image(monkeypatch, tmp_path: Path) -
 
     set_autostart(True)
 
-    assert f"Exec={appimage}" in path.read_text(encoding="utf-8")
+    assert f"Exec={shlex.join([str(appimage)])}" in path.read_text(encoding="utf-8")
 
 
 def test_data_directory_override(monkeypatch, tmp_path: Path) -> None:
