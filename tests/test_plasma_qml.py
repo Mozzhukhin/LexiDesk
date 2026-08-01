@@ -82,7 +82,7 @@ def test_widget_has_compact_navigation_and_hover_actions() -> None:
     assert 'text: i18n("Settings")' in qml
     assert "id: countdownProgress" in qml
     assert "until the next card" in qml
-    assert "id: contentHover" in qml
+    assert "contentHover.hovered" not in qml
     assert 'text: i18n("Edit card")' in qml
     assert 'text: i18n("Hide for now")' in qml
     assert 'text: i18n("Delete card…")' in qml
