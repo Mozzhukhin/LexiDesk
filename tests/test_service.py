@@ -311,5 +311,6 @@ def test_mixed_mode_guarantees_maintenance_quiz_on_fifth_card(
     assert not adaptive_quiz_due(word)
     assert not mixed_quiz_due(word, 4)
     assert mixed_quiz_due(word, 5)
+    assert not mixed_quiz_due(word, 1, now=word.due_at + timedelta(days=30))
     assert card_payload(word, repository)["quiz_eligible"] is True
     repository.close()

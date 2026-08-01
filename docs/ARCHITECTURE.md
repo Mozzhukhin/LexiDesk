@@ -64,8 +64,9 @@ unseen and least-recently-shown cards across the complete deck. Adaptive Mixed
 mode introduces each new card once, then prioritizes its first recall check and
 later FSRS-due reviews by miss rate and difficulty. A failed recall enters an
 explicit ten-minute learning/relearning step. Random ordering is only the final
-tie-breaker. A presentation-layer counter also guarantees a maintenance quiz
-after four ordinary eligible cards when no adaptive review is currently due.
+tie-breaker. A presentation-layer counter enforces four ordinary presentations
+between Mixed-mode quizzes. Due state affects card priority, never the spacing,
+so an accumulated review backlog cannot create consecutive quizzes.
 
 Each vocabulary row owns two learning states. The original direction retains
 its FSRS fields on `words`; the reverse direction uses the one-to-one

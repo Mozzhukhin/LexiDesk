@@ -107,6 +107,26 @@ def test_standalone_mixed_mode_guarantees_a_quiz(tmp_path: Path) -> None:
     repository.close()
 
 
+def test_due_cards_cannot_create_consecutive_mixed_quizzes(tmp_path: Path) -> None:
+    window, repository = _window(tmp_path)
+    window.settings.practice_mode = "mixed"
+    word_id = repository.add_word(
+        source_text="urgent",
+        source_lang="en",
+        target_text="срочный",
+    )
+    window.current_word = repository.review(word_id, "again")
+    variants = {"translation": {"type": "translation", "answer": "срочный"}}
+
+    for _ in range(4):
+        assert window._practice_for_card(variants) == "off"
+    assert window._practice_for_card(variants) == "translation"
+    assert window._practice_for_card(variants) == "off"
+
+    window.tick_timer.stop()
+    repository.close()
+
+
 def test_rotation_skips_an_unanswered_quiz(tmp_path: Path) -> None:
     window, repository = _window(tmp_path)
     window.tick_timer.stop()

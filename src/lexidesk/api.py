@@ -167,10 +167,9 @@ def mixed_quiz_due(
     ordinary_cards_since_quiz: int,
     now: datetime | None = None,
 ) -> bool:
-    """Combine FSRS timing with a guaranteed fifth-card maintenance check."""
-    return adaptive_quiz_due(word, now) or (
-        quiz_eligible(word) and ordinary_cards_since_quiz >= 5
-    )
+    """Allow a quiz only on the fifth eligible presentation after a quiz."""
+    del now
+    return quiz_eligible(word) and ordinary_cards_since_quiz >= 5
 
 
 def quiz_probability(word: Word, repository: WordRepository) -> float:

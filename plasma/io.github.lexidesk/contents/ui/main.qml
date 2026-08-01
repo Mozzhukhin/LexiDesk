@@ -55,7 +55,6 @@ PlasmoidItem {
     property string quizInstruction: ""
     property var quizVariants: ({})
     property string quizMode: plasmoid.configuration.quizMode || "off"
-    property bool adaptiveQuiz: false
     property bool quizEligible: false
     property int mixedDryStreak: 0
     property int cardRevision: 0
@@ -239,7 +238,7 @@ PlasmoidItem {
             return
         }
         mixedDryStreak++
-        if (!adaptiveQuiz && !(quizEligible && mixedDryStreak >= 5))
+        if (mixedDryStreak < 5 || !quizEligible)
             return
         var mixedKinds = ["translation", "reverse", "cloze", "context"]
         var available = []
@@ -287,7 +286,6 @@ PlasmoidItem {
         exampleText = card.example || ""
         exampleTranslationText = card.example_translation || ""
         quizVariants = card.quizzes || {}
-        adaptiveQuiz = Boolean(card.adaptive_quiz)
         quizEligible = Boolean(card.quiz_eligible)
         var quiz = card.quiz || {}
         quizType = quiz.type || ""

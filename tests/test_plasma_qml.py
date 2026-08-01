@@ -40,12 +40,13 @@ def test_widget_uses_simple_reviews_and_four_choice_quizzes() -> None:
     assert "id: appMenu" in qml
     assert 'root.selectQuizMode("typing")' in qml
     assert 'text: i18n("Mixed — adaptive + regular checks")' in qml
-    assert "property bool adaptiveQuiz" in qml
+    assert "property bool adaptiveQuiz" not in qml
     assert "property bool quizUnavailable" in qml
     assert "property bool quizEligible" in qml
     assert "property int mixedDryStreak" in qml
     assert "mixedDryStreak++" in qml
-    assert "quizEligible && mixedDryStreak >= 5" in qml
+    assert "mixedDryStreak < 5 || !quizEligible" in qml
+    assert "if (!adaptiveQuiz" not in qml
     assert 'quizMode === "mixed" ? " --adaptive"' in qml
     assert 'var mixedKinds = ["translation", "reverse", "cloze", "context"]' in qml
     assert 'checked: root.quizMode === "mixed"' in qml

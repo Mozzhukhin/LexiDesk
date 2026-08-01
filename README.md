@@ -104,10 +104,10 @@ the add and batch dialogs provide explicit source and target selectors.
 LexiDesk uses the official FSRS 6 implementation with 90% desired retention by
 default. Ordinary cards are passive: **Next** and automatic rotation only
 change the visible word. The user chooses a persistent mode from the Practice
-section of the widget menu. **Mixed** introduces new cards normally, tests them
-on their next eligible appearance, and turns FSRS-due cards into a random
-non-typing quiz. If nothing is due, it still guarantees a maintenance quiz
-after at most four ordinary eligible cards. Selecting a specific quiz type applies that type to every
+section of the widget menu. **Mixed** keeps a strict cadence: four ordinary
+presentations are followed by one random non-typing quiz. FSRS still chooses
+which weak or due card should receive that quiz, but a due backlog cannot cause
+two quizzes in a row. Selecting a specific quiz type applies that type to every
 available word until the mode is changed or switched Off.
 A correct choice records a successful review; a wrong choice records a failed
 review. Those quiz results produce individualized intervals instead of a fixed

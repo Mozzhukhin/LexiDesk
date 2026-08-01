@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Enforce a strict five-presentation cadence in Mixed mode so a backlog of
+  FSRS-due cards cannot produce consecutive quizzes.
 - Remove redundant correct/incorrect captions from choice quizzes and rely on
   green/red option highlighting before the automatic advance.
 - Unify opposite directions into one bidirectional vocabulary card while
