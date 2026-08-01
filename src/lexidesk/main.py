@@ -7,7 +7,7 @@ import sys
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QMessageBox
 
-from .autostart import set_autostart
+from .autostart import autostart_enabled, set_autostart
 from .backup import ensure_daily_backup
 from .batch import BatchAddDialog
 from .config import APP_ID, APP_NAME, database_path, settings_path
@@ -99,6 +99,7 @@ def main() -> int:
 
     settings_store = SettingsStore(settings_path())
     settings = settings_store.load()
+    settings.autostart = autostart_enabled()
     apply_application_theme(app, settings.theme, settings.font_scale)
     repository = WordRepository(
         database_path(), desired_retention=settings.desired_retention

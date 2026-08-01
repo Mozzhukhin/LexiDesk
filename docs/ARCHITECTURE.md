@@ -3,7 +3,7 @@
 ```text
 Plasma widget ── narrow JSON CLI ──┐
                                    ▼
-Standalone PySide6 UI ───────► D-Bus service
+Windows/Linux PySide6 widget ► D-Bus service
                                    │
                     ┌──────────────┼──────────────┐
                     ▼              ▼              ▼

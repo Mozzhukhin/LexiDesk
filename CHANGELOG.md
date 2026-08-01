@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Run Windows and standalone Linux builds as interactive desktop widgets that
+  stay out of the taskbar, with Desktop and Floating placement modes.
+- Keep the Windows installer and in-app autostart setting synchronized.
 - Made the widget header responsive at its compact 330 px width.
 - Fixed high-DPI clipping in settings, add-card, analytics, and support dialogs.
 - Added themed progress bars and consistent combo/spin input styling.

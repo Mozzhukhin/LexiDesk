@@ -20,6 +20,7 @@ def test_invalid_settings_are_sanitized(tmp_path: Path) -> None:
                 "desired_retention": 2.0,
                 "autocorrect": "yes",
                 "autostart": "yes",
+                "window_mode": "invalid",
             }
         ),
         encoding="utf-8",
@@ -37,6 +38,7 @@ def test_invalid_settings_are_sanitized(tmp_path: Path) -> None:
     assert settings.desired_retention == 0.99
     assert settings.autocorrect is True
     assert settings.autostart is False
+    assert settings.window_mode == "desktop"
 
 
 def test_active_language_deck_is_persisted_and_validated(tmp_path: Path) -> None:
@@ -56,3 +58,13 @@ def test_active_language_deck_is_persisted_and_validated(tmp_path: Path) -> None
     raw["active_source_language"] = "../bad"
     path.write_text(json.dumps(raw), encoding="utf-8")
     assert store.load().active_source_language == ""
+
+
+def test_widget_placement_is_persisted(tmp_path: Path) -> None:
+    path = tmp_path / "settings.json"
+    store = SettingsStore(path)
+    settings = store.load()
+    settings.window_mode = "floating"
+    store.save(settings)
+
+    assert store.load().window_mode == "floating"

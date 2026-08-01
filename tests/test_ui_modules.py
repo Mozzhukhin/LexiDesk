@@ -57,6 +57,9 @@ def test_settings_dialog_applies_every_value(qapp: QApplication) -> None:
     settings = Settings()
     dialog = SettingsDialog(settings)
     dialog.theme_combo.setCurrentText("Forest")
+    dialog.window_mode_combo.setCurrentIndex(
+        dialog.window_mode_combo.findData("floating")
+    )
     dialog.reveal_combo.setCurrentIndex(dialog.reveal_combo.findData("quiz"))
     dialog.practice_combo.setCurrentIndex(dialog.practice_combo.findData("translation"))
     dialog.rotation_spin.setValue(120)
@@ -66,6 +69,7 @@ def test_settings_dialog_applies_every_value(qapp: QApplication) -> None:
     dialog.apply_to(settings)
 
     assert settings.theme == "Forest"
+    assert settings.window_mode == "floating"
     assert settings.reveal_mode == "quiz"
     assert settings.practice_mode == "translation"
     assert settings.rotation_seconds == 120

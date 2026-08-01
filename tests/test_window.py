@@ -5,11 +5,13 @@ from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 
 from lexidesk.database import WordRepository
 from lexidesk.settings import SettingsStore
 from lexidesk.window import LexiDeskWindow
+from lexidesk.window_behavior import widget_window_flags
 
 
 def _application() -> QApplication:
@@ -88,6 +90,8 @@ def test_standalone_uses_mouse_only_next_and_compact_progress(tmp_path: Path) ->
     assert window.direction_label.text().endswith("▾")
     assert window.swap_direction_button.text() == "⇄"
     assert window.swap_direction_button.toolTip() == "Swap languages"
+    assert window.windowFlags() & Qt.WindowType.Tool
+    assert window.windowFlags() & Qt.WindowType.WindowStaysOnBottomHint
 
     repository.close()
 
@@ -121,6 +125,16 @@ def test_card_actions_stay_visible_without_hover(tmp_path: Path) -> None:
     window.current_word = None
     window._render_card()
     assert window.card_actions.isHidden()
+    repository.close()
+
+
+def test_widget_placement_can_switch_without_restarting(tmp_path: Path) -> None:
+    window, repository = _window(tmp_path)
+    window.settings.window_mode = "floating"
+    window._apply_appearance()
+
+    assert window.windowFlags() == widget_window_flags("floating")
+    window.tick_timer.stop()
     repository.close()
 
 

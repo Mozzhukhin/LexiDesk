@@ -4,11 +4,14 @@ import shlex
 import sys
 from pathlib import Path
 
+from PySide6.QtCore import Qt
+
 import lexidesk.service_client as service_client
-from lexidesk.autostart import set_autostart
+from lexidesk.autostart import autostart_enabled, set_autostart
 from lexidesk.config import autostart_path, data_dir, dictionary_path
 from lexidesk.model_translation import translation_model_roots
 from lexidesk.service_client import request_service
+from lexidesk.window_behavior import clamp_widget_position, widget_window_flags
 
 
 def test_windows_does_not_try_to_load_dbus(monkeypatch) -> None:
@@ -57,6 +60,20 @@ def test_windows_autostart_script(monkeypatch, tmp_path: Path) -> None:
 
     set_autostart(False)
     assert not path.exists()
+
+
+def test_windows_installer_autostart_link_is_detected_and_removed(
+    monkeypatch, tmp_path: Path
+) -> None:
+    path = tmp_path / "LexiDesk.cmd"
+    installer_link = path.with_suffix(".lnk")
+    installer_link.touch()
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr("lexidesk.autostart.autostart_path", lambda: path)
+
+    assert autostart_enabled() is True
+    set_autostart(False)
+    assert not installer_link.exists()
 
 
 def test_appimage_autostart_uses_persistent_image(monkeypatch, tmp_path: Path) -> None:
@@ -123,6 +140,36 @@ def test_bundle_excludes_training_only_translation_dependencies() -> None:
         "torch",
     ):
         assert f'"{dependency}"' in spec
+
+
+def test_desktop_widget_flags_are_interactive_and_stay_below() -> None:
+    flags = widget_window_flags("desktop")
+
+    assert flags & Qt.WindowType.Tool
+    assert flags & Qt.WindowType.FramelessWindowHint
+    assert flags & Qt.WindowType.WindowStaysOnBottomHint
+    assert not flags & Qt.WindowType.WindowDoesNotAcceptFocus
+
+
+def test_floating_widget_flags_stay_above() -> None:
+    flags = widget_window_flags("floating")
+
+    assert flags & Qt.WindowType.Tool
+    assert flags & Qt.WindowType.WindowStaysOnTopHint
+    assert not flags & Qt.WindowType.WindowStaysOnBottomHint
+
+
+def test_widget_position_is_clamped_to_the_available_desktop() -> None:
+    assert clamp_widget_position(
+        5000,
+        -400,
+        390,
+        310,
+        left=0,
+        top=40,
+        right=1919,
+        bottom=1079,
+    ) == (1530, 40)
 
 
 def test_plasma_rotation_does_not_pause_for_an_unanswered_quiz() -> None:

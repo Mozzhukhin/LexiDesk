@@ -8,10 +8,19 @@ import sys
 from .config import autostart_path
 
 
+def autostart_enabled() -> bool:
+    path = autostart_path()
+    if path.exists():
+        return True
+    return sys.platform == "win32" and path.with_suffix(".lnk").exists()
+
+
 def set_autostart(enabled: bool) -> None:
     path = autostart_path()
     if not enabled:
         path.unlink(missing_ok=True)
+        if sys.platform == "win32":
+            path.with_suffix(".lnk").unlink(missing_ok=True)
         return
 
     path.parent.mkdir(parents=True, exist_ok=True)

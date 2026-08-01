@@ -2,7 +2,8 @@
 
 LexiDesk is a multilingual offline vocabulary companion for Windows,
 KDE Plasma 6, and other Linux desktops. Its application core is written in
-Python with PySide6, and its optional native Plasma widget uses QML.
+Python with PySide6. Windows and general Linux builds run as desktop widgets,
+while KDE Plasma also has a native QML widget.
 
 The app starts with an empty vocabulary. Choose any installed source and target
 language, let the local model suggest a translation, review it, and save it.
@@ -58,7 +59,8 @@ a network connection. A source installation downloads this data once during
 - One-click undo for the most recent review
 - Automatic 90-second card rotation
 - A native Plasma 6 widget with system, OLED, Forest, and Purple themes
-- A portable frameless desktop application with five themes
+- A frameless Windows/Linux desktop widget that stays out of the taskbar and
+  offers Desktop (behind windows) and Floating (above windows) placement
 - Searchable vocabulary library with New/Learning/Known filters
 - Tags, editable examples, alternative meanings, and parts of speech
 - Daily goals, 30-day activity, recall accuracy, streak, and review forecast

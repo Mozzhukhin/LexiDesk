@@ -35,7 +35,7 @@ from PySide6.QtWidgets import (
 
 from .answers import AnswerGrade, evaluate_answer
 from .api import mixed_quiz_due, quiz_variants
-from .autostart import set_autostart
+from .autostart import autostart_enabled, set_autostart
 from .batch import BatchAddDialog
 from .config import database_path
 from .database import WordRepository
@@ -50,6 +50,7 @@ from .settings import SettingsStore
 from .support import SupportDialog
 from .themes import apply_application_theme, stylesheet
 from .translation import OfflineTranslator
+from .window_behavior import clamp_widget_position, widget_window_flags
 
 
 class LexiDeskWindow(QMainWindow):
@@ -64,6 +65,7 @@ class LexiDeskWindow(QMainWindow):
         self.settings_store = settings_store
         self.translator = translator
         self.settings = settings_store.load()
+        self.settings.autostart = autostart_enabled()
         self.current_word: Word | None = None
         self.seconds_left = self.settings.rotation_seconds
         self.review_clock = QElapsedTimer()
@@ -79,12 +81,26 @@ class LexiDeskWindow(QMainWindow):
         self.advance_timer.timeout.connect(self.next_card)
 
         self.setWindowTitle("LexiDesk")
-        self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
+        self.setWindowFlags(widget_window_flags(self.settings.window_mode))
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setMinimumSize(330, 290)
         self.resize(self.settings.width, self.settings.height)
         if self.settings.x is not None and self.settings.y is not None:
-            self.move(self.settings.x, self.settings.y)
+            requested = QPoint(self.settings.x, self.settings.y)
+            screen = QApplication.screenAt(requested) or QApplication.primaryScreen()
+            if screen is not None:
+                available = screen.availableGeometry()
+                bounded_x, bounded_y = clamp_widget_position(
+                    requested.x(),
+                    requested.y(),
+                    self.width(),
+                    self.height(),
+                    left=available.left(),
+                    top=available.top(),
+                    right=available.right(),
+                    bottom=available.bottom(),
+                )
+                self.move(bounded_x, bounded_y)
 
         self._build_ui()
         self._update_practice_button()
@@ -327,6 +343,12 @@ class LexiDeskWindow(QMainWindow):
         QTimer.singleShot(0, self._position_card_actions)
 
     def _apply_appearance(self) -> None:
+        expected_flags = widget_window_flags(self.settings.window_mode)
+        if self.windowFlags() != expected_flags:
+            was_visible = self.isVisible()
+            self.setWindowFlags(expected_flags)
+            if was_visible:
+                self.show()
         app = QApplication.instance()
         if isinstance(app, QApplication):
             apply_application_theme(app, self.settings.theme, self.settings.font_scale)

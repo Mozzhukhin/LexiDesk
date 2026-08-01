@@ -7,7 +7,7 @@ Exec=lexidesk
 Icon=io.github.lexidesk
 Terminal=false
 Categories=Education;Languages;
-StartupNotify=true
+StartupNotify=false
 Keywords=vocabulary;language;offline;translation;flashcards;FSRS;
 Actions=Library;Batch;Analytics;
 

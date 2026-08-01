@@ -21,6 +21,7 @@ class Settings:
     desired_retention: float = 0.9
     autocorrect: bool = True
     autostart: bool = False
+    window_mode: str = "desktop"
     active_source_language: str = ""
     active_target_language: str = ""
 
@@ -93,6 +94,11 @@ class SettingsStore:
                     raw["autostart"]
                     if isinstance(raw.get("autostart"), bool)
                     else defaults.autostart
+                ),
+                window_mode=(
+                    raw["window_mode"]
+                    if raw.get("window_mode") in {"desktop", "floating"}
+                    else defaults.window_mode
                 ),
                 active_source_language=_language_code(
                     raw.get("active_source_language")

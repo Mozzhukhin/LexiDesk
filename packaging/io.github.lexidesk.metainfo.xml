@@ -7,8 +7,8 @@
   <project_license>MIT</project_license>
   <description>
     <p>
-      LexiDesk combines a native KDE Plasma widget with a Python desktop
-      application, offline translation, conservative spelling correction,
+      LexiDesk combines a native KDE Plasma widget with a cross-platform
+      Python desktop widget, offline translation, conservative spelling correction,
       typed-answer practice, and FSRS 6 spaced repetition.
     </p>
     <p>

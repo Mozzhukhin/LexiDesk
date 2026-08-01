@@ -35,3 +35,6 @@ Name: "{userstartup}\LexiDesk"; Filename: "{app}\LexiDesk.exe"; Tasks: autostart
 
 [Run]
 Filename: "{app}\LexiDesk.exe"; Description: "Launch LexiDesk"; Flags: nowait postinstall skipifsilent
+
+[UninstallDelete]
+Type: files; Name: "{userstartup}\LexiDesk.cmd"

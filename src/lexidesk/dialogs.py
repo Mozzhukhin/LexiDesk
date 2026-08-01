@@ -575,6 +575,16 @@ class SettingsDialog(QDialog):
         self.theme_combo.addItems(list(THEMES))
         self.theme_combo.setCurrentText(settings.theme)
 
+        self.window_mode_combo = QComboBox()
+        self.window_mode_combo.addItem(
+            "Desktop widget — behind other windows", "desktop"
+        )
+        self.window_mode_combo.addItem(
+            "Floating widget — above other windows", "floating"
+        )
+        window_mode_index = self.window_mode_combo.findData(settings.window_mode)
+        self.window_mode_combo.setCurrentIndex(max(0, window_mode_index))
+
         self.reveal_combo = QComboBox()
         self.reveal_combo.addItem("Show word and translation", "both")
         self.reveal_combo.addItem("Click to reveal translation", "quiz")
@@ -627,6 +637,7 @@ class SettingsDialog(QDialog):
         form = QFormLayout()
         form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
         form.addRow("Theme", self.theme_combo)
+        form.addRow("Widget placement", self.window_mode_combo)
         form.addRow("Card mode", self.reveal_combo)
         form.addRow("Practice mode", self.practice_combo)
         form.addRow("Change card every", self.rotation_spin)
@@ -638,8 +649,8 @@ class SettingsDialog(QDialog):
         form.addRow("", self.autostart_check)
 
         note = QLabel(
-            "The standalone window behaves like a normal application. "
-            "Use the Plasma widget for desktop-only placement."
+            "Windows and Linux builds run as interactive desktop widgets. "
+            "Desktop mode stays behind regular windows; Floating mode stays above them."
         )
         note.setWordWrap(True)
         note.setObjectName("muted")
@@ -658,6 +669,7 @@ class SettingsDialog(QDialog):
 
     def apply_to(self, settings: Settings) -> None:
         settings.theme = self.theme_combo.currentText()
+        settings.window_mode = str(self.window_mode_combo.currentData())
         settings.reveal_mode = str(self.reveal_combo.currentData())
         settings.practice_mode = str(self.practice_combo.currentData())
         settings.rotation_seconds = self.rotation_spin.value()
