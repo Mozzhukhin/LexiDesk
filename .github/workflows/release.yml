@@ -63,6 +63,10 @@ jobs:
         with:
           python-version: "3.13"
           enable-cache: true
+      - name: Install Linux Qt runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libegl1
       - run: uv sync --extra bundle
       - uses: actions/download-artifact@v8.0.1
         with:
