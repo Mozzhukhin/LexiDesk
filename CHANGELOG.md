@@ -9,8 +9,9 @@
 - Fixed high-DPI clipping in settings, add-card, analytics, and support dialogs.
 - Added themed progress bars and consistent combo/spin input styling.
 - Kept the add-card form scrollable while its Save and Cancel actions stay visible.
-- Keep card edit, skip, delete, and library actions visible without requiring hover.
+- Keep card edit, delete, and library actions visible without requiring hover.
 - Keep the same card actions permanently visible in the Plasma widget.
+- Remove the redundant Hide for now action; Next remains the single skip control.
 
 - Apply themes at application scope with a cross-platform Fusion palette so
   Windows combo popups, menus, tabs, lists, tables, inputs, and disabled states

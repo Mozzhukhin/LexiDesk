@@ -291,7 +291,6 @@ class LexiDeskWindow(QMainWindow):
         action_layout.addStretch()
         for label, tooltip, callback in (
             ("✎", "Edit card", self.edit_current_word),
-            ("⇥", "Hide for now", self.next_card),
             ("✕", "Delete card…", self.delete_current_word),
             ("☰", "Open vocabulary library", self.open_library),
         ):

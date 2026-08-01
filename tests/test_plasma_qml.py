@@ -74,7 +74,7 @@ def test_widget_uses_simple_reviews_and_four_choice_quizzes() -> None:
     assert "visible: !choiceMode || quizUnavailable" in qml
 
 
-def test_widget_has_compact_navigation_and_hover_actions() -> None:
+def test_widget_has_compact_navigation_and_persistent_actions() -> None:
     qml = QML_PATH.read_text(encoding="utf-8")
 
     assert "id: appMenu" in qml
@@ -84,7 +84,7 @@ def test_widget_has_compact_navigation_and_hover_actions() -> None:
     assert "until the next card" in qml
     assert "contentHover.hovered" not in qml
     assert 'text: i18n("Edit card")' in qml
-    assert 'text: i18n("Hide for now")' in qml
+    assert 'text: i18n("Hide for now")' not in qml
     assert 'text: i18n("Delete card…")' in qml
     assert "maximumLineCount: 2" in qml
     assert "% recall" not in qml

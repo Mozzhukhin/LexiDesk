@@ -6,7 +6,7 @@ from pathlib import Path
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QPushButton
 
 from lexidesk.database import WordRepository
 from lexidesk.settings import SettingsStore
@@ -121,6 +121,10 @@ def test_card_actions_stay_visible_without_hover(tmp_path: Path) -> None:
 
     assert window.current_word is not None
     assert not window.card_actions.isHidden()
+    tooltips = {
+        button.toolTip() for button in window.card_actions.findChildren(QPushButton)
+    }
+    assert tooltips == {"Edit card", "Delete card…", "Open vocabulary library"}
 
     window.current_word = None
     window._render_card()

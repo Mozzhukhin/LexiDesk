@@ -651,16 +651,6 @@ PlasmoidItem {
                     }
 
                     PlasmaComponents.ToolButton {
-                        icon.name: "go-next-skip"
-                        text: i18n("Hide for now")
-                        display: PlasmaComponents.AbstractButton.IconOnly
-                        enabled: !busy
-                        onClicked: root.loadNext()
-                        PlasmaComponents.ToolTip.text: text
-                        PlasmaComponents.ToolTip.visible: hovered
-                    }
-
-                    PlasmaComponents.ToolButton {
                         icon.name: "edit-delete"
                         text: i18n("Delete card…")
                         display: PlasmaComponents.AbstractButton.IconOnly
