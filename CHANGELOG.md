@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 1.2.0 — 2026-08-03
+
+- Introduce LexiDesk Lite packages with no bundled language models, dictionary,
+  or example corpus, reducing download size and letting users choose languages.
+- Add first-run language setup, persistent in-widget setup access, package-size
+  reporting, compatibility validation, and safe language removal.
+- Keep downloaded language models outside application bundles so upgrades retain
+  offline languages, vocabulary, and learning progress.
+- Add compact Windows/Linux desktop-widget modes and retain the native Plasma 6
+  widget.
+- Add multilingual model routing, bidirectional decks, independent directional
+  FSRS state, strict Mixed-mode quiz cadence, and a five-card cooldown.
+- Refresh project documentation and screenshots for the Lite language manager,
+  quizzes, vocabulary library, and analytics.
+
 - Run Windows and standalone Linux builds as interactive desktop widgets that
   stay out of the taskbar, with Desktop and Floating placement modes.
 - Keep the Windows installer and in-app autostart setting synchronized.

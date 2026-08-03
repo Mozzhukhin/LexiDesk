@@ -1,6 +1,6 @@
 # Maintainer: LexiDesk contributors
 pkgname=lexidesk
-pkgver=1.1.0
+pkgver=1.2.0
 pkgrel=1
 pkgdesc="Multilingual offline vocabulary trainer and Plasma widget"
 arch=('any')

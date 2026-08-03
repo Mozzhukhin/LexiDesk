@@ -30,6 +30,14 @@
       <caption>Desktop vocabulary card</caption>
     </screenshot>
     <screenshot>
+      <image>https://raw.githubusercontent.com/Mozzhukhin/LexiDesk/main/docs/images/quiz.png</image>
+      <caption>Adaptive translation quiz</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/Mozzhukhin/LexiDesk/main/docs/images/languages.png</image>
+      <caption>Downloadable offline language manager</caption>
+    </screenshot>
+    <screenshot>
       <image>https://raw.githubusercontent.com/Mozzhukhin/LexiDesk/main/docs/images/library.png</image>
       <caption>Searchable vocabulary library</caption>
     </screenshot>
@@ -37,6 +45,7 @@
   <url type="homepage">https://github.com/Mozzhukhin/LexiDesk</url>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.2.0" date="2026-08-03"/>
     <release version="1.1.0" date="2026-07-30"/>
     <release version="1.0.0" date="2026-07-30"/>
   </releases>

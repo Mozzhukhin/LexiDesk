@@ -8,7 +8,7 @@ Windows/Linux PySide6 widget ► D-Bus service
                     ┌──────────────┼──────────────┐
                     ▼              ▼              ▼
                   SQLite       FSRS 6       offline language data
-               cards/reviews   scheduler   FreeDict + CTranslate2 + WordNet
+               cards/reviews   scheduler   CTranslate2 + optional indexes
 ```
 
 The session D-Bus service owns the long-lived repository connection. The CLI
@@ -42,12 +42,15 @@ removed from single-card translations while periods in abbreviations such as
 `U.S.` are preserved. Alternatives are de-duplicated after normalization, so
 GUI entry, batch import, and JSON/CSV import behave the same.
 
-Runtime translation calls the packaged CTranslate2 models directly with the
-same four-candidate beam search used previously. A compact sentence splitter is
-sufficient for card phrases and short examples, so Torch, Stanza, spaCy,
-MiniSBD, and ONNX are absent from production bundles. Language files are
-downloaded only by the explicit installation scripts. Neural hypotheses are
-cached for the current process; dictionary lookups remain the fast first path.
+Runtime translation calls user-installed CTranslate2 models directly with a
+four-candidate beam search. A compact sentence splitter is sufficient for card
+phrases and short examples, so Torch, Stanza, spaCy, MiniSBD, and ONNX are
+absent from production bundles. Lite distributions contain no language data.
+The explicit in-app package manager downloads compatible models into persistent
+per-user storage, where application upgrades leave them untouched. The model
+registry treats installed directions as a graph, prefers a direct edge, and
+allows one English pivot. Neural hypotheses are cached for the current process;
+an optional local dictionary remains the fast first path when installed.
 
 Daily SQLite snapshots keep seven days of recoverable state. Manual full backup
 and restore use SQLite's online backup API, validate `integrity_check` and the
@@ -72,8 +75,8 @@ Each vocabulary row owns two learning states. The original direction retains
 its FSRS fields on `words`; the reverse direction uses the one-to-one
 `reverse_progress` row. The ordered active pair controls which side is shown as
 the prompt, while the unordered pair still identifies one shared deck.
-Review-log entries record which side was tested, so undo, analytics, backup,
-and restore preserve the independent histories without duplicating the
+Review-log entries record which side was tested, so analytics, backup, and
+restore preserve the independent histories without duplicating the
 vocabulary entry.
 
 Quiz distractors come from one bounded, indexed repository query instead of

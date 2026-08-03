@@ -1,214 +1,189 @@
 # LexiDesk
 
-LexiDesk is a multilingual offline vocabulary companion for Windows,
-KDE Plasma 6, and other Linux desktops. Its application core is written in
-Python with PySide6. Windows and general Linux builds run as desktop widgets,
-while KDE Plasma also has a native QML widget.
+**A private, offline vocabulary widget that turns your desktop into a calm
+language-learning space.**
 
-The app starts with an empty vocabulary. Choose any installed source and target
-language, let the local model suggest a translation, review it, and save it.
-Cards rotate every 90 seconds by default.
+[![Tests](https://github.com/Mozzhukhin/LexiDesk/actions/workflows/tests.yml/badge.svg)](https://github.com/Mozzhukhin/LexiDesk/actions/workflows/tests.yml)
+[![Build downloads](https://github.com/Mozzhukhin/LexiDesk/actions/workflows/release.yml/badge.svg)](https://github.com/Mozzhukhin/LexiDesk/actions/workflows/release.yml)
+[![GitHub release](https://img.shields.io/github/v/release/Mozzhukhin/LexiDesk)](https://github.com/Mozzhukhin/LexiDesk/releases/latest)
+[![Python 3.12–3.14](https://img.shields.io/badge/Python-3.12–3.14-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-![LexiDesk desktop card](docs/images/desktop-window.png)
+LexiDesk combines a compact Windows/Linux desktop widget, a native KDE Plasma
+6 widget, offline neural translation, and FSRS 6 spaced repetition. There is no
+account, cloud vocabulary, telemetry, or network dependency after the selected
+languages are installed.
 
-![LexiDesk vocabulary library](docs/images/library.png)
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/desktop-window.png" alt="LexiDesk desktop vocabulary card"></td>
+    <td width="50%"><img src="docs/images/quiz.png" alt="LexiDesk translation quiz"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Passive desktop learning</b></td>
+    <td align="center"><b>Adaptive practice quizzes</b></td>
+  </tr>
+</table>
 
-![LexiDesk learning analytics](docs/images/analytics.png)
+## Why LexiDesk?
+
+Most vocabulary tools either demand constant attention or store learning data
+online. LexiDesk is designed for a different workflow:
+
+- keep one small card on the desktop;
+- see a new word automatically every 90 seconds;
+- browse freely without changing learning statistics;
+- occasionally answer a short adaptive quiz;
+- keep vocabulary, examples, review history, and models on your own computer.
+
+## Highlights
+
+- **Offline multilingual translation.** Install only the languages you need,
+  then translate without an internet connection.
+- **Lightweight distributions.** LexiDesk Lite ships without large language
+  models; packages are downloaded and removed from inside the app.
+- **Real desktop-widget behavior.** Desktop mode stays behind other windows;
+  Floating mode stays above them. KDE Plasma has a native QML widget.
+- **FSRS 6 scheduling.** Each recall direction has independent difficulty,
+  stability, due time, and accuracy.
+- **Six practice modes.** Mixed, choose translation, reverse translation,
+  complete the sentence, choose the context, and typed answer.
+- **Meaning-aware examples.** Every card keeps one short bilingual example
+  tied to the selected meaning.
+- **Bidirectional decks.** One `English ⇄ Russian` card can be studied from
+  either side without creating duplicate library rows.
+- **Useful learning tools.** Searchable library, analytics, batch import,
+  tags, JSON/CSV transfer, full backups, and diagnostics.
+- **Privacy by default.** Local SQLite storage, no login, no telemetry, and no
+  background network requests during study.
 
 ## Download
 
-Ready-to-run packages are published on the
-[GitHub Releases page](https://github.com/Mozzhukhin/LexiDesk/releases/latest):
+Use the [latest GitHub release](https://github.com/Mozzhukhin/LexiDesk/releases/latest).
 
-| System | Download | How to use it |
+| Platform | File | Notes |
 | --- | --- | --- |
-| Windows 10/11 x64 | `LexiDesk-Lite-Setup-Windows-x64.exe` | Run the installer. It can create desktop and automatic-start shortcuts. |
-| Windows x64, portable | `LexiDesk-Lite-Windows-x64-portable.zip` | Extract the whole archive and run `LexiDesk.exe`. |
-| Linux x86_64 | `LexiDesk-Lite-Linux-x86_64.AppImage` | Make it executable and open it. No system Python is required. |
-| Linux x86_64, portable | `LexiDesk-Lite-Linux-x86_64.tar.gz` | Extract it and run `LexiDesk/LexiDesk`. |
-| KDE Plasma 6 | `LexiDesk-Plasma6.plasmoid` | Optional native desktop add-on; install the Linux core first. |
-| Python 3.12–3.14 | `.whl` or `.tar.gz` source package | Intended for distributions and developers. |
+| Windows 10/11 x64 | `LexiDesk-Lite-Setup-Windows-x64.exe` | Installer with optional desktop and autostart shortcuts |
+| Windows x64 | `LexiDesk-Lite-Windows-x64-portable.zip` | Extract the entire archive and run `LexiDesk.exe` |
+| Linux x86_64 | `LexiDesk-Lite-Linux-x86_64.AppImage` | Portable build; no system Python required |
+| Linux x86_64 | `LexiDesk-Lite-Linux-x86_64.tar.gz` | Standalone directory archive |
+| KDE Plasma 6 | `LexiDesk-Plasma6.plasmoid` | Native QML widget; uses the installed LexiDesk core |
+| Python 3.12–3.14 | `.whl` / source archive | For distributions and developers |
 
-GitHub builds Windows and Linux packages on their corresponding operating
-systems from the same source code. `SHA256SUMS.txt` lets you verify every
-release download. Windows and Linux downloads are **LexiDesk Lite** builds: they
-contain the application and compact translation engine, but no preselected
-language. On first launch, choose only the languages you need.
+Windows may display a SmartScreen warning because community builds are not yet
+code-signed. Verify the release checksum and download only from this repository.
+The portable ZIP avoids installer-specific reputation warnings.
 
-## Features
-
-- Fully offline translation after installing the selected language packages
-- Direct and two-step translation routes between any installed languages
-- An in-app manager for downloading official Argos language models on demand
-- A 99,000-headword FreeDict index cross-checked in both translation directions
-- Compact CTranslate2 neural fallback for phrases and missing dictionary entries
-- Short examples validated against both the studied word and selected meaning
-- One short verified bilingual example per card
-- Conservative offline autocorrection for misspelled English and Russian words
-- Clean card meanings without sentence-ending periods or duplicate variants
-- Words and short phrases in either language
-- Explicit selection among up to four offline translation meanings
-- Editable translations, meanings, transcription, forms, frequency, and sources
-- Two regular card modes: always visible and click-to-reveal
-- Passive **Next** browsing that never changes learning statistics
-- Persistent Practice modes: Off, Mixed, translation, reverse, cloze, context,
-  and typed answer
-- Same-part-of-speech distractors weighted toward previously difficult cards
-- Soft card-change animations designed for an always-visible desktop widget
-- One-click undo for the most recent review
-- Automatic 90-second card rotation
-- A native Plasma 6 widget with system, OLED, Forest, and Purple themes
-- A frameless Windows/Linux desktop widget that stays out of the taskbar and
-  offers Desktop (behind windows) and Floating (above windows) placement
-- Searchable vocabulary library with New/Learning/Known filters
-- Tags, editable examples, alternative meanings, and parts of speech
-- Daily goals, 30-day activity, recall accuracy, streak, and review forecast
-- Difficult-card ranking based on FSRS difficulty and stability
-- Smart article import that removes stopwords, duplicates, names, and unknown noise
-- Responsive batch translation with progress and cooperative cancellation
-- JSON/CSV import and export
-- Daily SQLite backups with seven-day retention
-- Manual full backup and validated restore of cards, FSRS state, and review history
-- Built-in diagnostics report with database integrity and rotating local logs
-- KDE shortcut `Ctrl+Alt+L` to add the current clipboard text
-- Compact JSON CLI used by the widget and available for automation
-- Persistent local D-Bus service with automatic direct-database fallback
-- Local SQLite storage with no account, telemetry, or network calls at runtime
-- Desktop-menu actions for adding cards and opening the library
-
-## Offline languages
-
-LexiDesk Lite starts without bundled languages. Use the first-run
-**Choose languages** button, **Menu → Offline languages**, or press **+** and
-open the **Languages** tab. Installed languages are shown first, followed by
-the remaining catalog alphabetically. The manager shows download/disk size and
-can remove a language without deleting vocabulary or learning progress. Packages
-are downloaded only after an explicit click; translation makes no network
-request after installation.
-
-Downloaded models are stored in the operating system's persistent user-data
-folder, outside the installer and AppImage. Replacing or updating the application
-therefore keeps installed languages. If the catalog or download is unavailable,
-LexiDesk explains that an internet connection is required only for installation;
-already installed languages remain fully offline.
-
-LexiDesk treats installed models as a directed graph. A direct model is always
-preferred. If it is unavailable, one local pivot is allowed—for example,
-UK→EN plus EN→DE enables UK→DE. Pivot translation is convenient but may lose
-some nuance, so important meanings remain editable before a card is saved.
-Install both directions when you want to study either side of a pair.
-
-Vocabulary decks are bidirectional: one saved meaning such as
-`ambiguous ⇄ неоднозначный` can be studied from either side without creating a
-duplicate library row. The direction menu in the widget header selects a
-language pair, while the adjacent `⇄` button switches which language is shown
-above the translation and remembers that choice. FSRS state, due time,
-accuracy, and mistakes remain independent for each recall direction. Adding
-the exact reverse of an existing card reuses that card.
-
-Automatic language detection remains limited to legacy EN/RU use. Languages
-sharing a writing system cannot be identified reliably from a single word, so
-the add and batch dialogs provide explicit source and target selectors.
-
-## Learning model
-
-LexiDesk uses the official FSRS 6 implementation with 90% desired retention by
-default. Ordinary cards are passive: **Next** and automatic rotation only
-change the visible word. The user chooses a persistent mode from the Practice
-section of the widget menu. **Mixed** keeps a strict cadence: four ordinary
-presentations are followed by one random non-typing quiz. FSRS still chooses
-which weak or due card should receive that quiz, but a due backlog cannot cause
-two quizzes in a row. Selecting a specific quiz type applies that type to every
-available word until the mode is changed or switched Off.
-A correct choice records a successful review; a wrong choice records a failed
-review. Those quiz results produce individualized intervals instead of a fixed
-ladder. The desired retention can be adjusted between 70% and 99%.
-
-Legacy review history is migrated automatically. LexiDesk shows every unseen
-card before repeating one. In Mixed mode it then prioritizes first-recall and
-FSRS-due cards by mistake rate and difficulty; passive mode keeps a balanced
-full-deck rotation. **Next** does not alter learning history.
-The same card cannot reappear during the next five displays. In a smaller deck,
-LexiDesk cycles through every other available card before allowing a repeat.
-
-## Widget workflow
-
-1. At startup the QML widget asks the local D-Bus service for the next card.
-   Unseen cards are covered first; subsequent selection balances due status,
-   time since display, mistake rate, and FSRS difficulty without repeating a
-   small overdue subset forever. A five-card cooldown guarantees spacing
-   between repeated words and automatically adapts to small vocabularies.
-2. A regular card shows the source, translation, compact metadata, and a short
-   example for the selected meaning. The example must contain the studied term
-   and is limited to one compact sentence.
-3. **Next** requests another card without recording whether the word is known.
-   The 90-second timer performs the same passive change automatically.
-4. The compact application menu contains the Practice section. Off keeps normal
-   cards. Mixed inserts translation, reverse, sentence-gap, or context practice
-   when a card is ready for adaptive review, or on every fifth eligible card
-   when nothing is due. Selecting one exact quiz type uses
-   only that type on subsequent words. The active mode is check-marked and
-   remembered by Plasma.
-5. A correct answer turns green. A wrong selected answer turns red while the
-   correct answer turns green. The result remains visible for one second.
-6. The widget then records only that quiz result in FSRS and advances
-   automatically. Statistics, difficulty, and the next due date are based on
-   these quiz results.
-7. Adding and editing cards opens the Python application, while all vocabulary remains in
-   the same local SQLite database.
-
-## Install from source on Arch Linux
-
-Requirements:
-
-- KDE Plasma 6 or another Linux desktop
-- [`uv`](https://docs.astral.sh/uv/)
-- an internet connection for dependencies and languages selected in the app
+For AppImage:
 
 ```bash
-./scripts/setup.sh
+chmod +x LexiDesk-Lite-Linux-x86_64.AppImage
+./LexiDesk-Lite-Linux-x86_64.AppImage
 ```
 
-On Arch, setup reuses the distribution's PySide6 package through an isolated
-environment and installs CPU-only translation dependencies. It does not modify
-Arch's system Python. On other distributions it installs a portable Qt wheel.
+## First launch and offline languages
 
-Run:
+LexiDesk Lite intentionally starts without a preselected language:
+
+1. Select **Choose languages** on first launch, or open
+   **Menu → Offline languages**.
+2. Choose a language. LexiDesk installs both directions through English when
+   the official catalog provides them.
+3. Add a word with **+**, select source and target languages, review the local
+   translation, and save the card.
+4. Continue studying offline.
+
+The language manager shows installed languages first, reports package size,
+checks package compatibility, and can remove models without deleting cards or
+learning progress. Downloaded models live in the user's persistent data folder,
+outside the EXE/AppImage, so application upgrades keep them.
+
+![LexiDesk offline language manager](docs/images/languages.png)
+
+Direct translation models are preferred. If there is no direct model,
+LexiDesk can use one local English pivot—for example, `UK → EN → DE`. All
+translations remain editable because an isolated word can have several valid
+meanings.
+
+## Learning workflow
+
+- **Off:** regular cards only.
+- **Mixed:** four passive cards followed by one random non-typing quiz.
+- **Fixed quiz:** the selected quiz type is used for every suitable card.
+- **Next / timed rotation:** changes the card without recording a review.
+- **Quiz answer:** records the result in FSRS and advances automatically.
+
+Correct choices turn green. A wrong choice turns red while the correct answer
+turns green. The same card cannot reappear during the next five presentations;
+smaller decks adapt the cooldown to cycle through every available card first.
+
+## Library and analytics
+
+<table>
+  <tr>
+    <td width="55%"><img src="docs/images/library.png" alt="LexiDesk vocabulary library"></td>
+    <td width="45%"><img src="docs/images/analytics.png" alt="LexiDesk learning analytics"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Deck-aware vocabulary library</b></td>
+    <td align="center"><b>Local learning analytics</b></td>
+  </tr>
+</table>
+
+The library separates language decks, while opposite study directions remain
+two views of the same vocabulary. Analytics include daily progress, activity,
+recall accuracy, difficult cards, quiz breakdown, confusions, streak, and the
+seven-day review forecast.
+
+## Architecture
+
+```text
+Native Plasma widget (QML)             Windows/Linux widget (PySide6)
+             │                                      │
+             └──────────── local JSON / D-Bus ──────┘
+                                    │
+                                    ▼
+                            Application core
+                    ┌───────────────┼───────────────┐
+                    ▼               ▼               ▼
+              FSRS scheduler   Offline CTranslate2  SQLite storage
+              + quiz engine    model graph           + backups
+```
+
+Key implementation choices:
+
+- Python 3.12–3.14 and PySide6 for the cross-platform UI;
+- QML for native KDE Plasma integration;
+- CTranslate2 + SentencePiece for compact CPU inference;
+- SQLite for vocabulary, bidirectional FSRS state, and history;
+- a bounded SQL quiz-candidate query instead of repeated full-deck scans;
+- cancellable background workers for translation and batch imports;
+- PyInstaller, AppImage, and Inno Setup release automation;
+- native Windows and Ubuntu builds in GitHub Actions.
+
+See [Architecture](docs/ARCHITECTURE.md) for database migrations, services,
+scheduling, translation routing, and packaging details.
+
+## Install from source
+
+Requirements: Linux, Python 3.12–3.14, and
+[`uv`](https://docs.astral.sh/uv/).
 
 ```bash
+git clone https://github.com/Mozzhukhin/LexiDesk.git
+cd LexiDesk
+./scripts/setup.sh
 ./scripts/run.sh
 ```
 
-The installer also registers the native widget. Add it from:
+On Arch Linux the setup script can reuse the distribution's PySide6 package.
+It creates an isolated environment, installs the desktop integration and Plasma
+widget, and leaves system Python untouched. Choose languages from the app after
+the first start.
 
-`Right-click desktop → Enter Edit Mode → Add Widgets → LexiDesk`.
+To add the Plasma widget:
 
-Useful commands:
-
-```bash
-# Add a card, prefilled from the clipboard
-~/.local/bin/lexidesk-gui --add-clipboard
-
-# Open the searchable library
-~/.local/bin/lexidesk-gui --library
-
-# Batch add and analytics
-~/.local/bin/lexidesk-gui --batch
-~/.local/bin/lexidesk-gui --analytics
-
-# Read widget data as JSON
-~/.local/bin/lexidesk-bridge stats
-~/.local/bin/lexidesk-bridge card
-~/.local/bin/lexidesk-bridge analytics
-```
-
-After a language is installed, translation works without an internet connection. Application data
-is stored in `~/.local/share/LexiDesk`, and settings in
-`~/.config/LexiDesk`. Automatic backups are stored under
-`~/.local/share/LexiDesk/backups`.
-
-JSON/CSV export is intended for moving vocabulary between applications. Use
-**Library → Full backup** when review history and FSRS progress must be retained.
+`Right-click desktop → Enter Edit Mode → Add Widgets → LexiDesk`
 
 ## Development
 
@@ -221,125 +196,26 @@ uv run pytest -q
 uv run lexidesk
 ```
 
-The GitHub Actions workflow runs the same formatting, lint, type, and test
-checks on every push and pull request.
+The project enforces formatting, linting, type checks, branch-aware test
+coverage, and native packaged-runtime smoke tests. Release tags produce Windows
+installer/portable packages, Linux AppImage/archive packages, a Plasma widget,
+Python distributions, and SHA-256 checksums.
 
-Release tags build a Windows installer and portable ZIP on Windows, an AppImage
-and portable archive on Ubuntu 22.04, a Python wheel/source archive, and the
-Plasma add-on. A manually started workflow builds the same downloadable
-artifacts without publishing a release, which makes packaging changes safe to
-test first. Packaging sources for Windows, AppImage, Arch/AUR, Flatpak, and
-PyInstaller are under `packaging/`; see `packaging/flatpak/README.md` for the
-sandbox-specific language-data step.
+## Data and backups
 
-## Repair and diagnostics
-
-Setup is idempotent, so it can safely repair wrappers, desktop entries,
-shortcuts, or the Plasma package without resetting vocabulary:
-
-```bash
-./scripts/setup.sh
-```
-
-Check the local bridge independently from Plasma:
-
-```bash
-~/.local/bin/lexidesk-bridge card
-~/.local/bin/lexidesk-bridge stats
-```
-
-If Plasma still displays a cached widget after an upgrade, log out and back in,
-or remove and add only the widget instance. Vocabulary and review history remain
-in `~/.local/share/LexiDesk` and are not stored inside the widget.
-
-For unexpected errors, open **Menu → Diagnostics**. The report checks database
-integrity and shows the exact database, dictionary, settings, bridge, and log
-locations without including vocabulary contents.
-
-## Architecture
-
-```text
-Native Plasma widget (QML)
-           │ executable DataSource / JSON
-           ▼
-Python CLI bridge ─────► local D-Bus service ◄───── PySide6 application
-           │                       │                   ├── typed practice
-           │ direct fallback       │                   ├── batch importer
-           └───────────────────────┤                   └── analytics
-                                   ▼
-Application core
-    ├── FSRS 6 scheduler and answer checker
-    ├── compact offline CTranslate2 translator
-    ├── import/export and backups
-    └── SQLite repository + review history
-```
-
-See [the architecture document](docs/ARCHITECTURE.md) for migration and
-service details.
-
-For dictionary words, LexiDesk checks both EN→RU and RU→EN indexes, removes
-stress marks and source markup, demotes likely misspellings, and keeps ambiguous
-meanings available for explicit selection. The neural model remains a fallback for phrases
-and missing entries; no automatic system can infer the intended sense of an
-isolated word with certainty, so every translation remains editable.
-
-Regular cards place the selected source language above its translation. The
-header direction opens the deck chooser, and its adjacent `⇄` button reverses
-the prompt and translation; the deck remains one shared bidirectional
-vocabulary. Quiz prompts and review history retain the direction currently
-being tested. Single-word model results
-are normalized as card meanings rather than sentences: periods are removed and
-punctuation-only duplicates are collapsed before saving.
-
-Example generation is tied to the selected card meaning. Both sides must contain
-the corresponding studied term (including common inflected forms). A mismatched
-WordNet sense or neural translation is rejected and replaced with a short safe
-contextual example instead of being saved as misleading learning material. The
-compact WordNet SQLite index is retained; its larger source corpus is removed
-automatically after indexing.
-
-LexiDesk stores several short examples separately for each card and randomly
-selects one for sentence-completion practice. Only the current card's examples
-are queried. Older cards are enriched gradually in the background as they
-appear, so a large vocabulary does not cause a bulk startup job. Meta templates
-that merely mention a word are rejected; a sentence is saved only when both
-language sides contain the studied meaning in a useful context.
-
-For an unknown single word, LexiDesk compares nearby dictionary spellings with
-the offline model's translation and automatically substitutes a correction only
-when the evidence is strong. Typical inflected English forms such as `cars`,
-`worked`, and `working` are protected from overcorrection. Multi-word phrases
-are translated as entered.
-
-## Privacy and offline behavior
-
-The regular application, widget, CLI, database, review system, and translation
-engine run locally. LexiDesk runs the EN↔RU CTranslate2 models directly and does
-not ship Torch, Stanza, spaCy, or ONNX. Network access is used only by `scripts/install_models.py`
-during the initial EN↔RU model installation,
-`scripts/install_dictionary.py` while building the local FreeDict index, and
-`scripts/install_examples.py` while building the local WordNet example index.
-LexiDesk has no account, analytics, advertising, or telemetry. See
-[THIRD_PARTY.md](THIRD_PARTY.md) for data attribution and licenses.
-
-## Plasma implementation
-
-Plasma 6 requires widgets to use QML. The QML package never accesses the
-database directly: it invokes a narrow Python CLI and parses its JSON response.
-This keeps the learning logic testable in Python while giving Plasma ownership
-of placement, resizing, theming, and lifecycle.
-
-## License
-
-MIT
+On Linux, application data is stored under `~/.local/share/LexiDesk` and
+settings under `~/.config/LexiDesk`. Windows uses the corresponding per-user
+application-data folders. Daily backups retain seven days by default; a full
+backup preserves cards, FSRS state, and review history.
 
 ## Support the developer
 
-If LexiDesk is useful to you, you can optionally support its continued
-development:
+If LexiDesk is useful to you, the in-app **Support developer** page contains
+the same address:
 
-- Asset: **USDT**
-- Network: **TRON (TRC20)**
-- Address: `TCJxcsKVhm2Mjs7q5XkVvLK492XLpnY8um`
+`USDT TRC20: TCJxcsKVhm2Mjs7q5XkVvLK492XLpnY8um`
 
-Send only USDT using the TRON (TRC20) network.
+## License
+
+[MIT](LICENSE). Third-party components and language resources are documented in
+[THIRD_PARTY.md](THIRD_PARTY.md).

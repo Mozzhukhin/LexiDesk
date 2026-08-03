@@ -531,6 +531,7 @@ class LexiDeskWindow(QMainWindow):
         self.practice_label.setText(short_labels.get(self.settings.practice_mode, ""))
         self.practice_label.setVisible(self.settings.practice_mode != "off")
         self.practice_label.setToolTip(f"Practice mode: {selected}")
+        self._update_header_density()
 
     def _show_quiz(self, quiz: dict[str, Any]) -> None:
         self._current_quiz = quiz
@@ -900,7 +901,9 @@ class LexiDeskWindow(QMainWindow):
 
     def _update_header_density(self) -> None:
         """Keep the header readable at the supported compact width."""
-        compact = self.width() < 370
+        compact = self.width() < 370 or (
+            self.settings.practice_mode != "off" and self.width() < 440
+        )
         self.title_label.setVisible(not compact)
         self.goal_label.setVisible(not compact)
 

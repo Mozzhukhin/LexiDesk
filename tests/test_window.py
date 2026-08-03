@@ -114,6 +114,22 @@ def test_compact_window_hides_nonessential_header_labels(tmp_path: Path) -> None
     repository.close()
 
 
+def test_quiz_mode_prioritizes_direction_over_decorative_header_text(
+    tmp_path: Path,
+) -> None:
+    window, repository = _window(tmp_path)
+    window.resize(390, 310)
+    window.set_practice_mode("translation")
+    window._update_header_density()
+
+    assert window.title_label.isHidden()
+    assert window.goal_label.isHidden()
+    assert not window.direction_label.isHidden()
+    assert not window.practice_label.isHidden()
+    window.tick_timer.stop()
+    repository.close()
+
+
 def test_card_actions_stay_visible_without_hover(tmp_path: Path) -> None:
     window, repository = _window(tmp_path)
     window.tick_timer.stop()
