@@ -24,6 +24,7 @@ class Settings:
     window_mode: str = "desktop"
     active_source_language: str = ""
     active_target_language: str = ""
+    language_onboarding_seen: bool = False
 
 
 class SettingsStore:
@@ -105,6 +106,11 @@ class SettingsStore:
                 ),
                 active_target_language=_language_code(
                     raw.get("active_target_language")
+                ),
+                language_onboarding_seen=(
+                    raw["language_onboarding_seen"]
+                    if isinstance(raw.get("language_onboarding_seen"), bool)
+                    else defaults.language_onboarding_seen
                 ),
             )
         except (OSError, ValueError, TypeError):

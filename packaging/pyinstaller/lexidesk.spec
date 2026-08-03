@@ -12,10 +12,6 @@ binaries = []
 hiddenimports = []
 strip_binaries = not is_win
 
-language_data = root / "bundle-data"
-if language_data.is_dir():
-    datas.append((str(language_data), "language-data"))
-
 # Only the inference extensions are needed. ``collect_all(ctranslate2)`` also
 # follows training/conversion tools into pandas, matplotlib, and test packages.
 datas += collect_data_files("sentencepiece")

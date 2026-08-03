@@ -333,12 +333,16 @@ class AddWordDialog(QDialog):
         installed_languages = (
             self.translator.installed_languages()
             if hasattr(self.translator, "installed_languages")
-            else ("en", "ru")
-        ) or ("en", "ru")
+            else ()
+        )
         self.source_language.clear()
         self.target_language.clear()
-        self.source_language.addItem("Auto-detect EN / RU", "")
-        self.target_language.addItem("Automatic EN ↔ RU", "")
+        if installed_languages:
+            self.source_language.addItem("Choose source language", "")
+            self.target_language.addItem("Choose target language", "")
+        else:
+            self.source_language.addItem("Install languages first", "")
+            self.target_language.addItem("Install languages first", "")
         for code in installed_languages:
             label = language_label(code)
             self.source_language.addItem(label, code)

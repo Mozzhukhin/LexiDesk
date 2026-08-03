@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import urllib.error
 import urllib.request
 import zipfile
 from collections.abc import Callable
@@ -82,6 +83,7 @@ def install_package(
     target = root / package.identity
     if target.is_dir():
         _validate_installed(target, package)
+        _remove_obsolete_pair_versions(target, package)
         return target
     archive = root / f".{package.identity}.download"
     staging = root / f".{package.identity}.staging"
@@ -165,6 +167,7 @@ def install_package(
                     shutil.copyfileobj(source, out)
         _validate_installed(extracted, package)
         extracted.replace(target)
+        _remove_obsolete_pair_versions(target, package)
         if progress is not None:
             progress(100)
         return target
@@ -172,6 +175,46 @@ def install_package(
         archive.unlink(missing_ok=True)
         if staging.exists():
             shutil.rmtree(staging)
+
+
+def package_download_size(package: LanguagePackage, timeout: float = 12) -> int:
+    """Return a server-provided archive size without downloading the model."""
+    request = urllib.request.Request(
+        package.url,
+        method="HEAD",
+        headers={"User-Agent": "LexiDesk language package manager"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return max(0, int(response.headers.get("Content-Length", "0") or 0))
+    except (OSError, ValueError, urllib.error.URLError):
+        return 0
+
+
+def installed_package_size(language_code: str) -> int:
+    """Return disk usage of user-installed models involving one language."""
+    code = normalize_language_code(language_code)
+    return sum(_directory_size(path) for path in _user_packages_for_language(code))
+
+
+def remove_language(language_code: str) -> int:
+    """Remove only LexiDesk-owned model directories for a non-English language."""
+    code = normalize_language_code(language_code)
+    if code == "en":
+        raise ValueError("English is the routing language and cannot be removed alone.")
+    packages = _user_packages_for_language(code)
+    for path in packages:
+        shutil.rmtree(path)
+    return len(packages)
+
+
+def friendly_network_error(error: Exception) -> str:
+    if isinstance(error, (urllib.error.URLError, TimeoutError, ConnectionError)):
+        return (
+            "No internet connection. Connect to the internet and try again; "
+            "installed languages will continue to work offline."
+        )
+    return str(error) or error.__class__.__name__
 
 
 def package_for_pair(
@@ -197,6 +240,52 @@ def _validate_installed(path: Path, package: LanguagePackage) -> None:
         or str(metadata.get("to_code", "")).casefold() != package.target
     ):
         raise ValueError("The downloaded model metadata does not match its pair.")
+
+
+def _user_packages_for_language(language_code: str) -> tuple[Path, ...]:
+    root = model_install_dir()
+    matches: list[Path] = []
+    for path in root.iterdir():
+        metadata_path = path / "metadata.json"
+        if not path.is_dir() or not metadata_path.is_file():
+            continue
+        try:
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            source = normalize_language_code(str(metadata.get("from_code", "")))
+            target = normalize_language_code(str(metadata.get("to_code", "")))
+        except (OSError, ValueError, TypeError, json.JSONDecodeError):
+            continue
+        if language_code in {source, target}:
+            matches.append(path)
+    return tuple(matches)
+
+
+def _remove_obsolete_pair_versions(current: Path, package: LanguagePackage) -> None:
+    """Keep one model per direction so a stale version cannot win discovery."""
+    for path in model_install_dir().iterdir():
+        if path == current or not path.is_dir():
+            continue
+        metadata_path = path / "metadata.json"
+        try:
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError, json.JSONDecodeError):
+            continue
+        if (
+            str(metadata.get("from_code", "")).casefold() == package.source
+            and str(metadata.get("to_code", "")).casefold() == package.target
+        ):
+            shutil.rmtree(path)
+
+
+def _directory_size(path: Path) -> int:
+    total = 0
+    for item in path.rglob("*"):
+        try:
+            if item.is_file():
+                total += item.stat().st_size
+        except OSError:
+            continue
+    return total
 
 
 def _locate_unique_member(

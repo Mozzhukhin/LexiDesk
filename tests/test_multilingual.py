@@ -17,6 +17,7 @@ from lexidesk.language_packages import (
     install_package,
     package_for_pair,
     refresh_catalog,
+    remove_language,
 )
 from lexidesk.model_translation import OfflineModelRegistry
 from lexidesk.translation import OfflineTranslator
@@ -208,6 +209,30 @@ def test_package_install_rejects_archive_without_tokenizer(
 
     with pytest.raises(ValueError, match="no compatible SentencePiece tokenizer"):
         install_package(package())
+
+
+def test_removing_language_keeps_other_models_and_user_content(
+    tmp_path: Path, monkeypatch
+) -> None:
+    root = tmp_path / "translation-models"
+    for source, target in (("en", "uk"), ("uk", "en"), ("en", "de")):
+        path = root / f"translate-{source}_{target}"
+        path.mkdir(parents=True)
+        (path / "metadata.json").write_text(
+            json.dumps({"from_code": source, "to_code": target}), encoding="utf-8"
+        )
+        (path / "payload.bin").write_bytes(b"model")
+    vocabulary = tmp_path / "lexidesk.db"
+    vocabulary.write_bytes(b"cards")
+    monkeypatch.setattr("lexidesk.language_packages.data_dir", lambda: tmp_path)
+
+    assert remove_language("uk") == 2
+    assert not (root / "translate-en_uk").exists()
+    assert not (root / "translate-uk_en").exists()
+    assert (root / "translate-en_de").exists()
+    assert vocabulary.read_bytes() == b"cards"
+    with pytest.raises(ValueError, match="cannot be removed"):
+        remove_language("en")
 
 
 def test_language_dialog_groups_installed_languages_first(

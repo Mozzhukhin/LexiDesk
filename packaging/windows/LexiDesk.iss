@@ -1,4 +1,4 @@
-#define AppName "LexiDesk"
+#define AppName "LexiDesk Lite"
 #ifndef AppVersion
   #define AppVersion "dev"
 #endif
@@ -13,7 +13,7 @@ DefaultDirName={autopf}\LexiDesk
 DefaultGroupName=LexiDesk
 DisableProgramGroupPage=yes
 OutputDir=..\..\release
-OutputBaseFilename=LexiDesk-Setup-Windows-x64
+OutputBaseFilename=LexiDesk-Lite-Setup-Windows-x64
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern

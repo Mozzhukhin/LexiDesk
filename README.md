@@ -22,19 +22,18 @@ Ready-to-run packages are published on the
 
 | System | Download | How to use it |
 | --- | --- | --- |
-| Windows 10/11 x64 | `LexiDesk-Setup-Windows-x64.exe` | Run the installer. It can create desktop and automatic-start shortcuts. |
-| Windows x64, portable | `LexiDesk-Windows-x64-portable.zip` | Extract the whole archive and run `LexiDesk.exe`. |
-| Linux x86_64 | `LexiDesk-Linux-x86_64.AppImage` | Make it executable and open it. No system Python is required. |
-| Linux x86_64, portable | `LexiDesk-Linux-x86_64.tar.gz` | Extract it and run `LexiDesk/LexiDesk`. |
+| Windows 10/11 x64 | `LexiDesk-Lite-Setup-Windows-x64.exe` | Run the installer. It can create desktop and automatic-start shortcuts. |
+| Windows x64, portable | `LexiDesk-Lite-Windows-x64-portable.zip` | Extract the whole archive and run `LexiDesk.exe`. |
+| Linux x86_64 | `LexiDesk-Lite-Linux-x86_64.AppImage` | Make it executable and open it. No system Python is required. |
+| Linux x86_64, portable | `LexiDesk-Lite-Linux-x86_64.tar.gz` | Extract it and run `LexiDesk/LexiDesk`. |
 | KDE Plasma 6 | `LexiDesk-Plasma6.plasmoid` | Optional native desktop add-on; install the Linux core first. |
 | Python 3.12–3.14 | `.whl` or `.tar.gz` source package | Intended for distributions and developers. |
 
 GitHub builds Windows and Linux packages on their corresponding operating
 systems from the same source code. `SHA256SUMS.txt` lets you verify every
-release download. Ready-to-run Windows and Linux packages include the EN↔RU
-models, dictionary, and example index, so translation works immediately without
-a network connection. A source installation downloads this data once during
-`scripts/setup.sh`.
+release download. Windows and Linux downloads are **LexiDesk Lite** builds: they
+contain the application and compact translation engine, but no preselected
+language. On first launch, choose only the languages you need.
 
 ## Features
 
@@ -79,11 +78,19 @@ a network connection. A source installation downloads this data once during
 
 ## Offline languages
 
-EN↔RU is the default bundled pair. Press **+**, open the **Languages** tab, and
-select a language to install it. Installed languages are shown first, followed
-by the remaining catalog alphabetically. Packages
+LexiDesk Lite starts without bundled languages. Use the first-run
+**Choose languages** button, **Menu → Offline languages**, or press **+** and
+open the **Languages** tab. Installed languages are shown first, followed by
+the remaining catalog alphabetically. The manager shows download/disk size and
+can remove a language without deleting vocabulary or learning progress. Packages
 are downloaded only after an explicit click; translation makes no network
 request after installation.
+
+Downloaded models are stored in the operating system's persistent user-data
+folder, outside the installer and AppImage. Replacing or updating the application
+therefore keeps installed languages. If the catalog or download is unavailable,
+LexiDesk explains that an internet connection is required only for installation;
+already installed languages remain fully offline.
 
 LexiDesk treats installed models as a directed graph. A direct model is always
 preferred. If it is unavailable, one local pivot is allowed—for example,
@@ -156,7 +163,7 @@ Requirements:
 
 - KDE Plasma 6 or another Linux desktop
 - [`uv`](https://docs.astral.sh/uv/)
-- an internet connection for the one-time dependency and language-model download
+- an internet connection for dependencies and languages selected in the app
 
 ```bash
 ./scripts/setup.sh
@@ -195,7 +202,7 @@ Useful commands:
 ~/.local/bin/lexidesk-bridge analytics
 ```
 
-After setup, translation works without an internet connection. Application data
+After a language is installed, translation works without an internet connection. Application data
 is stored in `~/.local/share/LexiDesk`, and settings in
 `~/.config/LexiDesk`. Automatic backups are stored under
 `~/.local/share/LexiDesk/backups`.

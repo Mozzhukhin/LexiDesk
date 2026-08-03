@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtCore import Qt, QThread, QTimer, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QDialog,
@@ -21,9 +21,13 @@ from PySide6.QtWidgets import (
 from .language_packages import (
     LanguagePackage,
     cached_catalog,
+    friendly_network_error,
     install_package,
+    installed_package_size,
+    package_download_size,
     package_for_pair,
     refresh_catalog,
+    remove_language,
 )
 from .languages import LANGUAGES, language_name
 from .model_translation import OfflineModelRegistry
@@ -31,19 +35,46 @@ from .model_translation import OfflineModelRegistry
 logger = logging.getLogger(__name__)
 
 
+def format_size(size: int) -> str:
+    if size <= 0:
+        return "Size unavailable"
+    value = float(size)
+    for unit in ("B", "KB", "MB", "GB"):
+        if value < 1024 or unit == "GB":
+            return f"{value:.0f} {unit}" if unit != "GB" else f"{value:.1f} {unit}"
+        value /= 1024
+    return "Size unavailable"
+
+
 class PackageWorker(QThread):
     completed = Signal(object)
     failed = Signal(str)
     progressed = Signal(int)
 
-    def __init__(self, packages: tuple[LanguagePackage, ...] | None = None) -> None:
+    def __init__(
+        self,
+        action: str = "refresh",
+        packages: tuple[LanguagePackage, ...] = (),
+        language_code: str = "",
+    ) -> None:
         super().__init__()
+        self.action = action
         self.packages = packages
+        self.language_code = language_code
 
     def run(self) -> None:
         try:
-            if self.packages is None:
+            if self.action == "refresh":
                 self.completed.emit(refresh_catalog())
+                return
+            if self.action == "measure":
+                size = sum(package_download_size(item) for item in self.packages)
+                self.completed.emit(("measure", self.language_code, size))
+                return
+            if self.action == "remove":
+                self.completed.emit(
+                    ("remove", self.language_code, remove_language(self.language_code))
+                )
                 return
             for index, package in enumerate(self.packages):
                 offset = round(index * 100 / len(self.packages))
@@ -58,7 +89,7 @@ class PackageWorker(QThread):
             self.completed.emit(self.packages)
         except Exception as error:
             logger.exception("Language package operation failed")
-            self.failed.emit(str(error))
+            self.failed.emit(friendly_network_error(error))
 
 
 class LanguagePackagesPage(QWidget):
@@ -69,6 +100,8 @@ class LanguagePackagesPage(QWidget):
         self._worker: PackageWorker | None = None
         self._packages = cached_catalog()
         self._installed: set[str] = set()
+        self._download_sizes: dict[str, int] = {}
+        self._install_after_measure: tuple[LanguagePackage, ...] = ()
 
         intro = QLabel(
             "Download a language once, then translate offline. LexiDesk installs "
@@ -78,8 +111,8 @@ class LanguagePackagesPage(QWidget):
         intro.setWordWrap(True)
 
         self.languages = QTreeWidget()
-        self.languages.setColumnCount(2)
-        self.languages.setHeaderLabels(["Language", "Status"])
+        self.languages.setColumnCount(3)
+        self.languages.setHeaderLabels(["Language", "Status", "Size"])
         self.languages.setRootIsDecorated(False)
         self.languages.setAlternatingRowColors(True)
         self.languages.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -89,6 +122,9 @@ class LanguagePackagesPage(QWidget):
         )
         self.languages.header().setSectionResizeMode(
             1, self.languages.header().ResizeMode.ResizeToContents
+        )
+        self.languages.header().setSectionResizeMode(
+            2, self.languages.header().ResizeMode.ResizeToContents
         )
         self.languages.currentItemChanged.connect(self._selection_changed)
 
@@ -102,10 +138,16 @@ class LanguagePackagesPage(QWidget):
         self.refresh_button.clicked.connect(self.refresh)
         self.install_button = QPushButton("Download selected language")
         self.install_button.clicked.connect(self.install_selected)
+        self.remove_button = QPushButton("Remove")
+        self.remove_button.setToolTip(
+            "Remove downloaded models. Vocabulary and learning progress are kept."
+        )
+        self.remove_button.clicked.connect(self.remove_selected)
 
         actions = QHBoxLayout()
         actions.addWidget(self.refresh_button)
         actions.addStretch(1)
+        actions.addWidget(self.remove_button)
         actions.addWidget(self.install_button)
         layout = QVBoxLayout(self)
         layout.addWidget(intro)
@@ -114,6 +156,8 @@ class LanguagePackagesPage(QWidget):
         layout.addWidget(self.progress)
         layout.addLayout(actions)
         self._populate()
+        if not self._packages:
+            QTimer.singleShot(0, self.refresh)
 
     @property
     def busy(self) -> bool:
@@ -143,9 +187,28 @@ class LanguagePackagesPage(QWidget):
                 "for this language.",
             )
             return
+        self._install_after_measure = selected
         self._start(
-            PackageWorker(selected),
-            f"Downloading {language_name(code)} for offline use…",
+            PackageWorker("measure", selected, code),
+            f"Checking the {language_name(code)} download size…",
+        )
+
+    def remove_selected(self) -> None:
+        item = self.languages.currentItem()
+        code = str(item.data(0, Qt.ItemDataRole.UserRole) if item else "")
+        if not code or code == "en" or code not in self._installed:
+            return
+        answer = QMessageBox.question(
+            self,
+            "Remove offline language",
+            f"Remove downloaded {language_name(code)} models?\n\n"
+            "Vocabulary cards and learning progress will not be deleted.",
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        self._start(
+            PackageWorker("remove", language_code=code),
+            f"Removing {language_name(code)} offline data…",
         )
 
     def _start(self, worker: PackageWorker, message: str) -> None:
@@ -157,6 +220,7 @@ class LanguagePackagesPage(QWidget):
         self.progress.show()
         self.refresh_button.setEnabled(False)
         self.install_button.setEnabled(False)
+        self.remove_button.setEnabled(False)
         worker.progressed.connect(self.progress.setValue)
         worker.completed.connect(self._completed)
         worker.failed.connect(self._failed)
@@ -166,7 +230,22 @@ class LanguagePackagesPage(QWidget):
     def _completed(self, result: object) -> None:
         if not isinstance(result, tuple):
             return
-        if self._worker is not None and self._worker.packages is None:
+        if result and result[0] == "measure":
+            code = str(result[1])
+            size = int(result[2])
+            self._download_sizes[code] = size
+            detail = format_size(size)
+            self.status.setText(
+                f"{language_name(code)} download: {detail}. Starting download…"
+            )
+            self._populate()
+            return
+        if result and result[0] == "remove":
+            self.status.setText(
+                f"{language_name(str(result[1]))} removed. Your cards were kept."
+            )
+            self.languages_changed.emit()
+        elif self._worker is not None and self._worker.action == "refresh":
             self._packages = result
             self.status.setText(
                 f"Language list updated: {len(self._language_codes())} languages."
@@ -187,6 +266,15 @@ class LanguagePackagesPage(QWidget):
             worker.deleteLater()
         self.refresh_button.setEnabled(True)
         self._selection_changed(self.languages.currentItem())
+        if worker is not None and worker.action == "measure":
+            packages = self._install_after_measure
+            self._install_after_measure = ()
+            if packages:
+                code = worker.language_code
+                self._start(
+                    PackageWorker("install", packages, code),
+                    f"Downloading {language_name(code)} for offline use…",
+                )
 
     def _language_codes(self) -> set[str]:
         catalog_codes = {
@@ -239,7 +327,13 @@ class LanguagePackagesPage(QWidget):
             status = "✓ Installed" if installed else "Not installed"
             if code == "en" and installed:
                 status = "✓ Installed · core"
-            item = QTreeWidgetItem([f"{name}  ·  {code.upper()}", status])
+            size = (
+                installed_package_size(code)
+                if installed and code != "en"
+                else self._download_sizes.get(code, 0)
+            )
+            size_text = format_size(size) if code != "en" else "—"
+            item = QTreeWidgetItem([f"{name}  ·  {code.upper()}", status, size_text])
             item.setData(0, Qt.ItemDataRole.UserRole, code)
             if installed:
                 font = item.font(0)
@@ -268,6 +362,9 @@ class LanguagePackagesPage(QWidget):
             "Installed" if installed else "Download selected language"
         )
         self.install_button.setEnabled(not self.busy and not installed and available)
+        self.remove_button.setEnabled(
+            not self.busy and installed and bool(code) and code != "en"
+        )
 
 
 class LanguagePackagesDialog(QDialog):

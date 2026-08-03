@@ -28,34 +28,8 @@ jobs:
       - run: uv run mypy
       - run: uv run pytest -q
 
-  language-data:
-    needs: validate
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: astral-sh/setup-uv@v9.0.0
-        with:
-          python-version: "3.13"
-          enable-cache: true
-      - run: uv sync --extra data-build
-      - name: Build offline dictionary, examples, and translation models
-        env:
-          LEXIDESK_DATA_DIR: ${{ github.workspace }}/bundle-data/LexiDesk
-          ARGOS_PACKAGES_DIR: ${{ github.workspace }}/bundle-data/argos-translate/packages
-        run: |
-          uv run python scripts/install_dictionary.py
-          uv run python scripts/install_examples.py
-          uv run python scripts/install_models.py
-      - uses: actions/upload-artifact@v7.0.1
-        with:
-          name: language-data
-          path: bundle-data/
-          if-no-files-found: error
-
   linux:
-    needs:
-      - validate
-      - language-data
+    needs: validate
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v7.0.1
@@ -68,30 +42,29 @@ jobs:
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y libegl1
       - run: uv sync --extra bundle
-      - uses: actions/download-artifact@v8.0.1
-        with:
-          name: language-data
-          path: bundle-data
       - name: Build standalone application
         run: uv run pyinstaller --clean --noconfirm packaging/pyinstaller/lexidesk.spec
-      - name: Smoke-test bundled Linux translation
+      - name: Smoke-test Lite Linux runtime
         run: dist/LexiDesk/LexiDesk --self-test
       - name: Build AppImage and portable archive
         run: |
-          mkdir -p release LexiDesk.AppDir/usr/lib/lexidesk
+          mkdir -p release LexiDesk.AppDir/usr/lib/lexidesk \
+            LexiDesk.AppDir/usr/share/metainfo
           cp -a dist/LexiDesk/. LexiDesk.AppDir/usr/lib/lexidesk/
           cp packaging/appimage/AppRun LexiDesk.AppDir/AppRun
           cp packaging/appimage/io.github.lexidesk.desktop \
             LexiDesk.AppDir/io.github.lexidesk.desktop
           cp assets/lexidesk.svg LexiDesk.AppDir/io.github.lexidesk.svg
+          cp packaging/io.github.lexidesk.metainfo.xml \
+            LexiDesk.AppDir/usr/share/metainfo/io.github.lexidesk.metainfo.xml
           chmod +x LexiDesk.AppDir/AppRun
-          tar -C dist -czf "release/LexiDesk-Linux-x86_64.tar.gz" LexiDesk
+          tar -C dist -czf "release/LexiDesk-Lite-Linux-x86_64.tar.gz" LexiDesk
           curl -L --fail --retry 3 \
             -o appimagetool \
             https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod +x appimagetool
           ARCH=x86_64 ./appimagetool --appimage-extract-and-run \
-            LexiDesk.AppDir release/LexiDesk-Linux-x86_64.AppImage
+            LexiDesk.AppDir release/LexiDesk-Lite-Linux-x86_64.AppImage
       - uses: actions/upload-artifact@v7.0.1
         with:
           name: linux-downloads
@@ -99,9 +72,7 @@ jobs:
           if-no-files-found: error
 
   windows:
-    needs:
-      - validate
-      - language-data
+    needs: validate
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v7.0.1
@@ -110,13 +81,9 @@ jobs:
           python-version: "3.13"
           enable-cache: true
       - run: uv sync --extra bundle
-      - uses: actions/download-artifact@v8.0.1
-        with:
-          name: language-data
-          path: bundle-data
       - name: Build standalone application
         run: uv run pyinstaller --clean --noconfirm packaging/pyinstaller/lexidesk.spec
-      - name: Smoke-test bundled Windows translation
+      - name: Smoke-test Lite Windows runtime
         shell: pwsh
         run: |
           & dist/LexiDesk/LexiDesk.exe --self-test
@@ -126,7 +93,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force release | Out-Null
           Compress-Archive -Path dist/LexiDesk/* `
-            -DestinationPath release/LexiDesk-Windows-x64-portable.zip
+            -DestinationPath release/LexiDesk-Lite-Windows-x64-portable.zip
       - name: Build Windows installer
         shell: pwsh
         run: |

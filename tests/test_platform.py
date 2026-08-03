@@ -142,6 +142,22 @@ def test_bundle_excludes_training_only_translation_dependencies() -> None:
         assert f'"{dependency}"' in spec
 
 
+def test_lite_release_does_not_bundle_language_data() -> None:
+    root = Path(__file__).parents[1]
+    spec = (root / "packaging" / "pyinstaller" / "lexidesk.spec").read_text(
+        encoding="utf-8"
+    )
+    workflow = (root / ".github" / "workflows" / "release.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "bundle-data" not in spec
+    assert "language-data:" not in workflow
+    assert "download-artifact" not in workflow or "name: language-data" not in workflow
+    assert "LexiDesk-Lite-Linux-x86_64.AppImage" in workflow
+    assert "LexiDesk-Lite-Windows-x64-portable.zip" in workflow
+
+
 def test_desktop_widget_flags_are_interactive_and_stay_below() -> None:
     flags = widget_window_flags("desktop")
 

@@ -43,6 +43,7 @@ from .diagnostics_dialog import DiagnosticsDialog
 from .dialogs import AddWordDialog, DeckSelectionDialog, SettingsDialog
 from .enrichment import needs_example_enrichment
 from .insights import AnalyticsDialog
+from .language_dialog import LanguagePackagesDialog
 from .library import LibraryDialog
 from .models import Word
 from .service_client import request_service, schedule_example_enrichment
@@ -182,6 +183,8 @@ class LexiDeskWindow(QMainWindow):
         library_action.triggered.connect(self.open_library)
         batch_action = card_menu.addAction("Batch add from text")
         batch_action.triggered.connect(self.batch_add)
+        languages_action = card_menu.addAction("Offline languages")
+        languages_action.triggered.connect(self.manage_languages)
         analytics_action = card_menu.addAction("Learning analytics")
         analytics_action.triggered.connect(self.open_analytics)
         card_menu.addSeparator()
@@ -236,6 +239,11 @@ class LexiDeskWindow(QMainWindow):
         self.translation_label.setWordWrap(True)
         self.translation_label.setMinimumHeight(30)
         self.translation_label.setMaximumHeight(58)
+
+        self.language_setup_button = QPushButton("Install offline languages")
+        self.language_setup_button.setObjectName("primary")
+        self.language_setup_button.clicked.connect(self.manage_languages)
+        self.language_setup_button.hide()
 
         self.reveal_button = QPushButton("Reveal translation")
         self.reveal_button.setShortcut("Space")
@@ -307,6 +315,9 @@ class LexiDeskWindow(QMainWindow):
         card_layout.addStretch()
         card_layout.addWidget(self.word_label)
         card_layout.addWidget(self.translation_label)
+        card_layout.addWidget(
+            self.language_setup_button, 0, Qt.AlignmentFlag.AlignCenter
+        )
         card_layout.addWidget(self.quiz_instruction)
         card_layout.addWidget(self.reveal_button, 0, Qt.AlignmentFlag.AlignCenter)
         card_layout.addLayout(answer_row)
@@ -398,10 +409,17 @@ class LexiDeskWindow(QMainWindow):
         self._current_quiz = None
         self._quiz_answered = False
         self._clear_choices()
+        self.language_setup_button.hide()
         if word is None:
             self.direction_label.setText("EMPTY  ▾")
             self.word_label.setText("Your vocabulary is empty")
-            self.translation_label.setText("Add your first word with the + button")
+            if self._has_installed_languages():
+                self.translation_label.setText("Add your first word with the + button")
+            else:
+                self.translation_label.setText(
+                    "Choose languages once, then translate fully offline"
+                )
+                self.language_setup_button.show()
             self.translation_label.show()
             self.reveal_button.hide()
             self.alternatives_label.clear()
@@ -730,6 +748,44 @@ class LexiDeskWindow(QMainWindow):
         )
         dialog.setStyleSheet(self.styleSheet())
         dialog.exec()
+        self.current_word = None
+        self.next_card()
+
+    def _has_installed_languages(self) -> bool:
+        method = getattr(self.translator, "installed_languages", None)
+        if method is None:
+            return True
+        try:
+            return len(method()) >= 2
+        except (OSError, RuntimeError):
+            return False
+
+    def offer_language_setup(self) -> None:
+        """Show the lightweight first-run choice without trapping offline users."""
+        if self._has_installed_languages():
+            return
+        message = QMessageBox(self)
+        message.setWindowTitle("Welcome to LexiDesk Lite")
+        message.setIcon(QMessageBox.Icon.Information)
+        message.setText("Install the languages you want to study")
+        message.setInformativeText(
+            "LexiDesk Lite contains no language packs. Download a language once; "
+            "it will then work offline and remain installed after app updates."
+        )
+        install = message.addButton(
+            "Choose languages", QMessageBox.ButtonRole.AcceptRole
+        )
+        message.addButton("Later", QMessageBox.ButtonRole.RejectRole)
+        message.exec()
+        if message.clickedButton() is install:
+            self.manage_languages()
+
+    def manage_languages(self) -> None:
+        dialog = LanguagePackagesDialog(self)
+        dialog.setStyleSheet(self.styleSheet())
+        dialog.page.languages_changed.connect(self.translator.reload_models)
+        dialog.exec()
+        self.translator.reload_models()
         self.current_word = None
         self.next_card()
 

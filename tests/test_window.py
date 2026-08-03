@@ -132,6 +132,26 @@ def test_card_actions_stay_visible_without_hover(tmp_path: Path) -> None:
     repository.close()
 
 
+def test_empty_lite_profile_offers_language_installation(tmp_path: Path) -> None:
+    class EmptyTranslator:
+        def installed_languages(self) -> tuple[str, ...]:
+            return ()
+
+    _application()
+    repository = WordRepository(tmp_path / "empty.db")
+    window = LexiDeskWindow(
+        repository,
+        SettingsStore(tmp_path / "settings.json"),
+        EmptyTranslator(),  # type: ignore[arg-type]
+    )
+    window.tick_timer.stop()
+    window._render_card()
+
+    assert not window.language_setup_button.isHidden()
+    assert "offline" in window.translation_label.text().casefold()
+    repository.close()
+
+
 def test_widget_placement_can_switch_without_restarting(tmp_path: Path) -> None:
     window, repository = _window(tmp_path)
     window.settings.window_mode = "floating"
